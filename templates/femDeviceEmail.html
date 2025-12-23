@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>FEMS</title>
+</head>
+<body bgcolor="#e6e6e6" style="margin: 0px;font-family: 'arial'">
+<table width="100%" border="0" cellspacing="0" cellpadding="0" >
+  <tbody>
+    <tr>
+      <td><table width="650"  cellpadding="0" cellspacing="0" bgcolor="#fff">
+          <tbody>
+            <tr>
+              <td><table align="center" cellspacing="0" cellpadding="0" width="100%">
+                  <tbody>
+                    <tr>
+                      <td style="border-bottom: 1px solid #f5f5f5;padding: 10px"><img src="http://aviconn.in/wp-content/uploads/2020/06/download.jpg" alt="Aviconn Solution" width="80"></td>
+                    </tr>
+                    <tr>
+                      <td height="15"></td>
+                    </tr>
+                  </tbody>
+                </table></td>
+            </tr>
+            <tr>
+              <td align="center" valign="top" bgcolor="#ffffff"><table width="650" border="0" cellspacing="0" cellpadding="0" style="padding: 0px 10px">
+                  <tbody>
+                    <tr>
+                      <p>Dear <b>Customer</b></p>
+                        <p>Below are the List of Devices.Please plan needful action Accordingly</p>
+                    </tr>
+                  </tbody>
+                </table></td>
+            </tr>
+            <tr>
+              <td align="center" valign="top" bgcolor="#ffffff">&nbsp;</td>
+            </tr>
+         <tr>
+              <td align="center" valign="top" bgcolor="#ffffff" style="padding:  0px 10px">
+                  <table width="100%" cellpadding="5px" border="1" face="Helvetica Neue Regular, Helvetica, Arial" style="border-collapse:collapse; font-family:arial;">
+                      <tbody>
+                          <tr><td colspan="7" align="center"; style="background-color:gray; font-weight:bold; color:white; font-size:13px;">Devices List</td></tr>
+                          <tr>
+                              <td style="background-color:orange; font-weight:bold; font-size:16px;">Device Type</td>
+                               <td style="background-color:orange; font-weight:bold;font-size:16px;">Asset No.</td>
+                              <td style="background-color:orange; font-weight:bold;font-size:16px;">Model No.</td>
+                              <td style="background-color:orange; font-weight:bold;font-size:16px;">Location</td>
+                              <td style="background-color:orange; font-weight:bold;font-size:16px;">Warranty Till Date</td>
+                              <td style="background-color:orange; font-weight:bold;font-size:16px;">Last Service Date</td>
+                              <td style="background-color:orange; font-weight:bold;font-size:16px;">Next Service Date</td>
+                          </tr>
+                          {% for device in allDevicesData%}
+                          <tr>
+                              <td style="background-color:#eee; font-weight:bold; font-size:13px;">{{device.deviceType}}</td>
+                              <td style="font-size:13px;">{{device.assetNo}}</td>
+                              <td style="font-size:13px;">{{device.modelNo}}</td>
+                              <td style="font-size:13px;">{{device.loaction}}</td>
+                               <td style="font-size:13px;">{{device.Warrenty_till}}</td>
+                              <td style="font-size:13px;">{{device.last_service}}</td>
+                              <td style="font-size:13px;">{{device.next_service}}</td>
+                          </tr>
+                            {%endfor%}
+                      </tbody>
+                  </table>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<br>
+<p>Looking forward to your co-operation in helping us serve you better.</p>
+<br>
+Sincerely,
+<br>
+Smart Energy Management (SEM) Team
+<br>
+Aviconn Solution Pvt Ltd
+<br><br>
+<p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+</body>
+</html>

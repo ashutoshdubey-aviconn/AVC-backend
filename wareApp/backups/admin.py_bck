@@ -1,0 +1,103 @@
+
+from django.contrib import admin
+from django.contrib.admin import ModelAdmin
+from .models import *
+
+class HourlyReadingFields(admin.ModelAdmin):
+
+    list_display = ['associated_Site', 'aisle_group', 'unit_consumption', 'reading_from', 'reading_to']
+
+    class Meta:
+        model = HourlySiteReading
+
+
+class SupplyTimeShareFields(admin.ModelAdmin):
+
+    list_display = ['site', 'power_source', 'hourly_run_time', 'reading_from', 'reading_to']
+
+    class Meta:
+        model = SupplyLoadTimeShare
+
+
+class siteLoadPower(admin.ModelAdmin):
+    list_display = ['Associated_Site', 'Supply_Source', 'Status']
+    readonly_fields = ('Supply_Source', 'Meter_Number')
+
+    class Meta:
+        model = SiteLoadPower
+
+class monthlyLoadSharePercentage(admin.ModelAdmin):
+    list_display = ['site', 'power_source', 'for_month', 'monthly_time_based_percentage', 'monthly_energy_based_percentage']
+
+    class Meta:
+        model = MonthlyLoadSharePercentage
+
+
+class DailyReadingFields(admin.ModelAdmin):
+    list_display = ['associated_Site', 'aisle_group', 'leg_id', 'unit_consumption', 'reading_for']
+
+    class Meta:
+        model = DailySiteReading
+
+
+class SiteBaselineFields(admin.ModelAdmin):
+    list_display = ["associated_site_id","aisle_group","leg_id","baseline_value","baseline_from","baseline_to"]
+
+    class Meta:
+        model = SiteBaseline
+
+
+class AisleGroupFields(admin.ModelAdmin):
+    list_display = ["site", "aisleGroupName", "attached_leg_id"]
+
+    class Meta:
+        model = AisleGroup
+
+
+class SiteFields(admin.ModelAdmin):
+    list_display = ["id", "customer","site_name", "site_type", "location"]
+
+    class Meta:
+        model = Site
+
+
+class FloorFields(admin.ModelAdmin):
+    list_display = ["id", "site", "floor"]
+
+    class Meta:
+        model = Floor
+
+class EmailHistoryAdmin(admin.ModelAdmin):
+    list_display = ["deviceName","fire_site", "email_for"]
+    class Meta:
+        model = Email_History
+
+admin.site.register(User)
+admin.site.register(CustomerInfo)
+admin.site.register(Site, SiteFields)
+admin.site.register(Image)
+admin.site.register(BlockInfo)
+admin.site.register(AisleInfo)
+admin.site.register(HourlySiteReading, HourlyReadingFields)
+admin.site.register(AlarmNotifications)
+admin.site.register(SiteBaseline, SiteBaselineFields)
+admin.site.register(SupplyLoadTimeShare, SupplyTimeShareFields)
+admin.site.register(SiteLoadPower, siteLoadPower)
+admin.site.register(AisleGroup, AisleGroupFields)
+admin.site.register(Panel)
+admin.site.register(Floor, FloorFields)
+admin.site.register(MeterSource)
+admin.site.register(DailySiteReading, DailyReadingFields)
+admin.site.register(HomeGatewayId)
+admin.site.register(MonthlyLoadSharePercentage, monthlyLoadSharePercentage)
+admin.site.register(FirePumpAlarm)
+admin.site.register(Email_History,EmailHistoryAdmin)
+admin.site.register(FireEquipmentsSystem)
+admin.site.register(FireEquipmentsSystemType)
+admin.site.register(FansData)
+admin.site.register(LightsData)
+admin.site.register(RawLoadData)
+admin.site.register(HourlyLoadData)
+admin.site.register(DailyLoadData)
+admin.site.register(PowerFactorData)
+admin.site.register(MonthlyMinMaxLoadData)
