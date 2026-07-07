@@ -1,6 +1,5 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
 
 from wareApp.models import Site
 from wareApp.recovery.processor import process_http_recovery
@@ -13,42 +12,59 @@ class RecoveryUploadAPIView(APIView):
 
     def post(self, request):
 
-        gateway_id = request.data.get("gateway_id")
-        location_id = request.data.get("location_id")
-        msg_type = request.data.get("msg_type")
-        msg_subtype = request.data.get("msg_subtype")
-        message = request.data.get("message")
+        print("=" * 80)
+        print("HTTP RECOVERY REQUEST")
+        print(request.data)
+        print("=" * 80)
 
-        if not gateway_id:
-            return Response(
-                {
-                    "status": False,
-                    "message": "gateway_id missing"
-                },
-                status=400
-            )
+        topic = request.data.get("topic")
+        payload = request.data.get("payload")
+
+        if not topic:
+            return Response({"status": False, "message": "topic missing"}, status=400)
+
+        if not payload:
+            return Response({"status": False, "message": "payload missing"}, status=400)
+
+        try:
+
+            head = topic.split("/")
+
+            # Example:
+            # /Acclivate/iOmniControl/179/avc_test_gateway/in/recovery/hourlyConsumption
+
+            location_id = int(head[3])
+
+            gateway_id = head[4]
+
+            msg_type = head[6]
+
+            msg_subtype = head[7]
+
+            print("Location :", location_id)
+            print("Gateway  :", gateway_id)
+            print("Type     :", msg_type)
+            print("Subtype  :", msg_subtype)
+
+        except Exception as e:
+
+            return Response({"status": False, "message": str(e)}, status=400)
 
         try:
 
             site = Site.objects.get(id=location_id)
 
-        except Exception:
+        except Site.DoesNotExist:
 
-            return Response(
-                {
-                    "status": False,
-                    "message": "Invalid Site"
-                },
-                status=404
-            )
+            return Response({"status": False, "message": "Invalid Site"}, status=404)
 
         result = process_http_recovery(
-            site,
-            gateway_id,
-            location_id,
-            msg_type,
-            msg_subtype,
-            message
+            site=site,
+            gateway_id=gateway_id,
+            location_id=location_id,
+            msg_type=msg_type,
+            msg_subtype=msg_subtype,
+            message=payload,
         )
 
         return Response(result)
