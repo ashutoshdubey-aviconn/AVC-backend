@@ -1,0 +1,46 @@
+# Virtual Environment
+virtualwarehouse/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Django
+db.sqlite3
+*.sqlite3
+
+# Logs
+logges/
+logs/
+*.log
+
+# Static / Media
+static/
+media/
+
+# Environment
+.env
+.env.*
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/

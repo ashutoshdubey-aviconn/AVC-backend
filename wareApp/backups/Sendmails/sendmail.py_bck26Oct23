@@ -1,0 +1,678 @@
+import random
+from warehouse import settings
+from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
+from django.utils import timezone
+from wareApp.models import OTP, User, Site
+from datetime import datetime
+from django.template.loader import render_to_string
+from django.core.mail import send_mail
+import os
+
+
+def line(size, li=range(10)):
+    return ''.join(map(str, ([random.choice(li) for _ in range(size)])))
+
+
+def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
+    from_mail = settings.EMAIL_HOST_USER
+    email_to_send = ["mandeep", "manish"]
+    site = Site.objects.get(id=site_id)
+    site_name = site.site_name
+    location = site.location
+
+    if options == 1:
+        current_time = timezone.now().strftime("%b %d,%Y %H:%M:%S")
+        html_message = """
+                    <html>
+                    <head>
+                    Dear Aviconn Team,
+                    <br>
+                    <p>Aviconn System would like to inform you about the following alarm detected at your site.</p>
+                    <br>
+                    Site-Name : {}<br>
+                    Location  : {}<br>
+                    Alarm     : System By-Pass(Either Fire Alarm activated at site OR Manual By-Pass) <br>
+                    Aisle Names : {} <br>
+                    Detected Date/Time :{}<br><br>
+
+                    Could you please check at your end and take corrective measure.
+
+                    In case it is a false fire alarm OR by mistake manually by-pass, we request you to bring the system back to energy-saving mode to avoid wastage of energy.
+
+                    <br><br>
+                    <p>Looking forward to your co-operation in helping us serve you better.</p>
+                    <br><br>
+                    Sincerely,
+                    <br>
+                    Smart Energy Management (SEM) Team
+                    <br>
+                    Aviconn Solution Pvt Ltd
+                    <br><br>
+                    <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+                    <br><br>
+                    <center>********</center>
+
+                    </head>
+                    </html>
+                    """.format(site_name, location, " , ".join(aisle_id), current_time)
+
+        subject_mail = "Notification for {},{} : Alarm for system By-Pass".format(site_name, location)
+        msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['mandeep.kahlon@aviconn.in', 'rnd@aviconn.in'])
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
+        print("send mail only to avc admins")
+        return True
+
+    else:
+        # customer_email = site.customer.email
+        # email_to_send.append(customer_email)
+        current_time = timezone.now().strftime("%b %d,%Y %H:%M:%S")
+        html_message = """
+            <html>
+            <head>
+            Dear Customer,
+            <br>
+            <p>Aviconn System would like to inform you about the following alarm detected at your site.</p>
+            <br>
+            Site-Name : {}<br>
+            Location  : {}<br>
+            Alarm     : System By-Pass(Either Fire Alarm activated at site OR Manual By-Pass) <br>
+            Detected Date/Time :{}<br><br>
+
+            Could you please check at your end and take corrective measure.
+
+            In case it is a false fire alarm OR by mistake manually by-pass, we request you to bring the system back to energy-saving mode to avoid wastage of energy.
+
+            <br><br>
+            <p>Looking forward to your co-operation in helping us serve you better.</p>
+            <br><br>
+            Sincerely,
+            <br>
+            Smart Energy Management (SEM) Team
+            <br>
+            Aviconn Solution Pvt Ltd
+            <br><br>
+            <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+            <br><br>
+            <center>********</center>
+
+            </head>
+            </html>
+            """.format(site_name, location, current_time)
+
+        subject_mail = "Aviconn Notification for {},{} : Alarm for system By-Pass".format(site_name, location)
+        msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['nidhish.shahi@myntra.Com'],
+                                     cc=['mandeep.kahlon@aviconn.in'],
+                                     bcc=['manish@aviconn.in', 'rnd@aviconn.in'])
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
+        return True
+
+
+def send_mail_fire_alarm_aviconn_user(alarm_type):
+    from_mail = settings.EMAIL_HOST_USER
+    date = timezone.now().strftime("%b %d,%Y")
+    html_message = """
+            <html>
+            <head>
+            Dear Customer
+            <br><br>
+            Your system is working on {} mode at {}.
+            <br><br>
+            Sincerely,
+            <br><br>
+            Aviconn Solution Pvt Ltd
+            </head>
+            </html>
+            """.format(alarm_type, date)
+
+    subject_mail = "Fire Alarm Generated"
+    print(subject_mail)
+    msg = EmailMultiAlternatives(subject_mail, "", from_mail, ["komal.bhati@aviconn.in", "mandeep.kahlon@aviconn.in"])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    print("send mail both customer anc avc admins")
+    return True
+
+
+def send_mail_fire_equipments_system_8days_before(devices, userEmail):
+    print("#####################")
+    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
+    print("html path : ", htmlPath)
+    html_message = render_to_string("{}/femDeviceEmail.html".format(htmlPath), {"allDevicesData": devices})
+    print(html_message)
+    from_mail = settings.EMAIL_HOST_USER
+    send_mail(
+        'FEMS Device next service date information alert Before 8 Days',
+        '',
+        from_mail,
+        ["nidhish.shahi@myntra.Com", "Jatender.talwandi@myntra.Com", "Mahesh.kumar11@myntra.Com",
+         "Rewexecutivebinola@myntra.Com", "Binolasecurity@myntra.Com", "mandeep.kahlon@aviconn.in"],
+        html_message=html_message,
+    )
+    return True
+
+
+def send_mail_fire_equipments_system_after4days(devices, userEmail):
+    print("#####################")
+    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
+    print("html path : ", htmlPath)
+    html_message = render_to_string("{}/femDeviceEmail.html".format(htmlPath), {"allDevicesData": devices})
+    print(html_message)
+    from_mail = settings.EMAIL_HOST_USER
+    send_mail(
+        'FEMS device service due information alert After 4 days',
+        '',
+        from_mail,
+        ["nidhish.shahi@myntra.Com", "Jatender.talwandi@myntra.Com", "Mahesh.kumar11@myntra.Com",
+         "Rewexecutivebinola@myntra.Com", "Binolasecurity@myntra.Com", "mandeep.kahlon@aviconn.in"],
+        html_message=html_message,
+    )
+    return True
+
+
+def send_mail_fire_equipments_system_45days_before(devices, userEmail):
+    print("#####################")
+    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
+    print("html path : ", htmlPath)
+    html_message = render_to_string("{}/femDeviceEmail.html".format(htmlPath), {"allDevicesData": devices})
+    print(html_message)
+    from_mail = settings.EMAIL_HOST_USER
+    send_mail(
+        'Before 45 Days device Warranty expired information alert.',
+        '',
+        from_mail,
+        ["nidhish.shahi@myntra.Com", "Jatender.talwandi@myntra.Com", "Mahesh.kumar11@myntra.Com",
+         "Rewexecutivebinola@myntra.Com", "Binolasecurity@myntra.Com", "mandeep.kahlon@aviconn.in"],
+        html_message=html_message,
+    )
+    return True
+
+
+def send_mail_fire_equipments_system_30days_before(devices, userEmail):
+    print("#####################")
+    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
+    print("html path : ", htmlPath)
+    html_message = render_to_string("{}/femDeviceEmail.html".format(htmlPath), {"allDevicesData": devices})
+    print(html_message)
+    from_mail = settings.EMAIL_HOST_USER
+    send_mail(
+        'Before 30 Days device Warranty expired information alert.',
+        '',
+        from_mail,
+        ["nidhish.shahi@myntra.Com", "Jatender.talwandi@myntra.Com", "Mahesh.kumar11@myntra.Com",
+         "Rewexecutivebinola@myntra.Com", "Binolasecurity@myntra.Com", "mandeep.kahlon@aviconn.in"],
+        html_message=html_message,
+    )
+    return True
+
+
+def send_mail_fire_alarm_user(email, alarm_type, device_type, motor_status=0):
+    from_mail = settings.EMAIL_HOST_USER
+
+    if motor_status == 1:
+        motor_mode = "Yes"
+        current_status = "On"
+        previous_status = "Off"
+    else:
+        motor_mode = "No"
+        current_status = "Off"
+        previous_status = "Off"
+
+    if alarm_type == "Manual-Mode to Auto-Mode":
+        subject = "Manual is on"
+        current_mode = "Auto"
+        previous_mode = "Manual"
+        alarm_mode = "Yes"
+    elif alarm_type == "Auto-Mode to Manual-Mode":
+        subject = "Auto is on"
+        current_mode = "Manual"
+        previous_mode = "Auto"
+        alarm_mode = "Yes"
+    elif alarm_type == "Auto-Mode to Off-Mode":
+        subject = "Auto to Off"
+        current_mode = "Off"
+        previous_mode = "Auto"
+        alarm_mode = "Yes"
+    elif alarm_type == "Manual-Mode to Off-Mode":
+        subject = "Manual to Off"
+        current_mode = "Off"
+        previous_mode = "Manual"
+        alarm_mode = "Yes"
+    elif alarm_type == "Off-Mode to Manual-Mode":
+        subject = "Off to Manual"
+        current_mode = "Manual"
+        previous_mode = "Off"
+        alarm_mode = "Yes"
+    elif alarm_type == "Off-Mode to Auto-Mode":
+        subject = "Off to Auto"
+        current_mode = "Auto"
+        previous_mode = "Off"
+        alarm_mode = "Yes"
+    elif alarm_type == "Motor-On in Auto-Mode":
+        current_mode = "Auto"
+        previous_mode = "Manual"
+        alarm_mode = "No"
+    elif alarm_type == "Motor-On in Manual-Mode":
+        current_mode = "Manual"
+        previous_mode = "Auto"
+        alarm_mode = "No"
+    else:
+        current_mode = "-"
+        previous_mode = "-"
+        alarm_mode = "-"
+    current_time = timezone.now().strftime("%b %d,%Y %H:%M:%S")
+    html_message = """
+    <html>
+    <head>
+
+    Dear Customer,
+    <br><br>
+    <p>This is to notify you that below are the changes detected in your {}.</p>
+    <br>
+    <b>Fire-System Mode Change Notification:</b><br>
+        Mode Changed: {}<br>
+        Current Mode: {}<br>
+        Previous Mode: {}<br>
+        Current Status Detected Date/Time: {}<br><br>
+
+    <b>Notification for Fire-System Motor:</b><br>
+       Motor Status Changed: {}<br>
+       Current Status: {}<br>
+       Previous Status: {}<br>
+       Current Status Detected Date/Time: {}<br><br>
+
+    You can also check your current system status on your Smart dashboard <a href="https://asem1.aviconn.in/login">here</a> . If you face any problem, then please contact with aviconn team.
+    <br><br>
+    <p>Looking forward to your co-operation in helping us serve you better.</p>
+    <br><br>
+    Sincerely,
+    <br>
+    Smart Energy Management (SEM) Team
+    <br>
+    Aviconn Solution Pvt Ltd
+    <br><br>
+    <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+    <br><br>
+    <center>********</center>
+
+    </head>
+    </html>
+    """.format(device_type, alarm_mode, current_mode, previous_mode, current_time, motor_mode, current_status,
+               previous_status, current_time)
+
+    subject_mail = "Aviconn IOT System Notification - Change in Status"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail,
+                                 ["nidhish.shahi@myntra.Com", "Jatender.talwandi@myntra.Com",
+                                  "Mahesh.kumar11@myntra.Com", "Rewexecutivebinola@myntra.Com",
+                                  "Binolasecurity@myntra.Com"],
+                                 ['komal.bhati@aviconn.in', 'mandeep.kahlon@aviconn.in', 'manish@aviconn.in'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def send_mail_fire_alarm_aviconn_user(alarm_type):
+    from_mail = settings.EMAIL_HOST_USER
+    date = timezone.now().strftime("%b %d,%Y")
+    html_message = """
+    <html>
+    <head>
+    Dear Customer
+    <br><br>
+    Your system is working on {} mode at {}.
+    <br><br>
+    Sincerely,
+    <br><br>
+    Aviconn Solution Pvt Ltd
+    </head>
+    </html>
+    """.format(alarm_type, date)
+
+    subject_mail = "Fire Alarm Generated"
+    print(subject_mail)
+    msg = EmailMultiAlternatives(subject_mail, "", from_mail, ["komal.bhati@aviconn.in", "mandeep.kahlon@aviconn.in"])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def send_mail_for_motor_aviconn_user(motor):
+    from_mail = settings.EMAIL_HOST_USER
+    date = timezone.now().strftime("%b %d,%Y")
+    html_message = """
+    <html>
+    <head>
+
+    Dear Customer
+    <br><br>
+    Your Motor is turned {} at {}.
+    <br><br>
+    Sincerely,
+    <br><br>
+    Aviconn Solution Pvt Ltd
+    </head>
+    </html>
+    """.format(motor, date)
+
+    subject_mail = "Motor Status"
+    print(subject_mail)
+    msg = EmailMultiAlternatives(subject_mail, "", from_mail, ["komal.bhati@aviconn.in", "mandeep.kahlon@aviconn.in"])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def emailcheck(id, username, email):
+    from_mail = settings.EMAIL_HOST_USER
+    email_to_send = email
+    userId = User.objects.get(username=username).id
+    otp = line(5)
+    print(otp)
+    OTP.objects.create(otp=otp, user_id=userId)
+    date = timezone.now().strftime("%b %d,%Y")
+    email = ""
+
+    html_message = """
+    <html>
+    <head>
+
+    Dear Customer  &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;  {}
+    <br><br>
+    Thank you for using Aviconn Smart Energy Management (SEM)<a href="http://asem1.aviconn.in/login">here</a>.<br><br>
+    One Time Password (OTP) for the process to Reset Password is <b>{}</b>.
+    <br><br>
+    Do not share your password with anyone.
+    <br><br>
+    <p style="color:red;"> Looking forward to more opportunities to be of service to you.</p>
+    <br>
+    <br>
+    Sincerely,
+    <br><br>
+    Aviconn Solution Pvt Ltd
+    </head>
+    </html>
+
+    """.format(date, otp)
+
+    print("last step remaining")
+    subject_mail = "Password Change Request for Your Smart Meter Account"
+    print(subject_mail)
+    msg = EmailMultiAlternatives(subject_mail, email, from_mail, [email_to_send])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    print("send mail successfull")
+    return otp
+
+
+def send_mail_fire_equipments_system(device):
+    from_mail = settings.EMAIL_HOST_USER
+    html_message = """
+       <html>
+       <head>
+
+       Dear Customer,
+       <br><br>
+       <p>Device list{}.</p>
+       <p>Looking forward to your co-operation in helping us serve you better.</p>
+       <br><br>
+       Sincerely,
+       <br>
+       Smart Energy Management (SEM) Team
+       <br>
+       Aviconn Solution Pvt Ltd
+       <br><br>
+       <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+       <br><br>
+       <center>********</center>
+
+       </head>
+       </html>
+       """.format(device)
+
+    subject_mail = "fireequipemntSystem"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['komalbhati8527@gmai.com'],
+                                 ['komal.bhati@aviconn.in'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def send_mail_for_pf_fluctuation(data):
+    site = Site.objects.get(id=data['site_id'])
+    print(data)
+
+def send_alarm_for_high_voltage(data):
+    site = Site.objects.get(id=data['site_id'])
+    site_name = site.site_name
+    print(data)
+    r_max_volt = data['r_volt_threshold']
+    y_max_volt = data['y_volt_threshold']
+    b_max_volt = data['b_volt_threshold']
+    from_mail = settings.EMAIL_HOST_USER
+
+    # Define CSS classes for the color change
+    r_phase_color_class = 'color:red;' if int(data['r_volts']) > int(r_max_volt) else 'color:green;'
+    y_phase_color_class = 'color:red;' if int(data['y_volts']) > int(y_max_volt) else 'color:green;'
+    b_phase_color_class = 'color:red;' if int(data['b_volts']) > int(b_max_volt) else 'color:green;'
+
+    html_message = f"""
+        <html>
+        <head>
+        Dear Customer,
+        <br><br>
+        <p>We would like to bring to your attention that Our monitoring system has detected a high voltage alarm at your premises</p>
+        <p>Details of the alarm:</p>
+
+        <p><strong>Site Name: </strong>{site_name}.</p>
+        <p><strong>Alarm Name: </strong>High Voltage Alarm</p>
+
+        <p style="{r_phase_color_class}">R-Phase: {data['r_volts']}.</p>
+        <p style="{y_phase_color_class}">Y-Phase: {data['y_volts']}.</p>
+        <p style="{b_phase_color_class}">B-Phase: {data['b_volts']}.</p>
+        <p>Thank you for your attention to this matter. Please feel free to contact us.</p>
+
+        <p>Looking forward to your co-operation in helping us serve you better.</p>
+        <br><br>
+        Sincerely,
+        <br>
+        Smart Energy Management (SEM) Team
+        <br>
+        Aviconn Solution Pvt Ltd
+        <br><br>
+        <p style="color:red;">** This is a system-generated mail. Please do not reply to this e-mail ID. **</p>
+        <br><br>
+        <center>********</center>
+
+        </head>
+        </html>
+    """
+
+    subject_mail = "High Voltage Alarm Testing"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['komalbhati8527@gmail.com'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+"""def send_alarm_for_high_voltage(data):
+    site = Site.objects.get(id=data['site_id'])
+    print(data)
+    from_mail = settings.EMAIL_HOST_USER
+    html_message = f''' <!DOCTYPE html>
+    <html>
+    <head>
+        <title>High Voltage Alarm</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                background-color: #f0f0f0;
+                color: #333;
+            }}
+            .header {{
+                background-color: #fff;
+                color: #333;
+                padding: 10px 0;
+                text-align: center;
+            }}
+            h1 {{
+                color: #ff6600;
+            }}
+            .alert-color{{
+                color: #ff6600;
+            }}
+            .container {{
+                background-color: #fff;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 20px;
+                margin: 20px;
+            }}
+            .company-logo {{
+                max-width: 100px;
+                display: block;
+                margin: 0 auto 10px;
+            }}
+            small{{
+                color:#333
+            }}
+        </style>
+    </head>
+    <body>
+
+        <div class="header">
+            <img class="company-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPfXCmcxjjrtoMcDqmJp2Smioacg6H5NUasXP8MCAQDAUzqfqcHqmwGayPJSR1FZikCus&usqp=CAU" alt="Aviconn Solutions Logo">
+            <p>Aviconn Solutions Pvt. Ltd.</p>
+        </div>
+        <div class="container">
+            <h1>Fuel Level Alarm</h1>
+
+            <p>Dear Customer,</p>
+
+            <p>We would like to bring to your attention that the fuel level within our system' has fallen below the predetermined threshold. This has resulted in the activation of an alarm due to the elevated fuel level.</p>
+
+            <p>Details of the alarm:</p>
+
+            <ul>
+                <li><strong>Site: </strong>{data['site_id']} *</li>
+                <li><strong>Alarm Name: </strong>DG  <Alarm></Alarm></li>
+                <li><strong>R-Phase Voltage </strong><span id ="r-value">{data['r_volts']} Volts</span></li>
+                <li><strong>y-Phase Voltage </strong><span id ="y-value">{data['y_volts']} Volts</span> </li>
+                <li><strong>B-Phase Voltage </strong><span id ="b-value">{data['b_volts']} Volts</span></li>
+                <li><strong>Alarm Threshold: </strong> 30%* below the tank Capacity</li>
+            </ul>
+
+            <p style="color: #ff6600;">Immediate action may be required to address this situation and avoid potential issues. </p>
+
+            <p>Thank you for your attention to this matter. Please feel free to contact us at given contact details to you.</p>
+
+            <p>Best regards,<br>Customer Support Team<br>Aviconn Solutions Pvt. Ltd.</p>
+        </div>
+        <small>This is system generated e-mail. Please do not reply</small>
+        <script>
+            let r_phase_volt = {data['r_volts']}
+            let y_phase_volt = {data['y_volts']}
+            let b_phase_volt = {data['b_volts']}
+            let threshhold_r = {data['r_volt_threshold']}
+            let threshhold_y = {data['y_volt_threshold']}
+            let threshhold_b = {data['b_volt_threshold']}
+
+            if(r_phase_volt > threshhold_r)
+            {{
+                ele = document.getElementById('r-value');
+                console.log(ele)
+                ele.classList.add('alert-color')
+            }}
+            if(y_phase_volt > threshhold_y)
+            {{
+                ele = document.getElementById('y-value');
+                ele.classList.add('alert-color')
+            }}
+            if(b_phase_volt > threshhold_b)
+            {{
+                ele = document.getElementById('b-value');
+                ele.classList.add('alert-color')
+            }}
+        </script>
+    </body>
+    </html>'''
+    subject_mail = "High Volatge"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['komalbhati8527@gmail.com'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True"""
+
+
+
+def send_alarm_for_low_voltage(data):
+    site = Site.objects.get(id=data['site_id'])
+    print(data)
+    from_mail = settings.EMAIL_HOST_USER
+    html_message = """
+           <html>
+           <head>
+           Dear Customer,
+           <br><br>
+           <p>Site Name{}.</p>
+           <p>R-Phase{}.</p>
+           <p>Y-Phase{}.</p>
+           <p>B-Phase{}.</p>
+           <p>Looking forward to your co-operation in helping us serve you better.</p>
+           <br><br>
+           Sincerely,
+           <br>
+           Smart Energy Management (SEM) Team
+           <br>
+           Aviconn Solution Pvt Ltd
+           <br><br>
+           <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+           <br><br>
+           <center>********</center>
+
+           </head>
+           </html>
+           """.format(data['site_id'], data['r_volts'], data['y_volts'], data['b_volts'])
+
+    subject_mail = "Low Volatge"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['komalbhati8527@gmail.com'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def send_mail_for_dg_fuel_under_level(data):
+    site = Site.objects.get(id=data['site_id'])
+    from_mail = settings.EMAIL_HOST_USER
+    html_message = """
+           <html>
+           <head>
+
+           Dear Customer,
+           <br><br>
+           <p>Site Name{}.</p>
+           <p>Fuel Level{}.</p>
+           <p>Vehicle Number{}.</p>
+           <p>Looking forward to your co-operation in helping us serve you better.</p>
+           <br><br>
+           Sincerely,
+           <br>
+           Smart Energy Management (SEM) Team
+           <br>
+           Aviconn Solution Pvt Ltd
+           <br><br>
+           <p style="color:red;">** This is a system generated mail. Please do not reply to this e-mail ID. **</p>
+           <br><br>
+           <center>********</center>
+
+           </head>
+           </html>
+           """.format(data['site_id'],data['fuel_level'],data['vehicle_number'])
+
+    subject_mail = "DG_Fuel_Level"
+    msg = EmailMultiAlternatives(subject_mail, '', from_mail, ['komalbhati8527@gmail.com'])
+    msg.attach_alternative(html_message, "text/html")
+    msg.send()
+    return True
+
+
+def send_alarm_for_dg_overtime(data):
+    site = Site.objects.get(id=data['site_id'])
