@@ -1,0 +1,7 @@
+{
+    "gateway_id":"avc_dhlABFLR_bilaspur_000124_1",
+    "location_id":124,
+    "msg_type":"recovery",
+    "msg_subtype":"hourlyConsumption",
+    "message":"Aisle_group_id : 720; Recovery_Hours : 2026-07-04 17:00:00.000000,2026-07-04 18:00:00.000000,; Unit_consumptions : 0.01375,0.013875,; GW_total_cumulative : 330.52675"
+}

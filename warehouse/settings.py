@@ -96,17 +96,17 @@ SETTINGS_PATH = os.path.normpath(os.path.dirname(__file__))
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 DATABASE_ROUTERS = ["wareApp.routers.SecondaryDBRouter"]
-if env == "PROD":
+if env == "Local":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "warehouse_server",
-            "USER": "aviconncorp",
-            "PASSWORD": "1V3asem2025",
-            "HOST": "localhost",
-            "PORT": "5432",
+            "NAME": config("DB_HOSTNAME"),
+            "USER": config("DB_USERNAME"),
+            "PASSWORD": config("DB_PASSWORD"),
+            "HOST": config("DB_HOST"),
+            "PORT": config("DB_PORT"),
             "CONN_MAX_AGE": 60,
-        },
+        }
         # "secondary": {
         #     "ENGINE": "django.db.backends.postgresql_psycopg2",
         #     "NAME": "warehouse",
