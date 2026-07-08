@@ -13,8 +13,16 @@ Author:
     Aviconn Recovery Refactor
 """
 
+import re
 import logging
+from datetime import datetime
 import traceback
+
+from wareApp.models import (
+    AisleGroup,
+    HourlySiteReading,
+    SiteBaseline,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -139,34 +147,189 @@ def process_daily(
 
 # HOURLY RECOVERY
 
+logger = logging.getLogger(__name__)
+
+
 def process_hourly(
     site,
     gateway_id,
     location_id,
     message,
 ):
-    """
-    Hourly Recovery
-
-    TODO:
-        Move existing MQTT hourly recovery block here
-        WITHOUT changing any business logic.
-    """
 
     logger.info(
-        "Hourly Recovery Started | Gateway=%s",
+        "Starting hourly recovery | Site=%s | Gateway=%s",
+        location_id,
         gateway_id,
     )
 
-    return {
-        "status": True,
-        "gateway_id": gateway_id,
-        "type": "hourlyConsumption",
-        "message": "Hourly recovery placeholder",
-    }
+    created = 0
+    updated = 0
+    failed = 0
 
+    try:
+
+        aisle_group_id, recovery_hours, unit_consumptions, gw_total_cumulative = re.search(
+            r"Aisle_group_id : (.*); Recovery_Hours : (.*); Unit_consumptions : (.*); GW_total_cumulative : (.*)",
+            message,
+        ).groups()
+
+        hours = recovery_hours.split(",")
+        hourly_consumptions = unit_consumptions.split(",")
+
+        aisle_group = AisleGroup.objects.filter(
+            site=site,
+            attached_leg_id=aisle_group_id,
+        )
+
+        if not aisle_group.exists():
+
+            return {
+                "status": False,
+                "message": "Aisle Group Not Found",
+                "aisle_group": aisle_group_id,
+            }
+
+        aisle = aisle_group.first()
+
+        aisle_group_active = aisle.is_active
+
+        for i in range(len(hours) - 1):
+
+            try:
+
+                dateHour = datetime.strptime(
+                    hours[i],
+                    "%Y-%m-%d %H:%M:%S.%f",
+                )
+
+                lower = dateHour.replace(
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                )
+
+                upper = dateHour.replace(
+                    minute=59,
+                    second=59,
+                    microsecond=0,
+                )
+
+                if hourly_consumptions[i] == "ERROR404":
+
+                    hourly_unit_consumption = 0.0
+
+                else:
+
+                    hourly_unit_consumption = float(
+                        hourly_consumptions[i]
+                    )
+
+                hourly_saving = 0.0
+                leg_hourly_baseline = 0.0
+
+                if aisle_group_active:
+
+                    baseline = SiteBaseline.objects.filter(
+                        associated_site_id=int(location_id),
+                        leg_id=str(aisle_group_id),
+                        baseline_from__lte=dateHour.date(),
+                        baseline_to__gte=dateHour.date(),
+                    )
+
+                    if baseline.exists():
+
+                        baseline = baseline.first()
+
+                    else:
+
+                        baseline = SiteBaseline.objects.filter(
+                            associated_site_id=int(location_id),
+                            leg_id=str(aisle_group_id),
+                        ).last()
+
+                    if baseline:
+
+                        leg_hourly_baseline = (
+                            baseline.baseline_value
+                            / baseline.working_hours
+                        )
+
+                        hourly_saving = (
+                            leg_hourly_baseline
+                            - hourly_unit_consumption
+                        )
+
+                entry = HourlySiteReading.objects.filter(
+                    associated_Site=site,
+                    leg_id=aisle_group_id,
+                    reading_from=lower,
+                    reading_to=upper,
+                )
+
+                if entry.exists():
+
+                    entry.update(
+                        unit_consumption=hourly_unit_consumption,
+                        hourly_baseline_value=leg_hourly_baseline,
+                        energy_saved=hourly_saving,
+                    )
+
+                    updated += 1
+
+                else:
+
+                    HourlySiteReading.objects.create(
+                        associated_Site=site,
+                        aisle_group=aisle,
+                        leg_id=aisle_group_id,
+                        unit_consumption=hourly_unit_consumption,
+                        hourly_baseline_value=leg_hourly_baseline,
+                        energy_saved=hourly_saving,
+                        reading_from=lower,
+                        reading_to=upper,
+                        is_visible=True,
+                    )
+
+                    created += 1
+
+            except Exception:
+
+                failed += 1
+
+                logger.exception(
+                    "Failed Hour Recovery %s",
+                    hours[i],
+                )
+
+        logger.info(
+            "Recovery Complete | Created=%s Updated=%s Failed=%s",
+            created,
+            updated,
+            failed,
+        )
+
+        return {
+            "status": True,
+            "gateway_id": gateway_id,
+            "site_id": location_id,
+            "aisle_group": aisle_group_id,
+            "created": created,
+            "updated": updated,
+            "failed": failed,
+        }
+
+    except Exception as e:
+
+        logger.exception("Hourly Recovery Failed")
+
+        return {
+            "status": False,
+            "error": str(e),
+        }
 
 # LOAD RUNTIME RECOVERY
+
 
 def process_runtime(
     site,
