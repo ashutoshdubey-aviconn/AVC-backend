@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("avcadmin/", admin.site.urls),
     path("api/", include("wareApp.urls")),
+    # path("api/recovery/", include("recovery.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 admin.site.site_header = "Aviconn Admin"

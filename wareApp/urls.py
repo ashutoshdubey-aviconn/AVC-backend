@@ -1,6 +1,8 @@
 from django.urls import include, path
 from wareApp.views import *
 
+# from recovery.views import RecoveryUploadAPIView
+
 # from wareApp.tests import *
 
 urlpatterns = [
@@ -142,4 +144,5 @@ urlpatterns = [
     path("meter-disconnections/", MeterDisconnectionListView.as_view()),
     # path("fetchHomeGatewayId/", FetchHomeGatewayIdUsingProvisioning.as_view()),
     path("recovery/", include("wareApp.recovery.urls")),
+    # path("recovery/upload/", RecoveryUploadAPIView.as_view(), name="recovery-upload"),
 ]
