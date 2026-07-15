@@ -414,7 +414,7 @@ def process_hourly(
 
             processed_dates = set()
 
-            aisle_group_active = aisle.is_active
+            # aisle_group_active = aisle.is_active
 
             for day, hourly_data in dates.items():
 

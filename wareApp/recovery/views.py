@@ -1,8 +1,11 @@
+from queue import Full
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from wareApp.models import Site
 from .processor import process_http_recovery
+from .service import recovery_queue
 
 
 class RecoveryUploadAPIView(APIView):
@@ -103,13 +106,35 @@ class RecoveryUploadAPIView(APIView):
         #     msg_subtype=msg_subtype,
         #     message=payload,
         # )
-        result = process_http_recovery(
-            site=site,
-            gateway_id=gateway_id,
-            location_id=location_id,
-            msg_type=msg_type,
-            msg_subtype=msg_subtype,
-            message=recovery_data,
-        )
+        # result = process_http_recovery(
+        #     site=site,
+        #     gateway_id=gateway_id,
+        #     location_id=location_id,
+        #     msg_type=msg_type,
+        #     msg_subtype=msg_subtype,
+        #     message=recovery_data,
+        # )
 
-        return Response(result)
+        job = {
+            "site": site,
+            "gateway_id": gateway_id,
+            "location_id": location_id,
+            "msg_type": msg_type,
+            "msg_subtype": msg_subtype,
+            "message": recovery_data,
+        }
+
+        try:
+            recovery_queue.put(job, block=False)
+            
+
+        except Full:
+            return Response(
+                {
+                    "status": False,
+                    "message": "Recovery queue is full. Please try again later.",
+                },
+                status=503,
+            )
+
+        return Response({"status": True, "queued": True}, status=200)
