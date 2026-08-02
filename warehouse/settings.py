@@ -211,6 +211,21 @@ REST_FRAMEWORK = {
 }
 
 LOG_FILE = f"{BASE_DIR}/logges"
+# Recovery / Redis settings
+# Enable Redis-backed recovery coalescing (set to False to use in-process queue)
+RECOVERY_USE_REDIS = True
+# Redis URL for recovery data (separate DB recommended)
+REDIS_URL = config("REDIS_URL", "redis://localhost:6379/1")
+# How long to keep the latest payload in seconds (default: 1 hour)
+RECOVERY_PAYLOAD_TTL = config("RECOVERY_PAYLOAD_TTL", 3600, cast=int)
+# How long the pending flag persists to prevent duplicate queue pushes (default: 1 hour)
+RECOVERY_PENDING_TTL = config("RECOVERY_PENDING_TTL", 3600, cast=int)
+# Redis queue name for recovery keys
+RECOVERY_QUEUE_NAME = config("RECOVERY_QUEUE_NAME", "recovery:queue:v1")
+# How many worker threads to start for recovery processing (Redis or in-process)
+RECOVERY_WORKER_CONCURRENCY = config("RECOVERY_WORKER_CONCURRENCY", 1, cast=int)
+# Enable Prometheus metrics for recovery (if prometheus_client is installed)
+RECOVERY_ENABLE_METRICS = config("RECOVERY_ENABLE_METRICS", False, cast=bool)
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -236,6 +251,14 @@ LOGGING = {
             "filename": f"{LOG_FILE}/debug.log",
             "formatter": "verbose",
         },
+        "recovery_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": f"{LOG_FILE}/recovery.log",
+            "formatter": "verbose",
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+        },
     },
     "loggers": {
         "django": {
@@ -245,6 +268,11 @@ LOGGING = {
         "django.request": {
             "handlers": ["file", "console"],
             "level": "DEBUG",
+            "propagate": False,
+        },
+        "wareApp.recovery": {
+            "handlers": ["recovery_file", "console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
