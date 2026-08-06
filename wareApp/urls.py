@@ -143,6 +143,6 @@ urlpatterns = [
     path("meter-disconnections/ingest/", MeterDisconnectionIngestView.as_view()),
     path("meter-disconnections/", MeterDisconnectionListView.as_view()),
     # path("fetchHomeGatewayId/", FetchHomeGatewayIdUsingProvisioning.as_view()),
-    path("recovery/", include("wareApp.recovery.urls")),
+    path("v1/recovery/", include("wareApp.recovery.urls")),
     # path("recovery/upload/", RecoveryUploadAPIView.as_view(), name="recovery-upload"),
 ]
