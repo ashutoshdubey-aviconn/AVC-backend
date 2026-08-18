@@ -4,31 +4,65 @@ import datetime
 from django.db import migrations, models
 
 
+def add_baseline_date_if_missing(apps, schema_editor):
+    Site = apps.get_model("wareApp", "Site")
+    table = Site._meta.db_table
+    conn = schema_editor.connection
+    cursor = conn.cursor()
+    col_names = []
+    try:
+        desc = conn.introspection.get_table_description(cursor, table)
+        for col in desc:
+            # DB backends return different types for column description
+            if hasattr(col, "name"):
+                col_names.append(col.name)
+            else:
+                col_names.append(col[0])
+    except Exception:
+        try:
+            # SQLite fallback
+            cursor.execute("PRAGMA table_info(%s)" % table)
+            rows = cursor.fetchall()
+            for r in rows:
+                col_names.append(r[1])
+        except Exception:
+            pass
+
+    if "baseline_date" not in col_names:
+        field = models.DateTimeField(blank=True, null=True)
+        field.set_attributes_from_name("baseline_date")
+        schema_editor.add_field(Site, field)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wareApp', '0002_auto_20221216_1104'),
+        ("wareApp", "0002_auto_20221216_1104"),
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='site',
-            name='baseline_date',
-            field=models.DateTimeField(blank=True, null=True),
+        migrations.RunPython(
+            add_baseline_date_if_missing, reverse_code=migrations.RunPython.noop
         ),
         migrations.AlterField(
-            model_name='monthlyloadsharepercentage',
-            name='created_on',
-            field=models.DateTimeField(default=datetime.datetime(2022, 12, 16, 11, 8, 55, 159739)),
+            model_name="monthlyloadsharepercentage",
+            name="created_on",
+            field=models.DateTimeField(
+                default=datetime.datetime(2022, 12, 16, 11, 8, 55, 159739)
+            ),
         ),
         migrations.AlterField(
-            model_name='supplyloadtimeshare',
-            name='reading_from',
-            field=models.DateTimeField(default=datetime.datetime(2022, 12, 16, 11, 8, 55, 138241)),
+            model_name="supplyloadtimeshare",
+            name="reading_from",
+            field=models.DateTimeField(
+                default=datetime.datetime(2022, 12, 16, 11, 8, 55, 138241)
+            ),
         ),
         migrations.AlterField(
-            model_name='supplyloadtimeshare',
-            name='reading_to',
-            field=models.DateTimeField(default=datetime.datetime(2022, 12, 16, 11, 8, 55, 138285)),
+            model_name="supplyloadtimeshare",
+            name="reading_to",
+            field=models.DateTimeField(
+                default=datetime.datetime(2022, 12, 16, 11, 8, 55, 138285)
+            ),
         ),
     ]
