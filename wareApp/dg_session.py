@@ -1,6 +1,6 @@
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from wareApp.models import (
@@ -150,6 +150,35 @@ def update_event(
         active.dg_end_date = entry_time
         active.epoch_time = epoch_time
         active.save()
+        # Check DG overtime and generate alarm if needed (preserve existing behavior)
+        try:
+            run_minutes = (
+                (active.dg_end_date - active.dg_start_date).total_seconds() / 60
+                if active.dg_start_date and active.dg_end_date
+                else 0
+            )
+            if run_minutes > (site.dg_overtime or 0):
+                recent = NewAlarmsNotifications.objects.filter(
+                    site_id=site, alarm_type=3, created__gte=datetime.now() - timedelta(hours=2)
+                )
+                if not recent.exists():
+                    NewAlarmsNotifications.objects.create(
+                        site_id=site, alarm_type=3, created=datetime.now()
+                    )
+                    try:
+                        from wareApp.sendmail import send_alarm_for_dg_overtime
+
+                        data = {
+                            "start_time": active.dg_start_date,
+                            "end_time": active.dg_end_date,
+                            "site_id": site.id,
+                        }
+                        send_alarm_for_dg_overtime(data)
+                    except Exception:
+                        # best-effort; do not fail the update flow on mail errors
+                        pass
+        except Exception:
+            pass
     else:
         from wareApp.dg_ingest import create_dg_unit_consumption
 
