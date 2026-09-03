@@ -23,6 +23,23 @@ from wareApp import sendmail
 from wareApp.serializers import *
 from wareApp.utility import entryExit, logger
 
+
+# Replace real logger with a no-op logger to avoid noisy debug calls in views
+class _NoopLogger:
+    def debug(self, *args, **kwargs):
+        return None
+
+    def info(self, *args, **kwargs):
+        return None
+
+    def warning(self, *args, **kwargs):
+        return None
+
+    def error(self, *args, **kwargs):
+        return None
+
+logger = _NoopLogger()
+
 #################################
 from datetime import timedelta, datetime, time
 from telnetlib import STATUS
@@ -3415,7 +3432,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                     month = current_date - timedelta(i * 365 / 12)
                     month_year = month.strftime("%Y-%m")
 
-                    # 🔴 USE REDIS FOR PREVIOUS MONTHS
+                    # ðŸ”´ USE REDIS FOR PREVIOUS MONTHS
                     if month_year != current_month_key and cached_prev_data:
                         idx = cached_prev_data["months"].index(
                             month.strftime('%b') + "-" + month.strftime('%Y')
@@ -3428,7 +3445,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                         percentage_saved_list.append(cached_prev_data["percentageSaved"][idx])
                         continue
 
-                    # 🔴 CURRENT MONTH OR CACHE MISS → ORIGINAL LOGIC
+                    # ðŸ”´ CURRENT MONTH OR CACHE MISS â†’ ORIGINAL LOGIC
                     energyConsumed = 0
                     energySaved = 0
                     carbon_saved = 0
@@ -3486,7 +3503,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                     carbon_list.append(round(carbon_saved, 1))
                     percentage_saved_list.append(percentage_saved)
 
-            # 🔴 CACHE ONLY PREVIOUS 11 MONTHS
+            # ðŸ”´ CACHE ONLY PREVIOUS 11 MONTHS
             cache_data = {
                 "months": month_list[:-1],
                 "energyConsumed": energy_consumed_list[:-1],
@@ -3783,7 +3800,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                     month = current_date - timedelta(i * 365 / 12)
                     month_year = month.strftime("%Y-%m")
 
-                    # 🔴 USE REDIS FOR PREVIOUS MONTHS
+                    # ðŸ”´ USE REDIS FOR PREVIOUS MONTHS
                     if month_year != current_month_key and cached_prev_data:
                         idx = cached_prev_data["months"].index(
                             month.strftime("%b") + "-" + month.strftime("%Y")
@@ -3800,7 +3817,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                         )
                         continue
 
-                    # 🔴 CURRENT MONTH OR CACHE MISS → ORIGINAL LOGIC
+                    # ðŸ”´ CURRENT MONTH OR CACHE MISS â†’ ORIGINAL LOGIC
                     energyConsumed = 0
                     energySaved = 0
                     carbon_saved = 0
@@ -3868,7 +3885,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                     carbon_list.append(round(carbon_saved, 1))
                     percentage_saved_list.append(percentage_saved)
 
-            # 🔴 CACHE ONLY PREVIOUS 11 MONTHS
+            # ðŸ”´ CACHE ONLY PREVIOUS 11 MONTHS
             cache_data = {
                 "months": month_list[:-1],
                 "energyConsumed": energy_consumed_list[:-1],
@@ -8178,87 +8195,6 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
                 else:
                     theft_data.append(point)
 
-            if vehical_number:
-                alerts_qs = DGAlertsData.objects.filter(
-                    Q(alert_data__contains=vehical_number)
-                    & (
-                        Q(alert_data__contains="RefuelingAlert")
-                        | Q(alert_data__contains="deviceFuelFill")
-                        | Q(alert_data__contains="theft")
-                        | Q(alert_data__contains="deviceFuelDrop")
-                    )
-                    & Q(created__date=selected_date)
-                ).values_list("alert_data", flat=True)
-            else:
-                alerts_qs = []
-
-            for i in alerts_qs:
-                try:
-                    alert_type = i.get("alert_type") or i.get("eventType")
-                    ts = (
-                        i.get("event_time")
-                        or i.get("dateTimeStamp")
-                        or i.get("timestamp")
-                    )
-
-                    if isinstance(ts, dict):
-                        ts = ts.get("value") or ts.get("time")
-
-                    if not ts:
-                        continue
-
-                    if isinstance(ts, (int, float)):
-                        epoch_time = float(ts)
-                    else:
-                        epoch_time = date_parser.parse(ts).timestamp()
-
-                    # Handle Refuel
-                    if alert_type in ["RefuelingAlert", "deviceFuelFill"]:
-                        fuel_val = i.get("refueled_in_liters") or 0
-                        if not fuel_val:
-                            f_change = i.get("fuelChange", {})
-                            if isinstance(f_change, dict):
-                                fuel_val = f_change.get("fuel_change", 0)
-                            elif isinstance(f_change, str) and "ltr" in f_change:
-                                fuel_split = f_change.split("ltr")[0].strip()
-                                fuel_val = float(fuel_split) if fuel_split else 0
-
-                        try:
-                            fuel_val = float(fuel_val)
-                            point_epoch = int(epoch_time * 1000)
-                            alert_key = ("refuel", point_epoch)
-                            if alert_key not in alert_keys:
-                                alert_keys.add(alert_key)
-                                refuel_data.append({"x": point_epoch, "y": fuel_val})
-                        except ValueError:
-                            pass
-
-                    # Handle Theft
-                    elif alert_type in ["theft", "deviceFuelDrop"]:
-                        val = i.get("value")
-                        if val is None:
-                            f_change = i.get("fuelChange", "")
-                            if isinstance(f_change, str) and "ltr" in f_change:
-                                val_split = f_change.split("ltr")[0].strip()
-                                val = float(val_split) if val_split else 0
-                            elif isinstance(f_change, dict):
-                                val = f_change.get("fuel_change", 0)
-                            else:
-                                val = 0
-
-                        try:
-                            val = float(val)
-                            point_epoch = int(epoch_time * 1000)
-                            alert_key = ("theft", point_epoch)
-                            if alert_key not in alert_keys:
-                                alert_keys.add(alert_key)
-                                theft_data.append({"x": point_epoch, "y": val})
-                        except ValueError:
-                            pass
-
-                except Exception:
-                    continue
-
             response_payload = {
                 "status": 200,
                 "data": final_data,
@@ -8449,73 +8385,6 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
                     refuel_data.append(point)
                 else:
                     theft_data.append(point)
-            refueling_alerts = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & (
-                    Q(alert_data__contains="RefuelingAlert")
-                    | Q(alert_data__contains="deviceFuelFill")
-                )
-                & Q(created__date__gte=from_date.date())
-                & Q(created__date__lte=end_date.date())
-            )
-            refueling_alerts = [i.alert_data for i in refueling_alerts]
-            for i in refueling_alerts:
-                epoch_time = (
-                    datetime.strptime(
-                        i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                    if i.get("event_time", "") != ""
-                    else datetime.strptime(
-                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                )
-                point_epoch = int(epoch_time) * 1000
-                alert_key = ("refuel", point_epoch)
-                if alert_key not in alert_keys:
-                    alert_keys.add(alert_key)
-                    refuel_data.append(
-                        {
-                            "x": point_epoch,
-                            "y": float(
-                                i.get(
-                                    "refueled_in_liters",
-                                    i.get("fuelChange", "").split("ltr")[0],
-                                )
-                            ),
-                        }
-                    )
-
-            theft_alerts = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & (
-                    Q(alert_data__contains="theft")
-                    | Q(alert_data__contains="deviceFuelDrop")
-                )
-                & Q(created__date__gte=from_date.date())
-                & Q(created__date__lte=end_date.date())
-            )
-            theft_alerts = [i.alert_data for i in theft_alerts]
-            for i in theft_alerts:
-                epoch_time = (
-                    i.timestamp
-                    if i.get("timestamp", "") != ""
-                    else datetime.strptime(
-                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                )
-                point_epoch = int(epoch_time * 1000)
-                alert_key = ("theft", point_epoch)
-                if alert_key not in alert_keys:
-                    alert_keys.add(alert_key)
-                    theft_data.append(
-                        {
-                            "x": point_epoch,
-                            "y": float(
-                                i.get("value", i.get("fuelChange", "").split("ltr")[0])
-                            ),
-                        }
-                    )
-
             refuel_final_data = {
                 "name": "Refuel",
                 "data": refuel_data,
@@ -11206,10 +11075,7 @@ class MeterDisconnectionIngestView(APIView):
 
         for entry in payload:
             meter_id = entry.get("meter_id")
-            start = parse_datetime(entry.get("detection_window_start") or "")
-            end = parse_datetime(entry.get("detection_window_end") or "")
-
-            if not meter_id or not start or not end:
+            if not meter_id:
                 continue
 
             defaults = {
@@ -11220,6 +11086,16 @@ class MeterDisconnectionIngestView(APIView):
                 "meter_name": entry.get("meter_name") or "meter{}".format(meter_id),
                 "status": entry.get("status") or "disconnected",
                 "port_id": entry.get("port_id"),
+                "detection_window_start": (
+                    parse_datetime(entry.get("detection_window_start") or "")
+                    if entry.get("detection_window_start")
+                    else None
+                ),
+                "detection_window_end": (
+                    parse_datetime(entry.get("detection_window_end") or "")
+                    if entry.get("detection_window_end")
+                    else None
+                ),
                 "last_seen_at": (
                     parse_datetime(entry.get("last_seen_at") or "")
                     if entry.get("last_seen_at")
@@ -11236,12 +11112,29 @@ class MeterDisconnectionIngestView(APIView):
                 "cloud_response": entry.get("cloud_response"),
             }
 
-            _, created = MeterDisconnectionEvent.objects.update_or_create(
-                meter_id=meter_id,
-                detection_window_start=start,
-                detection_window_end=end,
-                defaults=defaults,
+            # Self-healing: Clean up duplicate records if they exist in the DB
+            existing_events = list(
+                MeterDisconnectionEvent.objects.filter(meter_id=meter_id).order_by(
+                    "-updated_at"
+                )
             )
+            if len(existing_events) > 1:
+                existing_event = existing_events[0]
+                for key, val in defaults.items():
+                    setattr(existing_event, key, val)
+                existing_event.save()
+                for dup in existing_events[1:]:
+                    dup.delete()
+                created = False
+            elif len(existing_events) == 1:
+                existing_event = existing_events[0]
+                for key, val in defaults.items():
+                    setattr(existing_event, key, val)
+                existing_event.save()
+                created = False
+            else:
+                MeterDisconnectionEvent.objects.create(meter_id=meter_id, **defaults)
+                created = True
 
             if created:
                 saved += 1
@@ -11305,3 +11198,196 @@ class MeterDisconnectionListView(APIView):
                 "results": serializer.data,
             }
         )
+
+class HomeGatewayStatusApi(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = []
+
+    def get(self, request):
+        try:
+            queryset = (
+                HomeGatewayStatus.objects.select_related(
+                    "home_gateway",
+                    "home_gateway__connected_to",
+                    "home_gateway__connected_to__customer",
+                    "home_gateway__owned_by__customer",
+                )
+                .all()
+                .order_by("id")
+            )
+
+            total = queryset.count()
+
+            try:
+                limit = int(request.query_params.get("limit", 100))
+                offset = int(request.query_params.get("offset", 0))
+            except ValueError:
+                return Response(
+                    {"status": 400, "message": "limit and offset must be integers."},
+                    status=400,
+                )
+
+            limit = max(1, min(limit, 500))
+            offset = max(0, offset)
+
+            gateways = queryset[offset : offset + limit]
+
+            data = []
+            for gw in gateways:
+                hgw = gw.home_gateway
+                site = hgw.connected_to if hgw else None
+                customer_name = "N/A"
+                if hgw:
+                    if hgw.owned_by and hgw.owned_by.customer:
+                        customer_name = hgw.owned_by.customer.username
+                    elif site and site.customer:
+                        customer_name = site.customer.username
+
+                data.append(
+                    {
+                        "id": gw.id,
+                        "gateway_id": hgw.hgw_id if hgw else None,
+                        "latitude": (
+                            float(gw.latitude) if gw.latitude is not None else None
+                        ),
+                        "longitude": (
+                            float(gw.longitude) if gw.longitude is not None else None
+                        ),
+                        "status": gw.status,
+                        "site_id": site.id if site else None,
+                        "site_name": site.site_name if site else "N/A",
+                        "customer_name": customer_name,
+                    }
+                )
+
+            return Response(
+                {
+                    "status": 200,
+                    "count": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "results": data,
+                }
+            )
+        except Exception as err:
+            return Response(
+                {"status": 500, "message": "Internal Server Error", "error": str(err)},
+                status=500,
+            )
+    def post(self, request):
+        try:
+            gateway_id = request.data.get("gateway_id")
+            status_id = request.data.get("id")
+
+            if not gateway_id and not status_id:
+                return Response(
+                    {
+                        "status": 400,
+                        "message": "Either 'gateway_id' or 'id' must be provided.",
+                    },
+                    status=400,
+                )
+
+            # Find or create the HomeGatewayStatus object
+            if status_id:
+                try:
+                    obj = HomeGatewayStatus.objects.get(id=status_id)
+                except HomeGatewayStatus.DoesNotExist:
+                    return Response(
+                        {
+                            "status": 404,
+                            "message": f"HomeGatewayStatus with id {status_id} not found.",
+                        },
+                        status=404,
+                    )
+            else:
+                try:
+                    obj = HomeGatewayStatus.objects.get(home_gateway__hgw_id=gateway_id)
+                except HomeGatewayStatus.DoesNotExist:
+                    # Try to create it if HomeGatewayId exists
+                    try:
+                        hgw_obj = HomeGatewayId.objects.get(hgw_id=gateway_id)
+                        obj = HomeGatewayStatus.objects.create(home_gateway=hgw_obj)
+                    except HomeGatewayId.DoesNotExist:
+                        return Response(
+                            {
+                                "status": 404,
+                                "message": f"HomeGatewayId with hgw_id {gateway_id} not found.",
+                            },
+                            status=404,
+                        )
+
+            # Update fields if provided in request body
+            if "latitude" in request.data:
+                lat = request.data.get("latitude")
+                if lat is not None and lat != "":
+                    try:
+                        from decimal import Decimal
+
+                        obj.latitude = Decimal(str(lat))
+                    except (ValueError, TypeError, ArithmeticError):
+                        return Response(
+                            {"status": 400, "message": "Invalid latitude format."},
+                            status=400,
+                        )
+                else:
+                    obj.latitude = None
+
+            if "longitude" in request.data:
+                lon = request.data.get("longitude")
+                if lon is not None and lon != "":
+                    try:
+                        from decimal import Decimal
+
+                        obj.longitude = Decimal(str(lon))
+                    except (ValueError, TypeError, ArithmeticError):
+                        return Response(
+                            {"status": 400, "message": "Invalid longitude format."},
+                            status=400,
+                        )
+                else:
+                    obj.longitude = None
+
+            if "status" in request.data:
+                status_val = request.data.get("status")
+                if isinstance(status_val, str):
+                    obj.status = status_val.lower() in ("true", "1", "yes")
+                else:
+                    obj.status = bool(status_val)
+
+            obj.save()
+
+            hgw = obj.home_gateway
+            site = hgw.connected_to if hgw else None
+            customer_name = "N/A"
+            if hgw:
+                if hgw.owned_by and hgw.owned_by.customer:
+                    customer_name = hgw.owned_by.customer.username
+                elif site and site.customer:
+                    customer_name = site.customer.username
+
+            return Response(
+                {
+                    "status": 200,
+                    "message": "Gateway status updated successfully.",
+                    "data": {
+                        "id": obj.id,
+                        "gateway_id": hgw.hgw_id if hgw else None,
+                        "latitude": (
+                            float(obj.latitude) if obj.latitude is not None else None
+                        ),
+                        "longitude": (
+                            float(obj.longitude) if obj.longitude is not None else None
+                        ),
+                        "status": obj.status,
+                        "site_id": site.id if site else None,
+                        "site_name": site.site_name if site else "N/A",
+                        "customer_name": customer_name,
+                    },
+                }
+            )
+        except Exception as err:
+            return Response(
+                {"status": 500, "message": "Internal Server Error", "error": str(err)},
+                status=500,
+            )

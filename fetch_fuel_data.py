@@ -25,7 +25,7 @@ django.setup()
 from wareApp.dg_fuel.poller import collect_level_cycle
 from wareApp.dg_fuel.normalization import epoch_milliseconds
 from wareApp.dg_fuel.ingestion import record_fuel_level
-from wareApp.dg_fuel.sessions import attempt_fetch_for_unit
+from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_unit_consumption
 from wareApp.models import DgUnitConsumption, Site
 
 
@@ -170,6 +170,9 @@ def get_fuel_data_roadcaste():
 
 def update_dg_fuel_consumption_data():
     """Retry closed DG runs using the unified session helper."""
+    sites = Site.objects.filter(dg_fuel_system_installed=True).only("id").order_by("id")
+    for site in sites:
+        reconcile_daily_unit_consumption(site)
     pending_units = DgUnitConsumption.objects.filter(fetch_fuel_data=True).order_by("id")
     updated = 0
     attempted = 0
@@ -183,6 +186,10 @@ def update_dg_fuel_consumption_data():
 
 
 def retry_closed_dg_runs():
+    sites = Site.objects.filter(dg_fuel_system_installed=True).only("id").order_by("id")
+    for site in sites:
+        reconcile_daily_unit_consumption(site)
+
     pending_units = DgUnitConsumption.objects.filter(fetch_fuel_data=True).order_by("id")
     updated = 0
     failed = 0

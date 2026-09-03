@@ -3,7 +3,7 @@ from datetime import datetime
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
-from wareApp.models import DGFuelAlertsData, Site
+from wareApp.models import DGAlertsData, DGFuelAlertsData, Site
 from wareApp.views import DgFuelConsumptionDataApiUsingLoconavAPI_new
 
 
@@ -31,6 +31,14 @@ class DgFuelGraphApiTests(TestCase):
             epoch_time="1788426000000",
             created=self.timestamp,
         )
+        DGAlertsData.objects.create(
+            alert_data={
+                "alert_type": "theft",
+                "timestamp": 1788433200,
+                "value": 9.75,
+                "vehicle_number": self.site.partner_dg_fuel_id,
+            }
+        )
 
     def test_normalized_alerts_are_returned_by_daily_graph_api(self):
         request = APIRequestFactory().post(
@@ -50,3 +58,4 @@ class DgFuelGraphApiTests(TestCase):
             response.data["theft_alert"]["data"],
             [{"x": 1788426000000, "y": 2.25}],
         )
+        self.assertNotIn({"x": 1788433200000, "y": 9.75}, response.data["theft_alert"]["data"])
