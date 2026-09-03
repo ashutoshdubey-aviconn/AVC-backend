@@ -24,7 +24,11 @@ def collect_loconav_levels(
             payload = fetch_current_levels(vehicle_number)
             levels = parse_loconav_current_levels(payload)
         except Exception:
-            logger.exception("LocoNav collection failed for site_id=%s", site.id)
+            logger.exception(
+                "LocoNav collection failed site_id=%s vehicle_number=%s",
+                site.id,
+                vehicle_number,
+            )
             failed_site_ids.append(site.id)
             continue
         matching = [
@@ -34,11 +38,21 @@ def collect_loconav_levels(
             == vehicle_number.replace("-", "").upper()
         ]
         samples.extend({"site": site, "source": "loconav", **level} for level in matching)
+        for level in matching:
+            logger.info(
+                "LocoNav fuel sample collected site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s source=%s",
+                site.id,
+                level.get("vehicle_number"),
+                level.get("fuel_liters"),
+                level.get("epoch_ms"),
+                "loconav",
+            )
         if not matching:
             expired_site_ids.append(site.id)
             logger.warning(
-                "LocoNav device unavailable or expired for site_id=%s vehicle_number=%s",
+                "LocoNav device unavailable or expired site_id=%s vehicle_number=%s expected_vehicle_number=%s",
                 site.id,
+                vehicle_number,
                 vehicle_number,
             )
     return {
@@ -61,7 +75,10 @@ def collect_roadcast_levels(
         payload = fetch_pull_api()
         levels = parse_roadcast_current_levels(payload, site_by_imei)
     except Exception:
-        logger.exception("Roadcast pull_api collection failed")
+        logger.exception(
+            "Roadcast pull_api collection failed configured_sites=%s",
+            len(site_by_imei),
+        )
         return {
             "samples": [],
             "missing_vehicle_ids": [],
@@ -73,13 +90,23 @@ def collect_roadcast_levels(
     missing_vehicle_ids = sorted(set(site_by_imei) - returned_ids)
     for vehicle_id in missing_vehicle_ids:
         logger.warning(
-            "Roadcast device unavailable or expired from pull_api vehicle_id=%s",
+            "Roadcast device unavailable or expired vehicle_id=%s known_vehicle_ids=%s",
             vehicle_id,
+            sorted(site_by_imei),
         )
     samples = [
         {"site": site_by_imei[level["vehicle_number"]], "source": "roadcast", **level}
         for level in levels
     ]
+    for level in levels:
+        logger.info(
+            "Roadcast fuel sample collected site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s source=%s",
+            site_by_imei[level["vehicle_number"]].id,
+            level.get("vehicle_number"),
+            level.get("fuel_liters"),
+            level.get("epoch_ms"),
+            "roadcast",
+        )
     return {
         "samples": samples,
         "missing_vehicle_ids": missing_vehicle_ids,

@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 import time
-
+from logging.handlers import RotatingFileHandler
 import requests
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +29,27 @@ from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_uni
 from wareApp.models import DgUnitConsumption, Site
 
 
+LOG_DIR = os.path.join(PROJECT_ROOT, "logges")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 logger = logging.getLogger("wareApp.dg_fuel.fetch_fuel_data")
+logger.setLevel(logging.INFO)
+logger.propagate = False
+
+if not logger.handlers:
+    file_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, "dg_fuel.log"),
+        maxBytes=20 * 1024 * 1024,
+        backupCount=5,
+    )
+    console_handler = logging.StreamHandler(sys.stdout)
+
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
 LOCONAV_API_KEY = os.environ.get("LOCONAV_API_KEY", "51uKh_YaL72s7zhx6bwZ")
 ROADCAST_USERNAME = os.environ.get("ROADCAST_USERNAME", "Aviconn")
