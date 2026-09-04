@@ -70,9 +70,13 @@ class FuelProvidersTests(unittest.TestCase):
         end = datetime.utcnow()
 
         report = {
-            "alerts": {
-                "REFUELING_ALERT": [{"timestamp": 1620000000, "value": 12.3}],
-                "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1620001000, "value": 1.2}],
+            "status": True,
+            "data": {
+                "refuel": {"value": 12.3, "unit": "L"},
+                "alerts": {
+                    "REFUELING_ALERT": [{"timestamp": 1620000000, "value": 12.3}],
+                    "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1620001000, "value": 1.2}],
+                },
             }
         }
 
@@ -85,6 +89,36 @@ class FuelProvidersTests(unittest.TestCase):
             payload = fp.fetch_loconav_report("veh1", start, end)
 
         self.assertEqual(payload, report)
+
+    def test_detect_refuel_with_nested_data_alerts(self):
+        alerts = {
+            "status": True,
+            "data": {
+                "alerts": {
+                    "REFUELING_ALERT": [{"timestamp": "1788499320", "value": "40.82"}]
+                }
+            },
+        }
+        out = fp.detect_refuel_from_alerts(alerts)
+        self.assertEqual(out, [{"timestamp": 1788499320, "value": 40.82}])
+
+    def test_detect_theft_with_nested_data_alerts(self):
+        alerts = {
+            "status": True,
+            "data": {
+                "alerts": {
+                    "POSSIBLE_FUEL_THEFT_ALERT": [
+                        {"timestamp": "1788499420", "value": "1.25"}
+                    ]
+                }
+            },
+        }
+        out = fp.detect_theft_from_alerts(alerts)
+        self.assertEqual(out, [{"timestamp": 1788499420, "value": 1.25}])
+
+    def test_detect_alerts_returns_empty_for_malformed_payload(self):
+        self.assertEqual(fp.detect_refuel_from_alerts({}), [])
+        self.assertEqual(fp.detect_theft_from_alerts({"data": {}}), [])
 
     def test_detect_refuel_and_theft(self):
         alerts = {

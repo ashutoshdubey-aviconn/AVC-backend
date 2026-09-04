@@ -805,6 +805,28 @@ class DgFuelConsumptionDataApi_new(APIView):
             theft_data = []
 
             print(vehical_number)
+            normalized_alerts = DGFuelAlertsData.objects.filter(
+                site=site_id,
+                created__date=selected_date.date(),
+                alert_name__in=["refuel", "theft"],
+            ).values("alert_name", "epoch_time", "fuel_consumption")
+            alert_keys = set()
+            for alert in normalized_alerts:
+                try:
+                    epoch_time = int(alert["epoch_time"])
+                    fuel_value = float(alert["fuel_consumption"])
+                except (TypeError, ValueError):
+                    continue
+                alert_key = (alert["alert_name"], epoch_time)
+                if alert_key in alert_keys:
+                    continue
+                alert_keys.add(alert_key)
+                point = {"x": epoch_time, "y": fuel_value}
+                if alert["alert_name"] == "refuel":
+                    refuel_data.append(point)
+                else:
+                    theft_data.append(point)
+
             refuel_alerts_for_site = DGAlertsData.objects.filter(
                 Q(alert_data__contains=vehical_number)
                 & Q(alert_data__contains="RefuelingAlert")
@@ -818,9 +840,15 @@ class DgFuelConsumptionDataApi_new(APIView):
                 epoch_time = datetime.strptime(
                     i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
                 ).timestamp()
-                refuel_data.append(
-                    {"x": int(epoch_time) * 1000, "y": i.get("refueled_in_liters")}
-                )
+                refuel_point = {
+                    "x": int(epoch_time) * 1000,
+                    "y": i.get("refueled_in_liters"),
+                }
+                alert_key = ("legacy_refuel", refuel_point["x"])
+                if alert_key in alert_keys:
+                    continue
+                alert_keys.add(alert_key)
+                refuel_data.append(refuel_point)
 
             theft_alerts = DGAlertsData.objects.filter(
                 Q(alert_data__contains=vehical_number)
@@ -829,7 +857,12 @@ class DgFuelConsumptionDataApi_new(APIView):
             )
             theft_alerts = [i.alert_data for i in theft_alerts]
             for i in theft_alerts:
-                theft_data.append({"x": i.timestamp * 1000, "y": i.get("value")})
+                theft_point = {"x": i.timestamp * 1000, "y": i.get("value")}
+                alert_key = ("legacy_theft", theft_point["x"])
+                if alert_key in alert_keys:
+                    continue
+                alert_keys.add(alert_key)
+                theft_data.append(theft_point)
 
             refuel_final_data = {
                 "name": "Refuel",
@@ -8125,6 +8158,14 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
             vehical_number = (
                 site.partner_dg_fuel_id.upper() if site.partner_dg_fuel_id else ""
             )
+            start_epoch_ms = int(
+                datetime.combine(selected_date, datetime.min.time()).timestamp() * 1000
+            )
+            end_epoch_ms = int(
+                datetime.combine(selected_date, datetime.max.time()).timestamp() * 1000
+            )
+            start_epoch_sec = start_epoch_ms // 1000
+            end_epoch_sec = end_epoch_ms // 1000
 
             # 1. Fetch Fuel Consumption Data
             fuel_qs = (
@@ -8148,27 +8189,44 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
             # 2. Fetch DG Unit Consumption Data
             dg_qs = DgUnitConsumption.objects.filter(
                 site=site_id, created__date=selected_date
-            ).values("epoch_time", "unit_consumption", "dg_fuel_consumption")
+            ).values(
+                "epoch_time",
+                "unit_consumption",
+                "dg_fuel_consumption",
+                "fetch_fuel_data",
+            )
 
             dg_unit_data, dg_fuel_data, dg_unit_per_litre = [], [], []
+
             for i in dg_qs:
                 if (
-                    i["epoch_time"] is None
-                    or i["unit_consumption"] is None
+                    i["unit_consumption"] is None
                     or i["dg_fuel_consumption"] is None
+                    or i["fetch_fuel_data"]
                 ):
                     continue
-                x_val = int(i["epoch_time"])
-                u_cons = i["unit_consumption"]
-                f_cons = i["dg_fuel_consumption"]
 
-                dg_unit_data.append({"x": x_val, "y": round(u_cons, 2)})
+                x_val = start_epoch_ms
+                u_cons = float(i["unit_consumption"])
+                f_cons = float(i["dg_fuel_consumption"])
+
+                # Provider fuel fetch completed, including confirmed 0.0.
+                dg_unit_data.append({
+                    "x": x_val,
+                    "y": round(u_cons, 2),
+                })
+
+                dg_fuel_data.append({
+                    "x": x_val,
+                    "y": round(f_cons, 2),
+                })
+
+                # Never divide by zero.
                 if f_cons > 0:
-                    dg_fuel_data.append({"x": x_val, "y": round(f_cons, 2)})
-                    dg_unit_per_litre.append(
-                        {"x": x_val, "y": round(u_cons / f_cons, 2)}
-                    )
-
+                    dg_unit_per_litre.append({
+                        "x": x_val,
+                        "y": round(u_cons / f_cons, 2),
+                    })
             # 3. Fetch Alerts (Combined Refuel and Theft for optimization)
             refuel_data = []
             theft_data = []
@@ -8178,13 +8236,17 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
                 site=site_id,
                 created__date=selected_date,
                 alert_name__in=["refuel", "theft"],
+            ).filter(
+                Q(epoch_time__gte=str(start_epoch_sec), epoch_time__lte=str(end_epoch_sec))
+                | Q(epoch_time__gte=str(start_epoch_ms), epoch_time__lte=str(end_epoch_ms))
             ).values("alert_name", "epoch_time", "fuel_consumption")
             for alert in normalized_alerts:
                 try:
-                    epoch_time = int(alert["epoch_time"])
+                    epoch_raw = int(alert["epoch_time"])
                     fuel_value = float(alert["fuel_consumption"])
                 except (TypeError, ValueError):
                     continue
+                epoch_time = epoch_raw * 1000 if epoch_raw < 100000000000 else epoch_raw
                 alert_key = (alert["alert_name"], epoch_time)
                 if alert_key in alert_keys:
                     continue
@@ -8321,6 +8383,23 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             vehical_number = site.partner_dg_fuel_id.upper()
             from_date = datetime.strptime(from_date, "%Y-%m-%d")
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+            def normalize_epoch_value(epoch_value):
+                epoch_raw = int(epoch_value)
+                return epoch_raw * 1000 if epoch_raw < 100000000000 else epoch_raw
+
+            def day_start_timestamp(record):
+                record_date = None
+                dg_start_date = record.get("dg_start_date") if isinstance(record, dict) else getattr(record, "dg_start_date", None)
+                created_date = record.get("created") if isinstance(record, dict) else getattr(record, "created", None)
+                if dg_start_date is not None:
+                    record_date = dg_start_date.date()
+                elif created_date is not None:
+                    record_date = created_date.date()
+                if record_date is None:
+                    return None
+                return int(datetime.combine(record_date, datetime.min.time()).timestamp() * 1000)
+
             final_data = []
             fuel_data = DgFuelConsumptionData.objects.filter(
                 site=site_id,
@@ -8328,14 +8407,23 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
                 created__date__lte=end_date.date(),
             ).order_by("created")
             for i in fuel_data:
+                if i.epoch_time is None or i.fuel_consumption is None:
+                    continue
                 final_data.append(
-                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
+                    {"x": normalize_epoch_value(i.epoch_time), "y": round(i.fuel_consumption, 2)}
                 )
             dg_data = DgUnitConsumption.objects.filter(
                 site=site_id,
                 created__date__gte=from_date.date(),
                 created__date__lte=end_date.date(),
-            )
+            ).values(
+                "epoch_time",
+                "unit_consumption",
+                "dg_fuel_consumption",
+                "fetch_fuel_data",
+                "created",
+                "dg_start_date",
+            ).order_by("created")
             logger.debug(final_data)
             logger.debug(dg_data)
             print("dg data: ", dg_data)
@@ -8346,18 +8434,30 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
                     logger.debug("i value: ", i)
+                    if (
+                        i["unit_consumption"] is None
+                        or i["dg_fuel_consumption"] is None
+                        or i["fetch_fuel_data"]
+                    ):
+                        continue
+                    x_val = day_start_timestamp(i)
+                    if x_val is None:
+                        continue
+                    unit_consumption = i["unit_consumption"]
+                    fuel_consumption = i["dg_fuel_consumption"]
                     dg_unit_data.append(
-                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
+                        {"x": x_val, "y": round(unit_consumption, 2)}
                     )
-                    if i.dg_fuel_consumption > 0:
+                    if fuel_consumption is not None:
                         dg_fuel_data.append(
-                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
+                            {"x": x_val, "y": round(fuel_consumption, 2)}
                         )
+                    if fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": int(i.epoch_time),
+                                "x": x_val,
                                 "y": round(
-                                    i.unit_consumption / i.dg_fuel_consumption, 2
+                                    unit_consumption / fuel_consumption, 2
                                 ),
                             }
                         )
@@ -8372,7 +8472,7 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             ).values("alert_name", "epoch_time", "fuel_consumption")
             for alert in normalized_alerts:
                 try:
-                    epoch_time = int(alert["epoch_time"])
+                    epoch_time = normalize_epoch_value(alert["epoch_time"])
                     fuel_value = float(alert["fuel_consumption"])
                 except (TypeError, ValueError):
                     continue

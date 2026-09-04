@@ -10,7 +10,9 @@ import os
 import sys
 import time
 from logging.handlers import RotatingFileHandler
+
 import requests
+from django.utils import timezone
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
@@ -24,8 +26,14 @@ django.setup()
 
 from wareApp.dg_fuel.poller import collect_level_cycle
 from wareApp.dg_fuel.normalization import epoch_milliseconds
-from wareApp.dg_fuel.ingestion import record_fuel_level
+from wareApp.dg_fuel.ingestion import record_fuel_alert, record_fuel_level
 from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_unit_consumption
+from wareApp.fuel_providers import (
+    detect_refuel_from_alerts,
+    detect_theft_from_alerts,
+    fetch_loconav_report,
+    fetch_roadcast_report,
+)
 from wareApp.models import DgUnitConsumption, Site
 
 
@@ -129,6 +137,148 @@ def run_current_level_cycle():
         .order_by("id")
     )
     return collect_level_cycle(sites, fetch_loconav, fetch_roadcast, dry_run=False)
+
+
+# def _today_provider_window():
+#     current_time = timezone.localtime()
+#     start_time = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+#     return start_time, current_time
+
+def _today_provider_window():
+    current_time = timezone.now()
+
+    if timezone.is_naive(current_time):
+        current_time = timezone.make_aware(
+            current_time,
+            timezone.get_current_timezone(),
+        )
+
+    current_time = timezone.localtime(current_time)
+    start_time = current_time.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+    return start_time, current_time
+
+def _persist_today_provider_alerts(site, provider, fuel_id, report):
+    if provider == "loconav":
+        refuels = detect_refuel_from_alerts(report or {})
+        thefts = detect_theft_from_alerts(report or {})
+        for event in refuels:
+            record_fuel_alert(
+                site=site,
+                vehicle_number=fuel_id,
+                alert_name="refuel",
+                fuel_liters=event.get("value"),
+                epoch_value=event.get("timestamp"),
+                created=timezone.now(),
+            )
+        for event in thefts:
+            record_fuel_alert(
+                site=site,
+                vehicle_number=fuel_id,
+                alert_name="theft",
+                fuel_liters=event.get("value"),
+                epoch_value=event.get("timestamp"),
+                created=timezone.now(),
+            )
+        return {"refuels": len(refuels), "thefts": len(thefts)}
+
+    if provider == "roadcast":
+        refuels = (report or {}).get("refuels", []) or []
+        thefts = (report or {}).get("thefts", []) or []
+        for event in refuels:
+            record_fuel_alert(
+                site=site,
+                vehicle_number=fuel_id,
+                alert_name="refuel",
+                fuel_liters=event.get("fuel_liters"),
+                epoch_value=event.get("epoch_ms"),
+                created=timezone.now(),
+            )
+        for event in thefts:
+            record_fuel_alert(
+                site=site,
+                vehicle_number=fuel_id,
+                alert_name="theft",
+                fuel_liters=event.get("fuel_liters"),
+                epoch_value=event.get("epoch_ms"),
+                created=timezone.now(),
+            )
+        return {"refuels": len(refuels), "thefts": len(thefts)}
+
+    return {"refuels": 0, "thefts": 0}
+
+
+def poll_today_provider_alerts():
+    start_time, end_time = _today_provider_window()
+    sites = (
+        Site.objects.filter(dg_fuel_system_installed=True)
+        .only("id", "partner_dg_provider", "partner_dg_fuel_id")
+        .order_by("id")
+    )
+    result = {
+        "start_time": start_time,
+        "end_time": end_time,
+        "attempted": 0,
+        "refuels": 0,
+        "thefts": 0,
+        "failed_site_ids": [],
+        "skipped_site_ids": [],
+    }
+
+    for site in sites:
+        provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
+        fuel_id = (getattr(site, "partner_dg_fuel_id", None) or "").strip()
+        if provider not in {"loconav", "roadcast"} or not fuel_id:
+            result["skipped_site_ids"].append(site.id)
+            logger.warning(
+                "Skipping provider alert poll site_id=%s provider=%s vehicle_number=%s reason=%s",
+                site.id,
+                provider,
+                fuel_id,
+                "missing_or_unsupported_provider",
+            )
+            continue
+
+        result["attempted"] += 1
+        try:
+            if provider == "loconav":
+                report = fetch_loconav_report(fuel_id, start_time, end_time)
+            else:
+                report = fetch_roadcast_report(fuel_id, start_time, end_time)
+
+            if not isinstance(report, dict):
+                result["failed_site_ids"].append(site.id)
+                logger.warning(
+                    "Provider alert poll returned no report site_id=%s provider=%s vehicle_number=%s start_time=%s end_time=%s",
+                    site.id,
+                    provider,
+                    fuel_id,
+                    start_time,
+                    end_time,
+                )
+                continue
+
+            counts = _persist_today_provider_alerts(site, provider, fuel_id, report)
+            result["refuels"] += counts["refuels"]
+            result["thefts"] += counts["thefts"]
+        except Exception:
+            result["failed_site_ids"].append(site.id)
+            logger.exception(
+                "Provider alert poll failed site_id=%s provider=%s vehicle_number=%s start_time=%s end_time=%s",
+                site.id,
+                provider,
+                fuel_id,
+                start_time,
+                end_time,
+            )
+
+    logger.info("Today provider alert poll result=%s", result)
+    return result
 
 
 def fetch_real_time_data():
@@ -235,8 +385,13 @@ def retry_closed_dg_runs():
 
 def run_once():
     level_result = run_current_level_cycle()
+    alert_result = poll_today_provider_alerts()
     retry_result = retry_closed_dg_runs()
-    summary = {"level_cycle": level_result, "closed_run_retry": retry_result}
+    summary = {
+        "level_cycle": level_result,
+        "today_provider_alerts": alert_result,
+        "closed_run_retry": retry_result,
+    }
     logger.info("DG fuel cycle summary=%s", summary)
     print(summary)
     return summary

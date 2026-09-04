@@ -229,8 +229,8 @@ class SupplyLoadTimeShare(models.Model):
     # power_source = models.CharField(max_length=40, blank=True, null=True)
     hourly_run_time = models.IntegerField()
     # total_run_time_till_date = models.IntegerField()
-    reading_from = models.DateTimeField(default=timezone.now)
-    reading_to = models.DateTimeField(default=timezone.now)
+    reading_from = models.DateTimeField(default=datetime.now())
+    reading_to = models.DateTimeField(default=datetime.now())
 
     def __str__(self):
         return self.get_power_source_display()
@@ -742,7 +742,7 @@ class MonthlyLoadSharePercentage(models.Model):
     monthly_time_based_percentage = models.PositiveIntegerField(default=0)
     monthly_energy_based_percentage = models.PositiveIntegerField(default=0)
     for_month = models.CharField(max_length=50, null=True, blank=True)
-    created_on = models.DateTimeField(default=timezone.now)
+    created_on = models.DateTimeField(default=datetime.now())
 
     def __str__(self):
         return str(self.time_based_percentage)
@@ -996,12 +996,6 @@ class DgFuelConsumptionData(models.Model):
 
 
 class DgUnitConsumption(models.Model):
-    class DailyDataStatus(models.TextChoices):
-        OPEN = "OPEN", "Open"
-        PENDING = "PENDING", "Pending"
-        COMPLETED = "COMPLETED", "Completed"
-        FAILED = "FAILED", "Failed"
-
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
@@ -1015,17 +1009,10 @@ class DgUnitConsumption(models.Model):
     epoch_time = models.CharField(max_length=50, null=True, blank=True)
     is_dg_on = models.BooleanField(default=False)
     fetch_fuel_data = models.BooleanField(default=False)
-    daily_data_status = models.CharField(
-        max_length=16,
-        choices=DailyDataStatus.choices,
-        default=DailyDataStatus.COMPLETED,
-    )
-    daily_data_retry_count = models.PositiveIntegerField(default=0)
-    daily_data_last_attempt_at = models.DateTimeField(null=True, blank=True)
-    daily_data_retry_deadline = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return str(self.unit_consumption)
+
 
 class DGFuelAlertsData(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)

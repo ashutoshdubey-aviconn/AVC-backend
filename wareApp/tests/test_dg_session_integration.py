@@ -208,9 +208,13 @@ class DgSessionIntegrationTests(TestCase):
         )
         mock_fetch.return_value = 12.5
         mock_report.return_value = {
-            "alerts": {
-                "REFUELING_ALERT": [{"timestamp": 1788115579, "value": 14.4}],
-                "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1788116679, "value": 1.4}],
+            "status": True,
+            "data": {
+                "refuel": {"value": 14.4, "unit": "L"},
+                "alerts": {
+                    "REFUELING_ALERT": [{"timestamp": 1788115579, "value": 14.4}],
+                    "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1788116679, "value": 1.4}],
+                },
             }
         }
 
@@ -219,6 +223,55 @@ class DgSessionIntegrationTests(TestCase):
         ok = attempt_fetch_for_unit(unit)
 
         self.assertTrue(ok)
+        self.assertTrue(
+            DGFuelAlertsData.objects.filter(
+                site=site, alert_name="refuel", epoch_time="1788115579000"
+            ).exists()
+        )
+        self.assertTrue(
+            DGFuelAlertsData.objects.filter(
+                site=site, alert_name="theft", epoch_time="1788116679000"
+            ).exists()
+        )
+
+    @patch("wareApp.dg_fuel.sessions.fetch_loconav_report")
+    @patch("wareApp.dg_fuel.sessions.fetch_loconav_fuel")
+    def test_loconav_report_events_are_persisted_without_fuel_value(
+        self, mock_fetch, mock_report
+    ):
+        site = Site.objects.create(
+            site_name="Loconav No Fuel Value Site",
+            partner_dg_fuel_id="DCGenerator-01",
+            partner_dg_provider="loconav",
+            dg_fuel_tank_capacity=50,
+        )
+        aisle = AisleGroup.objects.create(site=site, aisleGroupName="A1", power_source=1)
+        DailySiteReading.objects.create(
+            associated_Site=site,
+            aisle_group=aisle,
+            leg_id=str(aisle.id),
+            unit_consumption=79.69,
+            daily_baseline_value=0,
+            reading_for=timezone.now().date(),
+            is_visible=True,
+        )
+        mock_fetch.return_value = None
+        mock_report.return_value = {
+            "status": True,
+            "data": {
+                "refuel": {"value": 14.4, "unit": "L"},
+                "alerts": {
+                    "REFUELING_ALERT": [{"timestamp": 1788115579, "value": 14.4}],
+                    "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1788116679, "value": 1.4}],
+                },
+            }
+        }
+
+        reconcile_daily_unit_consumption(site)
+        unit = DgUnitConsumption.objects.get(site=site, aisle_group=aisle)
+        ok = attempt_fetch_for_unit(unit)
+
+        self.assertFalse(ok)
         self.assertTrue(
             DGFuelAlertsData.objects.filter(
                 site=site, alert_name="refuel", epoch_time="1788115579000"

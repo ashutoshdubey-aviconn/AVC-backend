@@ -307,11 +307,23 @@ def fetch_loconav_report(
     return None
 
 
+def _loconav_alerts_container(alerts_json: Dict[str, Any]) -> Dict[str, Any]:
+    if not alerts_json or not isinstance(alerts_json, dict):
+        return {}
+
+    data = alerts_json.get("data") or {}
+    if isinstance(data, dict):
+        nested_alerts = data.get("alerts")
+        if isinstance(nested_alerts, dict):
+            return nested_alerts
+
+    root_alerts = alerts_json.get("alerts") or {}
+    return root_alerts if isinstance(root_alerts, dict) else {}
+
+
 def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     out = []
-    if not alerts_json or not isinstance(alerts_json, dict):
-        return out
-    alerts = alerts_json.get("alerts") or {}
+    alerts = _loconav_alerts_container(alerts_json)
     refuel = alerts.get("REFUELING_ALERT") or []
     for r in refuel:
         try:
@@ -324,9 +336,7 @@ def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any
 
 def detect_theft_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     out = []
-    if not alerts_json or not isinstance(alerts_json, dict):
-        return out
-    alerts = alerts_json.get("alerts") or {}
+    alerts = _loconav_alerts_container(alerts_json)
     theft = alerts.get("POSSIBLE_FUEL_THEFT_ALERT") or []
     for t in theft:
         try:

@@ -70,20 +70,21 @@ def _daily_window(reading_date: date_type) -> tuple[datetime, datetime]:
         day_end = dj_timezone.make_aware(day_end, current_timezone)
     return day_start, day_end
 
-
 def reconcile_daily_unit_consumption(
     site: Site, reading_date: Optional[date_type] = None
 ) -> dict:
-    """Materialize DG unit rows from the daily site readings for one site/day."""
+    """Materialize DG unit rows from MAIN DailySiteReading for one site/day."""
     if site is None:
         return {"created": 0, "updated": 0, "skipped": 0}
 
     reading_date = reading_date or dj_timezone.now().date()
+
     logger.info(
         "Reconciling DG unit consumption site_id=%s reading_date=%s",
         site.id,
         reading_date,
     )
+
     day_start, day_end = _daily_window(reading_date)
     epoch_time = int(day_end.timestamp() * 1000)
 
@@ -92,110 +93,115 @@ def reconcile_daily_unit_consumption(
     skipped = 0
     seen_aisles = set()
 
-    with transaction.atomic():
-        daily_readings = (
-            DailySiteReading.objects.select_for_update()
-            .filter(associated_Site=site, reading_for=reading_date)
-            .exclude(aisle_group__isnull=True)
-            .select_related("aisle_group")
-            .order_by("aisle_group_id", "-id")
+    # MAIN DB is authoritative for DailySiteReading.
+    daily_readings = (
+        DailySiteReading.objects.using("main")
+        .filter(
+            associated_Site_id=site.id,
+            reading_for=reading_date,
+            aisle_group__power_source__gte=1,
+        )
+        .exclude(aisle_group_id__isnull=True)
+        .order_by("aisle_group_id", "-id")
+    )
+
+    for daily_reading in daily_readings:
+        aisle_id = daily_reading.aisle_group_id
+
+        if aisle_id in seen_aisles:
+            continue
+
+        seen_aisles.add(aisle_id)
+
+        unit_value = as_float(daily_reading.unit_consumption)
+
+        if unit_value is None:
+            skipped += 1
+            logger.warning(
+                "Skipping DG unit reconciliation site_id=%s "
+                "aisle_group_id=%s reading_date=%s reason=%s",
+                site.id,
+                aisle_id,
+                reading_date,
+                "invalid_daily_unit_consumption",
+            )
+            continue
+
+        # TEST DB
+        unit = (
+            DgUnitConsumption.objects
+            .filter(
+                site_id=site.id,
+                aisle_group_id=aisle_id,
+                created__date=reading_date,
+            )
+            .order_by("-id")
+            .first()
         )
 
-        for daily_reading in daily_readings:
-            aisle_id = daily_reading.aisle_group_id
-            if aisle_id in seen_aisles:
-                continue
-            seen_aisles.add(aisle_id)
+        if unit:
+            update_fields = []
 
-            unit_value = as_float(daily_reading.unit_consumption)
-            if unit_value is None:
-                skipped += 1
-                logger.warning(
-                    "Skipping DG unit reconciliation site_id=%s aisle_group_id=%s reading_date=%s reason=%s",
-                    site.id,
-                    aisle_id,
-                    reading_date,
-                    "invalid_daily_unit_consumption",
-                )
-                continue
+            if unit.unit_consumption != unit_value:
+                unit.unit_consumption = unit_value
+                update_fields.append("unit_consumption")
 
-            unit = (
-                DgUnitConsumption.objects.select_for_update()
-                .filter(site=site, aisle_group=daily_reading.aisle_group, created__date=reading_date)
-                .order_by("-id")
-                .first()
+            if unit.created != day_start:
+                unit.created = day_start
+                update_fields.append("created")
+
+            if unit.dg_start_date != day_start:
+                unit.dg_start_date = day_start
+                update_fields.append("dg_start_date")
+
+            if unit.dg_end_date != day_end:
+                unit.dg_end_date = day_end
+                update_fields.append("dg_end_date")
+
+            if unit.epoch_time != epoch_time:
+                unit.epoch_time = epoch_time
+                update_fields.append("epoch_time")
+
+            if unit.dg_fuel_consumption is None and not unit.fetch_fuel_data:
+                unit.fetch_fuel_data = True
+                update_fields.append("fetch_fuel_data")
+
+            if update_fields:
+                unit.save(update_fields=update_fields)
+
+            updated += 1
+
+        else:
+            DgUnitConsumption.objects.create(
+                site_id=site.id,
+                aisle_group_id=aisle_id,
+                unit_consumption=unit_value,
+                dg_fuel_consumption=None,
+                created=day_start,
+                dg_start_date=day_start,
+                dg_end_date=day_end,
+                epoch_time=epoch_time,
+                is_dg_on=False,
+                fetch_fuel_data=True,
             )
 
-            if unit:
-                update_fields = []
-                if unit.unit_consumption != unit_value:
-                    unit.unit_consumption = unit_value
-                    update_fields.append("unit_consumption")
-                if unit.created != day_start:
-                    unit.created = day_start
-                    update_fields.append("created")
-                if unit.dg_start_date != day_start:
-                    unit.dg_start_date = day_start
-                    update_fields.append("dg_start_date")
-                if unit.dg_end_date != day_end:
-                    unit.dg_end_date = day_end
-                    update_fields.append("dg_end_date")
-                if unit.epoch_time != epoch_time:
-                    unit.epoch_time = epoch_time
-                    update_fields.append("epoch_time")
-                if unit.dg_fuel_consumption is None and not unit.fetch_fuel_data:
-                    unit.fetch_fuel_data = True
-                    update_fields.append("fetch_fuel_data")
-                if update_fields:
-                    unit.save(update_fields=update_fields)
-                    logger.info(
-                        "Updated DG unit row site_id=%s aisle_group_id=%s reading_date=%s unit_consumption=%s dg_start_date=%s dg_end_date=%s epoch_time=%s fetch_fuel_data=%s",
-                        site.id,
-                        aisle_id,
-                        reading_date,
-                        unit.unit_consumption,
-                        unit.dg_start_date,
-                        unit.dg_end_date,
-                        unit.epoch_time,
-                        unit.fetch_fuel_data,
-                    )
-                updated += 1
-            else:
-                DgUnitConsumption.objects.create(
-                    site=site,
-                    aisle_group=daily_reading.aisle_group,
-                    unit_consumption=unit_value,
-                    dg_fuel_consumption=None,
-                    created=day_start,
-                    dg_start_date=day_start,
-                    dg_end_date=day_end,
-                    epoch_time=epoch_time,
-                    is_dg_on=False,
-                    fetch_fuel_data=True,
-                )
-                logger.info(
-                    "Created DG unit row site_id=%s aisle_group_id=%s reading_date=%s unit_consumption=%s dg_start_date=%s dg_end_date=%s epoch_time=%s fetch_fuel_data=%s",
-                    site.id,
-                    aisle_id,
-                    reading_date,
-                    unit_value,
-                    day_start,
-                    day_end,
-                    epoch_time,
-                    True,
-                )
-                created += 1
+            created += 1
 
     logger.info(
-        "DG unit reconciliation summary site_id=%s reading_date=%s created=%s updated=%s skipped=%s",
+        "DG unit reconciliation summary site_id=%s reading_date=%s "
+        "created=%s updated=%s skipped=%s",
         site.id,
         reading_date,
         created,
         updated,
         skipped,
     )
-    return {"created": created, "updated": updated, "skipped": skipped}
 
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+    }
 
 def determine_provider(site: Site) -> Optional[str]:
     """Return the configured provider name for a site."""
@@ -232,123 +238,7 @@ def _fetch_loconav_report(
         return None
 
 
-def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
-    """Fetch consumed fuel for a closed DG run and persist the result."""
-    if not unit or not unit.dg_start_date or not unit.dg_end_date:
-        return False
-
-    if unit.unit_consumption is None:
-        sync_daily_value = _daily_unit_consumption_for_unit(unit)
-        if sync_daily_value is not None:
-            unit.unit_consumption = sync_daily_value
-            unit.save(update_fields=["unit_consumption"])
-
-    if unit.unit_consumption is None:
-        unit.fetch_fuel_data = True
-        unit.save(update_fields=["fetch_fuel_data"])
-        return False
-
-    site = unit.site
-    provider = determine_provider(site)
-    if provider is None:
-        logger.warning(
-            "Skipping DG fuel fetch site_id=%s unit_id=%s vehicle_number=%s due to missing or invalid provider configuration",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-        )
-        unit.fetch_fuel_data = True
-        unit.save(update_fields=["fetch_fuel_data"])
-        return False
-
-    try:
-        if provider == "roadcast":
-            value = _fetch_roadcast_fuel(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
-            )
-        else:
-            value = _fetch_loconav_fuel(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
-            )
-    except Exception:
-        value = None
-
-    if value is None:
-        logger.warning(
-            "DG fuel fetch returned no usable value site_id=%s unit_id=%s vehicle_number=%s provider=%s dg_start_date=%s dg_end_date=%s unit_consumption=%s",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-            provider,
-            unit.dg_start_date,
-            unit.dg_end_date,
-            unit.unit_consumption,
-        )
-        unit.fetch_fuel_data = True
-        unit.save(update_fields=["fetch_fuel_data"])
-        return False
-
-    normalized_value = as_float(value)
-    if normalized_value is None:
-        logger.warning(
-            "DG fuel fetch returned invalid value site_id=%s unit_id=%s vehicle_number=%s provider=%s value=%r dg_start_date=%s dg_end_date=%s",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-            provider,
-            value,
-            unit.dg_start_date,
-            unit.dg_end_date,
-        )
-        unit.fetch_fuel_data = True
-        unit.save(update_fields=["fetch_fuel_data"])
-        return False
-
-    try:
-        unit.dg_fuel_consumption = normalized_value
-    except Exception:
-        logger.exception(
-            "Failed to persist DG fuel value site_id=%s unit_id=%s vehicle_number=%s provider=%s",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-            provider,
-        )
-        unit.fetch_fuel_data = True
-        unit.save(update_fields=["fetch_fuel_data"])
-        return False
-    unit.fetch_fuel_data = False
-    unit.save(update_fields=["dg_fuel_consumption", "fetch_fuel_data"])
-
-    if unit.unit_consumption is not None and unit.unit_consumption <= 0:
-        NewAlarmsNotifications.objects.create(
-            site_id=site,
-            alarm_type=9,
-            alarm_priority=0,
-            created=dj_timezone.now(),
-        )
-
-    try:
-        tank_capacity = site.dg_fuel_tank_capacity
-        if detect_suspicious_fuel(tank_capacity, unit.dg_fuel_consumption):
-            DGFuelAlertsData.objects.create(
-                site=site,
-                vehicle_number=site.partner_dg_fuel_id,
-                alert_name="suspicious_fuel",
-                fuel_consumption=unit.dg_fuel_consumption,
-                epoch_time=str(int(time.time())),
-                created=dj_timezone.now(),
-            )
-            NewAlarmsNotifications.objects.create(
-                site_id=site,
-                alarm_type=6,
-                alarm_priority=1,
-                created=dj_timezone.now(),
-                fuel_level=unit.dg_fuel_consumption,
-            )
-    except Exception:
-        pass
-
+def _persist_provider_alerts(site: Site, unit: DgUnitConsumption, provider: str) -> None:
     if provider == "roadcast":
         try:
             report = fetch_roadcast_report(
@@ -404,4 +294,125 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
         except Exception:
             pass
 
-    return True
+
+def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
+    """Fetch consumed fuel for a closed DG run and persist the result."""
+    if not unit or not unit.dg_start_date or not unit.dg_end_date:
+        return False
+
+    if unit.unit_consumption is None:
+        sync_daily_value = _daily_unit_consumption_for_unit(unit)
+        if sync_daily_value is not None:
+            unit.unit_consumption = sync_daily_value
+            unit.save(update_fields=["unit_consumption"])
+
+    if unit.unit_consumption is None:
+        unit.fetch_fuel_data = True
+        unit.save(update_fields=["fetch_fuel_data"])
+        return False
+
+    site = unit.site
+    provider = determine_provider(site)
+    if provider is None:
+        logger.warning(
+            "Skipping DG fuel fetch site_id=%s unit_id=%s vehicle_number=%s due to missing or invalid provider configuration",
+            getattr(site, "id", None),
+            getattr(unit, "id", None),
+            getattr(site, "partner_dg_fuel_id", None),
+        )
+        unit.fetch_fuel_data = True
+        unit.save(update_fields=["fetch_fuel_data"])
+        return False
+
+    fuel_fetch_success = False
+    try:
+        if provider == "roadcast":
+            value = _fetch_roadcast_fuel(
+                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+            )
+        else:
+            value = _fetch_loconav_fuel(
+                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+            )
+    except Exception:
+        value = None
+
+    if value is None:
+        logger.warning(
+            "DG fuel fetch returned no usable value site_id=%s unit_id=%s vehicle_number=%s provider=%s dg_start_date=%s dg_end_date=%s unit_consumption=%s",
+            getattr(site, "id", None),
+            getattr(unit, "id", None),
+            getattr(site, "partner_dg_fuel_id", None),
+            provider,
+            unit.dg_start_date,
+            unit.dg_end_date,
+            unit.unit_consumption,
+        )
+        unit.fetch_fuel_data = True
+        unit.save(update_fields=["fetch_fuel_data"])
+    else:
+        normalized_value = as_float(value)
+        if normalized_value is None:
+            logger.warning(
+                "DG fuel fetch returned invalid value site_id=%s unit_id=%s vehicle_number=%s provider=%s value=%r dg_start_date=%s dg_end_date=%s",
+                getattr(site, "id", None),
+                getattr(unit, "id", None),
+                getattr(site, "partner_dg_fuel_id", None),
+                provider,
+                value,
+                unit.dg_start_date,
+                unit.dg_end_date,
+            )
+            unit.fetch_fuel_data = True
+            unit.save(update_fields=["fetch_fuel_data"])
+        else:
+            try:
+                unit.dg_fuel_consumption = normalized_value
+            except Exception:
+                logger.exception(
+                    "Failed to persist DG fuel value site_id=%s unit_id=%s vehicle_number=%s provider=%s",
+                    getattr(site, "id", None),
+                    getattr(unit, "id", None),
+                    getattr(site, "partner_dg_fuel_id", None),
+                    provider,
+                )
+                unit.fetch_fuel_data = True
+                unit.save(update_fields=["fetch_fuel_data"])
+            else:
+                unit.fetch_fuel_data = False
+                unit.save(update_fields=["dg_fuel_consumption", "fetch_fuel_data"])
+                fuel_fetch_success = True
+
+    if fuel_fetch_success:
+        if unit.unit_consumption is not None and unit.unit_consumption <= 0:
+            NewAlarmsNotifications.objects.create(
+                site_id=site,
+                alarm_type=9,
+                alarm_priority=0,
+                created=dj_timezone.now(),
+            )
+
+        try:
+            tank_capacity = site.dg_fuel_tank_capacity
+            if detect_suspicious_fuel(tank_capacity, unit.dg_fuel_consumption):
+                DGFuelAlertsData.objects.create(
+                    site=site,
+                    vehicle_number=site.partner_dg_fuel_id,
+                    alert_name="suspicious_fuel",
+                    fuel_consumption=unit.dg_fuel_consumption,
+                    epoch_time=str(int(time.time())),
+                    created=dj_timezone.now(),
+                )
+                NewAlarmsNotifications.objects.create(
+                    site_id=site,
+                    alarm_type=6,
+                    alarm_priority=1,
+                    created=dj_timezone.now(),
+                    fuel_level=unit.dg_fuel_consumption,
+                )
+        except Exception:
+            pass
+
+    _persist_provider_alerts(site, unit, provider)
+
+    return fuel_fetch_success
