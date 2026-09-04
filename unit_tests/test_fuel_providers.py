@@ -65,6 +65,27 @@ class FuelProvidersTests(unittest.TestCase):
             val = fp.fetch_loconav_fuel("veh1", start, end)
             self.assertEqual(val, 7.75)
 
+    def test_loconav_report_payload(self):
+        start = datetime.utcnow() - timedelta(hours=2)
+        end = datetime.utcnow()
+
+        report = {
+            "alerts": {
+                "REFUELING_ALERT": [{"timestamp": 1620000000, "value": 12.3}],
+                "POSSIBLE_FUEL_THEFT_ALERT": [{"timestamp": 1620001000, "value": 1.2}],
+            }
+        }
+
+        def side_effect(url, params=None, headers=None, timeout=None):
+            if "marketplace.loconav.com/api/v1/vehicles/fuel?" in url:
+                return MockResponse(200, report)
+            return MockResponse(404, {})
+
+        with patch("wareApp.fuel_providers.requests.get", side_effect=side_effect):
+            payload = fp.fetch_loconav_report("veh1", start, end)
+
+        self.assertEqual(payload, report)
+
     def test_detect_refuel_and_theft(self):
         alerts = {
             "alerts": {

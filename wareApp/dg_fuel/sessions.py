@@ -12,7 +12,10 @@ from django.utils import timezone as dj_timezone
 from wareApp.dg_fuel.normalization import as_float
 from wareApp.fuel_providers import (
     detect_suspicious_fuel,
+    detect_refuel_from_alerts,
+    detect_theft_from_alerts,
     fetch_loconav_fuel,
+    fetch_loconav_report,
     fetch_roadcast_fuel,
     fetch_roadcast_report,
 )
@@ -220,6 +223,15 @@ def _fetch_loconav_fuel(
         return None
 
 
+def _fetch_loconav_report(
+    vehicle_number: str, start_dt: datetime, end_dt: datetime
+) -> Optional[dict]:
+    try:
+        return fetch_loconav_report(vehicle_number, start_dt, end_dt)
+    except Exception:
+        return None
+
+
 def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
     """Fetch consumed fuel for a closed DG run and persist the result."""
     if not unit or not unit.dg_start_date or not unit.dg_end_date:
@@ -359,6 +371,34 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
                         alert_name="theft",
                         fuel_liters=event.get("fuel_liters"),
                         epoch_value=event.get("epoch_ms"),
+                        created=dj_timezone.now(),
+                    )
+        except Exception:
+            pass
+    elif provider == "loconav":
+        try:
+            report = _fetch_loconav_report(
+                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+            )
+            if isinstance(report, dict):
+                refuels = detect_refuel_from_alerts(report)
+                thefts = detect_theft_from_alerts(report)
+                for event in refuels:
+                    record_fuel_alert(
+                        site=site,
+                        vehicle_number=site.partner_dg_fuel_id,
+                        alert_name="refuel",
+                        fuel_liters=event.get("value"),
+                        epoch_value=event.get("timestamp"),
+                        created=dj_timezone.now(),
+                    )
+                for event in thefts:
+                    record_fuel_alert(
+                        site=site,
+                        vehicle_number=site.partner_dg_fuel_id,
+                        alert_name="theft",
+                        fuel_liters=event.get("value"),
+                        epoch_value=event.get("timestamp"),
                         created=dj_timezone.now(),
                     )
         except Exception:

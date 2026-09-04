@@ -281,6 +281,32 @@ def fetch_loconav_fuel(
     return None
 
 
+def fetch_loconav_report(
+    vehicle_number: str, start_dt: datetime, end_dt: datetime
+) -> Optional[Dict[str, Any]]:
+    """Fetch the Loconav fuel report payload for a DG-run window."""
+    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+    start_ts = int(start_dt.timestamp())
+    end_ts = int(end_dt.timestamp())
+
+    for v in vehicle_variants(vehicle_number):
+        url = (
+            "https://marketplace.loconav.com/api/v1/vehicles/fuel"
+            f"?vehicle_number={v}&start_time={start_ts}&end_time={end_ts}"
+        )
+        r = _try_request(url, headers=headers, timeout=8, retries=2)
+        if r is None:
+            continue
+        try:
+            j = r.json()
+        except Exception:
+            continue
+        if isinstance(j, dict):
+            return j
+
+    return None
+
+
 def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     out = []
     if not alerts_json or not isinstance(alerts_json, dict):
