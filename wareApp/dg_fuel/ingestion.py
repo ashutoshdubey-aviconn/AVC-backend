@@ -11,7 +11,6 @@ from wareApp.models import DGFuelAlertsData, DgFuelConsumptionData, Site
 from .dedupe import dedupe_dg_consumption
 from .normalization import as_float, epoch_milliseconds
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +40,9 @@ def record_fuel_level(
             source,
             "missing_vehicle_or_invalid_fuel_or_timestamp",
         )
-        raise ValueError("Fuel level requires a vehicle, numeric fuel value, and timestamp")
+        raise ValueError(
+            "Fuel level requires a vehicle, numeric fuel value, and timestamp"
+        )
 
     created = created or _created_from_epoch(normalized_epoch)
     with transaction.atomic():
@@ -55,7 +56,7 @@ def record_fuel_level(
                 "created": created,
             },
         )
-    logger.info(
+    logger.debug(
         "DG fuel level %s site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s created_at=%s source=%s",
         "created" if created_flag else "existing",
         getattr(site, "id", None),
@@ -90,7 +91,9 @@ def record_fuel_alert(
             epoch_value,
             "missing_vehicle_or_invalid_fuel_or_timestamp",
         )
-        raise ValueError("Fuel alert requires a vehicle, numeric fuel value, and timestamp")
+        raise ValueError(
+            "Fuel alert requires a vehicle, numeric fuel value, and timestamp"
+        )
     if alert_name not in {"refuel", "theft"}:
         logger.warning(
             "Skipping DG fuel alert write site_id=%s vehicle_number=%s alert_name=%s reason=%s",
@@ -110,7 +113,7 @@ def record_fuel_alert(
             epoch_time=str(normalized_epoch),
             defaults={"fuel_consumption": normalized_fuel, "created": created},
         )
-    logger.info(
+    logger.debug(
         "DG fuel alert %s site_id=%s vehicle_number=%s alert_name=%s fuel_liters=%s epoch_ms=%s created_at=%s",
         "created" if created_flag else "existing",
         getattr(site, "id", None),

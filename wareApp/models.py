@@ -996,6 +996,12 @@ class DgFuelConsumptionData(models.Model):
 
 
 class DgUnitConsumption(models.Model):
+    class DailyDataStatus(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        PENDING = "PENDING", "Pending"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
@@ -1009,6 +1015,12 @@ class DgUnitConsumption(models.Model):
     epoch_time = models.CharField(max_length=50, null=True, blank=True)
     is_dg_on = models.BooleanField(default=False)
     fetch_fuel_data = models.BooleanField(default=False)
+    daily_data_status = models.CharField(
+        max_length=16, choices=DailyDataStatus.choices, default=DailyDataStatus.COMPLETED
+    )
+    daily_data_retry_count = models.PositiveIntegerField(default=0)
+    daily_data_last_attempt_at = models.DateTimeField(blank=True, null=True)
+    daily_data_retry_deadline = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return str(self.unit_consumption)

@@ -21,7 +21,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from wareApp.models import *
 from wareApp import sendmail
 from wareApp.serializers import *
-from wareApp.utility import entryExit, logger
+from wareApp.utility import entryExit
 
 
 # Replace real logger with a no-op logger to avoid noisy debug calls in views
@@ -37,6 +37,7 @@ class _NoopLogger:
 
     def error(self, *args, **kwargs):
         return None
+
 
 logger = _NoopLogger()
 
@@ -154,6 +155,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 
 class FetchAllCustomersForSuperAdmin(APIView):
+    throttle_classes = []
     # authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
@@ -162,20 +164,35 @@ class FetchAllCustomersForSuperAdmin(APIView):
         user_id = data.get("user_id")
         start_date = data.get("start_date")
         end_date = data.get("end_date")
-        User.objects.only("id").get(id=user_id)
 
+        user_obj = None
+        if user_id:
+            try:
+                user_obj = User.objects.filter(id=user_id).first()
+            except Exception:
+                pass
+
+        default_super_admin_customers = [2, 4, 27, 28, 29, 31, 32, 38, 39, 55, 60, 68]
         allowed_customers_by_user = {
-            22: [2, 4, 27, 28, 29, 31, 32, 38, 39, 55, 60, 68],
+            22: default_super_admin_customers,
         }
 
-        all_users_query = User.objects.filter(UserType=4)
+        allowed_customer_ids = default_super_admin_customers
         if user_id:
-            allowed_customer_ids = allowed_customers_by_user.get(int(user_id))
-            if allowed_customer_ids:
-                all_users_query = all_users_query.filter(id__in=allowed_customer_ids)
+            try:
+                uid_int = int(user_id)
+                if uid_int in allowed_customers_by_user:
+                    allowed_customer_ids = allowed_customers_by_user[uid_int]
+            except (ValueError, TypeError):
+                pass
 
-        all_users = list(all_users_query.only("id", "username").order_by("id"))
-        customer_ids = [user.id for user in all_users]
+        all_users_query = User.objects.filter(UserType=4, id__in=allowed_customer_ids)
+
+        all_users = list(all_users_query.values("id", "username").order_by("id"))
+        if not all_users:
+            return Response({"data": []})
+
+        customer_ids = [u["id"] for u in all_users]
 
         site_counts = {
             item["customer_id"]: item
@@ -192,11 +209,14 @@ class FetchAllCustomersForSuperAdmin(APIView):
             associated_Site__is_live=True,
         )
         if start_date is not None and end_date is not None:
-            start_date = datetime.strptime(start_date, "%Y/%m/%d").date()
-            end_date = datetime.strptime(end_date, "%Y/%m/%d").date()
-            daily_readings = daily_readings.filter(
-                reading_for__gte=start_date, reading_for__lte=end_date
-            )
+            try:
+                start_dt = datetime.strptime(start_date, "%Y/%m/%d").date()
+                end_dt = datetime.strptime(end_date, "%Y/%m/%d").date()
+                daily_readings = daily_readings.filter(
+                    reading_for__gte=start_dt, reading_for__lte=end_dt
+                )
+            except (ValueError, TypeError):
+                pass
         else:
             current_date = datetime.now()
             daily_readings = daily_readings.filter(
@@ -211,16 +231,19 @@ class FetchAllCustomersForSuperAdmin(APIView):
             readings_by_customer[item["associated_Site__customer_id"]].append(item)
 
         response_data = []
-        for users in all_users:
-            customer_readings = readings_by_customer.get(users.id, [])
+        for user in all_users:
+            cid = user["id"]
+            cname = user["username"]
+            customer_readings = readings_by_customer.get(cid, [])
+
             total_energy_saved = [i.get("sum") or 0 for i in customer_readings]
             total_baseline = [i.get("baseline") or 0 for i in customer_readings]
             total_saved = sum(total_energy_saved)
             total_base = sum(total_baseline)
 
-            average = 0
-            max_saving = 0
-            min_saving = 0
+            average = 0.0
+            max_saving = 0.0
+            min_saving = 0.0
             if total_saved > 0 and total_base > 0:
                 average = (total_saved / total_base) * 100
                 max_saved = max(total_energy_saved)
@@ -232,15 +255,15 @@ class FetchAllCustomersForSuperAdmin(APIView):
                 if min_baseline > 0:
                     min_saving = (min_saved / min_baseline) * 100
 
-            counts = site_counts.get(users.id, {})
+            counts = site_counts.get(cid, {})
             customer_data = {
-                "customer_id": users.id,
-                "customer_name": users.username,
+                "customer_id": cid,
+                "customer_name": cname,
                 "total_WH": counts.get("total_sites", 0),
                 "live_Wh": counts.get("total_live_sites", 0),
-                "avg_saving": str(round(average, 2)) + " %",
-                "max_saving": str(round(max_saving, 2)) + " %",
-                "min_saving": str(round(min_saving, 2)) + " %",
+                "avg_saving": f"{round(average, 2)} %",
+                "max_saving": f"{round(max_saving, 2)} %",
+                "min_saving": f"{round(min_saving, 2)} %",
             }
             response_data.append(customer_data)
         return Response({"data": response_data})
@@ -499,6 +522,21 @@ class SiteTotalGraphDataDaily(APIView):
 
             # Optimization & Caching START
             data = []
+
+            # 1. Calculate Date Range (Caps at 31 days)
+            max_days = 31
+            actual_days = (till_date - from_date).days + 1
+            days_to_process = min(actual_days, max_days)
+
+            dates_obj_list = [
+                from_date.date() + timedelta(days=i) for i in range(days_to_process)
+            ]
+            dates = dates_obj_list  # for response
+
+            if not dates_obj_list:
+                return Response(
+                    {"Dates": [], "Data": [], "status": "1", "msg": "No Data"}
+                )
 
             start_date_obj = dates_obj_list[0]
             end_date_obj = dates_obj_list[-1]
@@ -768,18 +806,16 @@ class DgFuelConsumptionDataApi_new(APIView):
                     {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
                 )
             dg_data = DgUnitConsumption.objects.filter(
-                site=site_id, created__date=selected_date.date()
+                site=site_id,
+                created__date=selected_date.date(),
+                daily_data_status=DgUnitConsumption.DailyDataStatus.COMPLETED,
             )
-            logger.debug(final_data)
-            logger.debug(dg_data)
             print("dg data: ", dg_data)
             dg_unit_data = []
             dg_fuel_data = []
             dg_unit_per_litre = []
             if dg_data.exists():
-                logger.debug("enside dg data conditions")
                 for i in dg_data:
-                    logger.debug("i value: ", i)
                     dg_unit_data.append(
                         {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
                     )
@@ -805,28 +841,6 @@ class DgFuelConsumptionDataApi_new(APIView):
             theft_data = []
 
             print(vehical_number)
-            normalized_alerts = DGFuelAlertsData.objects.filter(
-                site=site_id,
-                created__date=selected_date.date(),
-                alert_name__in=["refuel", "theft"],
-            ).values("alert_name", "epoch_time", "fuel_consumption")
-            alert_keys = set()
-            for alert in normalized_alerts:
-                try:
-                    epoch_time = int(alert["epoch_time"])
-                    fuel_value = float(alert["fuel_consumption"])
-                except (TypeError, ValueError):
-                    continue
-                alert_key = (alert["alert_name"], epoch_time)
-                if alert_key in alert_keys:
-                    continue
-                alert_keys.add(alert_key)
-                point = {"x": epoch_time, "y": fuel_value}
-                if alert["alert_name"] == "refuel":
-                    refuel_data.append(point)
-                else:
-                    theft_data.append(point)
-
             refuel_alerts_for_site = DGAlertsData.objects.filter(
                 Q(alert_data__contains=vehical_number)
                 & Q(alert_data__contains="RefuelingAlert")
@@ -840,15 +854,9 @@ class DgFuelConsumptionDataApi_new(APIView):
                 epoch_time = datetime.strptime(
                     i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
                 ).timestamp()
-                refuel_point = {
-                    "x": int(epoch_time) * 1000,
-                    "y": i.get("refueled_in_liters"),
-                }
-                alert_key = ("legacy_refuel", refuel_point["x"])
-                if alert_key in alert_keys:
-                    continue
-                alert_keys.add(alert_key)
-                refuel_data.append(refuel_point)
+                refuel_data.append(
+                    {"x": int(epoch_time) * 1000, "y": i.get("refueled_in_liters")}
+                )
 
             theft_alerts = DGAlertsData.objects.filter(
                 Q(alert_data__contains=vehical_number)
@@ -857,12 +865,7 @@ class DgFuelConsumptionDataApi_new(APIView):
             )
             theft_alerts = [i.alert_data for i in theft_alerts]
             for i in theft_alerts:
-                theft_point = {"x": i.timestamp * 1000, "y": i.get("value")}
-                alert_key = ("legacy_theft", theft_point["x"])
-                if alert_key in alert_keys:
-                    continue
-                alert_keys.add(alert_key)
-                theft_data.append(theft_point)
+                theft_data.append({"x": i.timestamp * 1000, "y": i.get("value")})
 
             refuel_final_data = {
                 "name": "Refuel",
@@ -3465,7 +3468,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                     month = current_date - timedelta(i * 365 / 12)
                     month_year = month.strftime("%Y-%m")
 
-                    # ðŸ”´ USE REDIS FOR PREVIOUS MONTHS
+                    # 🔴 USE REDIS FOR PREVIOUS MONTHS
                     if month_year != current_month_key and cached_prev_data:
                         idx = cached_prev_data["months"].index(
                             month.strftime('%b') + "-" + month.strftime('%Y')
@@ -3478,7 +3481,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                         percentage_saved_list.append(cached_prev_data["percentageSaved"][idx])
                         continue
 
-                    # ðŸ”´ CURRENT MONTH OR CACHE MISS â†’ ORIGINAL LOGIC
+                    # 🔴 CURRENT MONTH OR CACHE MISS → ORIGINAL LOGIC
                     energyConsumed = 0
                     energySaved = 0
                     carbon_saved = 0
@@ -3536,7 +3539,7 @@ class EnergySavingMonthlyTrendApi(APIView):
                     carbon_list.append(round(carbon_saved, 1))
                     percentage_saved_list.append(percentage_saved)
 
-            # ðŸ”´ CACHE ONLY PREVIOUS 11 MONTHS
+            # 🔴 CACHE ONLY PREVIOUS 11 MONTHS
             cache_data = {
                 "months": month_list[:-1],
                 "energyConsumed": energy_consumed_list[:-1],
@@ -3833,7 +3836,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                     month = current_date - timedelta(i * 365 / 12)
                     month_year = month.strftime("%Y-%m")
 
-                    # ðŸ”´ USE REDIS FOR PREVIOUS MONTHS
+                    # 🔴 USE REDIS FOR PREVIOUS MONTHS
                     if month_year != current_month_key and cached_prev_data:
                         idx = cached_prev_data["months"].index(
                             month.strftime("%b") + "-" + month.strftime("%Y")
@@ -3850,7 +3853,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                         )
                         continue
 
-                    # ðŸ”´ CURRENT MONTH OR CACHE MISS â†’ ORIGINAL LOGIC
+                    # 🔴 CURRENT MONTH OR CACHE MISS → ORIGINAL LOGIC
                     energyConsumed = 0
                     energySaved = 0
                     carbon_saved = 0
@@ -3918,7 +3921,7 @@ class NewEnergySavingMonthlyTrendApi(APIView):
                     carbon_list.append(round(carbon_saved, 1))
                     percentage_saved_list.append(percentage_saved)
 
-            # ðŸ”´ CACHE ONLY PREVIOUS 11 MONTHS
+            # 🔴 CACHE ONLY PREVIOUS 11 MONTHS
             cache_data = {
                 "months": month_list[:-1],
                 "energyConsumed": energy_consumed_list[:-1],
@@ -7881,23 +7884,93 @@ class EnergySavingMonthlyBarChart(APIView):
             )
 
 
+# class EnergySavingMonthlyBarChart_new(APIView):
+#     permission_classes = [AllowAny]
+#     @entryExit
+#     def post(self, request):
+#         data = request.data
+#         site_id = int(data.get("site_id", 0))
+#         if site_id == 34:
+#             site_id = 29
+
+#         try:
+#             site = Site.objects.get(id=site_id)
+#             from_date = datetime.strptime(data.get("from_date", ""), "%Y/%m/%d")
+#             till_date = datetime.strptime(data.get("till_date", ""), "%Y/%m/%d")
+#             user_type = int(data.get("user_type", 0))
+#             #if(from_date > site.live_date):
+#              #   from_date = site.live_date
+#             print(from_date, till_date, user_type)
+#             total_days = (till_date - from_date).days + 1
+
+#             all_dates = [(till_date - timedelta(days=i)).date() for i in range(total_days)]
+#             all_dates.reverse()
+#             print(all_dates)
+
+#             filter_condition = (
+#                 Q(attached_leg_id__in=[259, 260, 261, 276, 710])
+#                 if int(data.get("site_id", 0)) == 34
+#                 else Q(site_id=site_id)
+#             )
+
+#             # Add is_visible condition only if user_type is NOT 1
+#             if user_type != 1 and int(data.get("site_id", 0)) != 34:
+#                 filter_condition &= ~Q(is_visible=False)
+
+#             aisle_group = AisleGroup.objects.filter(filter_condition)
+#             aisle_map = {aisle.attached_leg_id: aisle.aisleGroupName for aisle in aisle_group}
+#             all_leg_ids = list(aisle_map.keys())
+
+#             all_data = DailySiteReading.objects.filter(
+#                 associated_Site=site, leg_id__in=all_leg_ids,
+#                 reading_for__range=[from_date.date(), till_date.date()], is_visible=True
+#             ).values("leg_id", "reading_for", "unit_consumption")
+
+#             data_dict = {}
+#             for record in all_data:
+#                 leg_id, reading_for, unit_consumption = record.values()
+#                 aisle_name = aisle_map.get(leg_id, "Unknown")
+#                 idx = all_dates.index(reading_for) if reading_for in all_dates else None
+#                 if idx is not None:
+#                     data_dict.setdefault(aisle_name, [0] * total_days)[idx] = round(unit_consumption, 2)
+
+#             data_list = [{"name": k, "data": v, "type": "column"} for k, v in data_dict.items()]
+#             saving_data_list = data_list.copy()
+
+#             baseline_list = []
+#             if site.is_live:
+#                 baseline_filter = Q(associated_site_id=site_id, leg_id__in=all_leg_ids)
+#                 latest_baseline_values = SiteBaseline.objects.filter(baseline_filter)
+#                 print(latest_baseline_values)
+
+#                 for date in all_dates:
+#                     baseline_value = latest_baseline_values.filter(
+#                         Q(baseline_to__gte=date) | Q(Q(baseline_from__lte=date) & Q(baseline_to__isnull=True))
+#                     ).aggregate(Sum('baseline_value'))['baseline_value__sum'] or 0
+#                     baseline_list.append(round(baseline_value, 2))
+
+#                 data_list.append({"name": "baseline", "data": baseline_list, "type": "spline"})
+
+#             return Response({"result": 1, "Dates": all_dates, "Data": data_list, "SavingData": saving_data_list})
+
+#         except Exception as err:
+#             return Response({"status": 500, "msg": str(err)})
+
+
 class EnergySavingMonthlyBarChart_new(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = []
 
     @entryExit
     def post(self, request):
         data = request.data
         site_id = int(data.get("site_id", 0))
-        if site_id == 34:
-            site_id = 29
 
         try:
             site = Site.objects.get(id=site_id)
             from_date = datetime.strptime(data.get("from_date", ""), "%Y/%m/%d")
             till_date = datetime.strptime(data.get("till_date", ""), "%Y/%m/%d")
             user_type = int(data.get("user_type", 0))
-            # if(from_date > site.live_date):
-            #   from_date = site.live_date
             print(from_date, till_date, user_type)
             total_days = (till_date - from_date).days + 1
 
@@ -7907,28 +7980,27 @@ class EnergySavingMonthlyBarChart_new(APIView):
             all_dates.reverse()
             print(all_dates)
 
-            filter_condition = (
-                Q(attached_leg_id__in=[259, 260, 261, 276, 710])
-                if int(data.get("site_id", 0)) == 34
-                else Q(site_id=site_id)
-            )
+            # Add is_visible condition only if user_type is not 1 and user_type is not 6
+            if user_type in [1, 6]:
+                aisle_group = AisleGroup.objects.filter(virtual_siteID=site)
+            else:
+                aisle_group = AisleGroup.objects.filter(
+                    virtual_siteID=site, is_visible=True
+                )
+            print(aisle_group)
 
-            # Add is_visible condition only if user_type is NOT 1
-            if user_type != 1 and int(data.get("site_id", 0)) != 34:
-                filter_condition &= ~Q(is_visible=False)
-
-            aisle_group = AisleGroup.objects.filter(filter_condition)
             aisle_map = {
                 aisle.attached_leg_id: aisle.aisleGroupName for aisle in aisle_group
             }
             all_leg_ids = list(aisle_map.keys())
 
             all_data = DailySiteReading.objects.filter(
-                associated_Site=site,
+                aisle_group__virtual_siteID=site,
                 leg_id__in=all_leg_ids,
                 reading_for__range=[from_date.date(), till_date.date()],
                 is_visible=True,
             ).values("leg_id", "reading_for", "unit_consumption")
+            print(all_data)
 
             data_dict = {}
             for record in all_data:
@@ -7943,22 +8015,26 @@ class EnergySavingMonthlyBarChart_new(APIView):
             data_list = [
                 {"name": k, "data": v, "type": "column"} for k, v in data_dict.items()
             ]
-            saving_data_list = data_list.copy()
 
+            # Build aisle_name -> list of leg_ids mapping for per-aisle baseline lookup
+            aisle_leg_map = {}
+            for leg_id, aisle_name in aisle_map.items():
+                aisle_leg_map.setdefault(aisle_name, []).append(leg_id)
+
+            saving_data_list = []
             baseline_list = []
             if site.is_live:
-                baseline_filter = Q(associated_site_id=site_id, leg_id__in=all_leg_ids)
-                latest_baseline_values = SiteBaseline.objects.filter(baseline_filter)
+                latest_baseline_values = SiteBaseline.objects.filter(
+                    leg_id__in=all_leg_ids
+                )
                 print(latest_baseline_values)
 
+                # Total baseline list (sum of all aisles per date)
                 for date in all_dates:
                     baseline_value = (
-                        latest_baseline_values.filter(
-                            Q(baseline_to__gte=date)
-                            | Q(
-                                Q(baseline_from__lte=date) & Q(baseline_to__isnull=True)
-                            )
-                        ).aggregate(Sum("baseline_value"))["baseline_value__sum"]
+                        latest_baseline_values.filter(baseline_from__lte=date)
+                        .filter(Q(baseline_to__gte=date) | Q(baseline_to__isnull=True))
+                        .aggregate(Sum("baseline_value"))["baseline_value__sum"]
                         or 0
                     )
                     baseline_list.append(round(baseline_value, 2))
@@ -7966,6 +8042,29 @@ class EnergySavingMonthlyBarChart_new(APIView):
                 data_list.append(
                     {"name": "baseline", "data": baseline_list, "type": "spline"}
                 )
+
+                # Compute per-aisle savings without altering unit consumption Data array
+                for aisle_name, consumption_values in data_dict.items():
+                    leg_ids_for_aisle = aisle_leg_map.get(aisle_name, [])
+                    aisle_savings = []
+                    for idx, date in enumerate(all_dates):
+                        aisle_baseline = (
+                            latest_baseline_values.filter(
+                                leg_id__in=leg_ids_for_aisle, baseline_from__lte=date
+                            )
+                            .filter(
+                                Q(baseline_to__gte=date) | Q(baseline_to__isnull=True)
+                            )
+                            .aggregate(Sum("baseline_value"))["baseline_value__sum"]
+                            or 0
+                        )
+                        saving = round(aisle_baseline - consumption_values[idx], 2)
+                        aisle_savings.append(max(saving, 0.0))
+                    saving_data_list.append(
+                        {"name": aisle_name, "data": aisle_savings, "type": "column"}
+                    )
+            else:
+                saving_data_list = []
 
             return Response(
                 {
@@ -8158,14 +8257,6 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
             vehical_number = (
                 site.partner_dg_fuel_id.upper() if site.partner_dg_fuel_id else ""
             )
-            start_epoch_ms = int(
-                datetime.combine(selected_date, datetime.min.time()).timestamp() * 1000
-            )
-            end_epoch_ms = int(
-                datetime.combine(selected_date, datetime.max.time()).timestamp() * 1000
-            )
-            start_epoch_sec = start_epoch_ms // 1000
-            end_epoch_sec = end_epoch_ms // 1000
 
             # 1. Fetch Fuel Consumption Data
             fuel_qs = (
@@ -8189,73 +8280,105 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
             # 2. Fetch DG Unit Consumption Data
             dg_qs = DgUnitConsumption.objects.filter(
                 site=site_id, created__date=selected_date
-            ).values(
-                "epoch_time",
-                "unit_consumption",
-                "dg_fuel_consumption",
-                "fetch_fuel_data",
-            )
+            ).values("epoch_time", "unit_consumption", "dg_fuel_consumption")
 
             dg_unit_data, dg_fuel_data, dg_unit_per_litre = [], [], []
-
             for i in dg_qs:
                 if (
-                    i["unit_consumption"] is None
+                    i["epoch_time"] is None
+                    or i["unit_consumption"] is None
                     or i["dg_fuel_consumption"] is None
-                    or i["fetch_fuel_data"]
                 ):
                     continue
+                x_val = int(i["epoch_time"])
+                u_cons = i["unit_consumption"]
+                f_cons = i["dg_fuel_consumption"]
 
-                x_val = start_epoch_ms
-                u_cons = float(i["unit_consumption"])
-                f_cons = float(i["dg_fuel_consumption"])
-
-                # Provider fuel fetch completed, including confirmed 0.0.
-                dg_unit_data.append({
-                    "x": x_val,
-                    "y": round(u_cons, 2),
-                })
-
-                dg_fuel_data.append({
-                    "x": x_val,
-                    "y": round(f_cons, 2),
-                })
-
-                # Never divide by zero.
+                dg_unit_data.append({"x": x_val, "y": round(u_cons, 2)})
                 if f_cons > 0:
-                    dg_unit_per_litre.append({
-                        "x": x_val,
-                        "y": round(u_cons / f_cons, 2),
-                    })
+                    dg_fuel_data.append({"x": x_val, "y": round(f_cons, 2)})
+                    dg_unit_per_litre.append(
+                        {"x": x_val, "y": round(u_cons / f_cons, 2)}
+                    )
+
             # 3. Fetch Alerts (Combined Refuel and Theft for optimization)
             refuel_data = []
             theft_data = []
-            alert_keys = set()
 
-            normalized_alerts = DGFuelAlertsData.objects.filter(
-                site=site_id,
-                created__date=selected_date,
-                alert_name__in=["refuel", "theft"],
-            ).filter(
-                Q(epoch_time__gte=str(start_epoch_sec), epoch_time__lte=str(end_epoch_sec))
-                | Q(epoch_time__gte=str(start_epoch_ms), epoch_time__lte=str(end_epoch_ms))
-            ).values("alert_name", "epoch_time", "fuel_consumption")
-            for alert in normalized_alerts:
+            if vehical_number:
+                alerts_qs = DGAlertsData.objects.filter(
+                    Q(alert_data__contains=vehical_number)
+                    & (
+                        Q(alert_data__contains="RefuelingAlert")
+                        | Q(alert_data__contains="deviceFuelFill")
+                        | Q(alert_data__contains="theft")
+                        | Q(alert_data__contains="deviceFuelDrop")
+                    )
+                    & Q(created__date=selected_date)
+                ).values_list("alert_data", flat=True)
+            else:
+                alerts_qs = []
+
+            for i in alerts_qs:
                 try:
-                    epoch_raw = int(alert["epoch_time"])
-                    fuel_value = float(alert["fuel_consumption"])
-                except (TypeError, ValueError):
+                    alert_type = i.get("alert_type") or i.get("eventType")
+                    ts = (
+                        i.get("event_time")
+                        or i.get("dateTimeStamp")
+                        or i.get("timestamp")
+                    )
+
+                    if isinstance(ts, dict):
+                        ts = ts.get("value") or ts.get("time")
+
+                    if not ts:
+                        continue
+
+                    if isinstance(ts, (int, float)):
+                        epoch_time = float(ts)
+                    else:
+                        epoch_time = date_parser.parse(ts).timestamp()
+
+                    # Handle Refuel
+                    if alert_type in ["RefuelingAlert", "deviceFuelFill"]:
+                        fuel_val = i.get("refueled_in_liters") or 0
+                        if not fuel_val:
+                            f_change = i.get("fuelChange", {})
+                            if isinstance(f_change, dict):
+                                fuel_val = f_change.get("fuel_change", 0)
+                            elif isinstance(f_change, str) and "ltr" in f_change:
+                                fuel_split = f_change.split("ltr")[0].strip()
+                                fuel_val = float(fuel_split) if fuel_split else 0
+
+                        try:
+                            fuel_val = float(fuel_val)
+                            refuel_data.append(
+                                {"x": int(epoch_time * 1000), "y": fuel_val}
+                            )
+                        except ValueError:
+                            pass
+
+                    # Handle Theft
+                    elif alert_type in ["theft", "deviceFuelDrop"]:
+                        val = i.get("value")
+                        if val is None:
+                            f_change = i.get("fuelChange", "")
+                            if isinstance(f_change, str) and "ltr" in f_change:
+                                val_split = f_change.split("ltr")[0].strip()
+                                val = float(val_split) if val_split else 0
+                            elif isinstance(f_change, dict):
+                                val = f_change.get("fuel_change", 0)
+                            else:
+                                val = 0
+
+                        try:
+                            val = float(val)
+                            theft_data.append({"x": int(epoch_time * 1000), "y": val})
+                        except ValueError:
+                            pass
+
+                except Exception:
                     continue
-                epoch_time = epoch_raw * 1000 if epoch_raw < 100000000000 else epoch_raw
-                alert_key = (alert["alert_name"], epoch_time)
-                if alert_key in alert_keys:
-                    continue
-                alert_keys.add(alert_key)
-                point = {"x": epoch_time, "y": fuel_value}
-                if alert["alert_name"] == "refuel":
-                    refuel_data.append(point)
-                else:
-                    theft_data.append(point)
 
             response_payload = {
                 "status": 200,
@@ -8383,23 +8506,6 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             vehical_number = site.partner_dg_fuel_id.upper()
             from_date = datetime.strptime(from_date, "%Y-%m-%d")
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
-
-            def normalize_epoch_value(epoch_value):
-                epoch_raw = int(epoch_value)
-                return epoch_raw * 1000 if epoch_raw < 100000000000 else epoch_raw
-
-            def day_start_timestamp(record):
-                record_date = None
-                dg_start_date = record.get("dg_start_date") if isinstance(record, dict) else getattr(record, "dg_start_date", None)
-                created_date = record.get("created") if isinstance(record, dict) else getattr(record, "created", None)
-                if dg_start_date is not None:
-                    record_date = dg_start_date.date()
-                elif created_date is not None:
-                    record_date = created_date.date()
-                if record_date is None:
-                    return None
-                return int(datetime.combine(record_date, datetime.min.time()).timestamp() * 1000)
-
             final_data = []
             fuel_data = DgFuelConsumptionData.objects.filter(
                 site=site_id,
@@ -8407,23 +8513,14 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
                 created__date__lte=end_date.date(),
             ).order_by("created")
             for i in fuel_data:
-                if i.epoch_time is None or i.fuel_consumption is None:
-                    continue
                 final_data.append(
-                    {"x": normalize_epoch_value(i.epoch_time), "y": round(i.fuel_consumption, 2)}
+                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
                 )
             dg_data = DgUnitConsumption.objects.filter(
                 site=site_id,
                 created__date__gte=from_date.date(),
                 created__date__lte=end_date.date(),
-            ).values(
-                "epoch_time",
-                "unit_consumption",
-                "dg_fuel_consumption",
-                "fetch_fuel_data",
-                "created",
-                "dg_start_date",
-            ).order_by("created")
+            )
             logger.debug(final_data)
             logger.debug(dg_data)
             print("dg data: ", dg_data)
@@ -8434,57 +8531,82 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
                     logger.debug("i value: ", i)
-                    if (
-                        i["unit_consumption"] is None
-                        or i["dg_fuel_consumption"] is None
-                        or i["fetch_fuel_data"]
-                    ):
-                        continue
-                    x_val = day_start_timestamp(i)
-                    if x_val is None:
-                        continue
-                    unit_consumption = i["unit_consumption"]
-                    fuel_consumption = i["dg_fuel_consumption"]
                     dg_unit_data.append(
-                        {"x": x_val, "y": round(unit_consumption, 2)}
+                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
                     )
-                    if fuel_consumption is not None:
+                    if i.dg_fuel_consumption > 0:
                         dg_fuel_data.append(
-                            {"x": x_val, "y": round(fuel_consumption, 2)}
+                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
                         )
-                    if fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": x_val,
+                                "x": int(i.epoch_time),
                                 "y": round(
-                                    unit_consumption / fuel_consumption, 2
+                                    i.unit_consumption / i.dg_fuel_consumption, 2
                                 ),
                             }
                         )
             refuel_data = []
             theft_data = []
-            alert_keys = set()
-            normalized_alerts = DGFuelAlertsData.objects.filter(
-                site=site_id,
-                created__date__gte=from_date.date(),
-                created__date__lte=end_date.date(),
-                alert_name__in=["refuel", "theft"],
-            ).values("alert_name", "epoch_time", "fuel_consumption")
-            for alert in normalized_alerts:
-                try:
-                    epoch_time = normalize_epoch_value(alert["epoch_time"])
-                    fuel_value = float(alert["fuel_consumption"])
-                except (TypeError, ValueError):
-                    continue
-                alert_key = (alert["alert_name"], epoch_time)
-                if alert_key in alert_keys:
-                    continue
-                alert_keys.add(alert_key)
-                point = {"x": epoch_time, "y": fuel_value}
-                if alert["alert_name"] == "refuel":
-                    refuel_data.append(point)
-                else:
-                    theft_data.append(point)
+            refueling_alerts = DGAlertsData.objects.filter(
+                Q(alert_data__contains=vehical_number)
+                & (
+                    Q(alert_data__contains="RefuelingAlert")
+                    | Q(alert_data__contains="deviceFuelFill")
+                )
+                & Q(created__date__gte=from_date.date())
+                & Q(created__date__lte=end_date.date())
+            )
+            refueling_alerts = [i.alert_data for i in refueling_alerts]
+            for i in refueling_alerts:
+                epoch_time = (
+                    datetime.strptime(
+                        i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
+                    ).timestamp()
+                    if i.get("event_time", "") != ""
+                    else datetime.strptime(
+                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
+                    ).timestamp()
+                )
+                refuel_data.append(
+                    {
+                        "x": int(epoch_time) * 1000,
+                        "y": float(
+                            i.get(
+                                "refueled_in_liters",
+                                i.get("fuelChange", "").split("ltr")[0],
+                            )
+                        ),
+                    }
+                )
+
+            theft_alerts = DGAlertsData.objects.filter(
+                Q(alert_data__contains=vehical_number)
+                & (
+                    Q(alert_data__contains="theft")
+                    | Q(alert_data__contains="deviceFuelDrop")
+                )
+                & Q(created__date__gte=from_date.date())
+                & Q(created__date__lte=end_date.date())
+            )
+            theft_alerts = [i.alert_data for i in theft_alerts]
+            for i in theft_alerts:
+                epoch_time = (
+                    i.timestamp
+                    if i.get("timestamp", "") != ""
+                    else datetime.strptime(
+                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
+                    ).timestamp()
+                )
+                theft_data.append(
+                    {
+                        "x": epoch_time * 1000,
+                        "y": float(
+                            i.get("value", i.get("fuelChange", "").split("ltr")[0])
+                        ),
+                    }
+                )
+
             refuel_final_data = {
                 "name": "Refuel",
                 "data": refuel_data,
@@ -9704,6 +9826,7 @@ class EnergySavingMonthlyBarChartTestVB(APIView):
 
 class EnergySavingsHourlyExcelDownloadVB(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = []
 
     def get(self, request):
         from datetime import date
@@ -9719,9 +9842,21 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
             )
 
         try:
-            data = request.data if request.method == "POST" else request.query_params
-            if not data:
-                data = request.query_params or request.data
+            # Combine parameters from both query parameters and request body
+            data = {}
+            if hasattr(request, "query_params") and request.query_params:
+                try:
+                    data.update(request.query_params.dict())
+                except AttributeError:
+                    data.update(request.query_params)
+            if hasattr(request, "data") and request.data:
+                try:
+                    data.update(request.data.dict())
+                except AttributeError:
+                    try:
+                        data.update(request.data)
+                    except (TypeError, ValueError):
+                        pass
 
             site_id = data.get("site_id")
             if not site_id:
@@ -9739,11 +9874,35 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
                 )
 
             try:
-                site = Site.objects.only("site_name", "is_live").get(id=site_id)
+                site = Site.objects.only("site_name", "is_live", "site_type").get(
+                    id=site_id
+                )
             except Site.DoesNotExist:
                 return Response(
                     {"result": 0, "msg": "Site not found"},
                     status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Check permissions based on user_type and site_type
+            if site.site_type == 2:
+                if user_type not in [1, 2]:
+                    return Response(
+                        {"result": 0, "msg": "Access denied: admin only"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif site.site_type in [1, 3, 4, 5]:
+                if user_type != 1:
+                    return Response(
+                        {
+                            "result": 0,
+                            "msg": "Access denied: this feature is restricted to Super Admin",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                return Response(
+                    {"result": 0, "msg": "Invalid or unsupported site type"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             from_date_str = (
@@ -9802,59 +9961,64 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
             target_date_from = from_date.date()
             target_date_to = end_date.date()
 
-            # Find all leg_ids for the site in this range
-            all_leg_ids = list(
-                DailySiteReading.objects.filter(
-                    aisle_group__virtual_siteID_id=site_id,
-                    aisle_group__is_active=True,
-                    reading_for__range=[target_date_from, target_date_to],
+            # Determine aisle groups associated strictly to site_id considering virtual_siteID concept
+            if site_id == 34:
+                aisle_group_qs = AisleGroup.objects.filter(
+                    attached_leg_id__in=["259", "260", "261", "276", "710"]
                 )
-                .values_list("leg_id", flat=True)
-                .distinct()
-            )
+            else:
+                virtual_aisles = AisleGroup.objects.filter(virtual_siteID_id=site_id)
+                if virtual_aisles.exists():
+                    aisle_group_qs = virtual_aisles
+                else:
+                    aisle_group_qs = AisleGroup.objects.filter(site_id=site_id)
 
-            if not all_leg_ids:
-                return Response(
-                    {
-                        "result": 0,
-                        "msg": "No data found for the selected site and date range",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if user_type not in [1, 2, 6] and site_id != 34:
+                aisle_group_qs = aisle_group_qs.filter(is_visible=True)
 
-            str_leg_ids = [str(lid) for lid in all_leg_ids]
-
-            # Fetch AisleGroup names
             aisle_map = dict(
-                AisleGroup.objects.filter(
-                    virtual_siteID_id=site_id,
-                    is_active=True,
-                    attached_leg_id__in=str_leg_ids,
-                ).values_list("attached_leg_id", "aisleGroupName")
+                aisle_group_qs.exclude(attached_leg_id__isnull=True).values_list(
+                    "attached_leg_id", "aisleGroupName"
+                )
             )
             aisle_map = {str(k): v for k, v in aisle_map.items()}
 
+            if not aisle_map:
+                return Response(
+                    {"result": 0, "msg": "No aisle data found for the selected site"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            str_leg_ids = list(aisle_map.keys())
+
             # Sort leg IDs to guarantee stable column ordering
             sorted_leg_ids = sorted(
-                all_leg_ids, key=lambda x: aisle_map.get(str(x), str(x))
+                str_leg_ids, key=lambda x: aisle_map.get(str(x), str(x))
             )
             aisle_names = [
                 aisle_map.get(str(leg_id), str(leg_id)) for leg_id in sorted_leg_ids
             ]
 
-            # Fetch HourlySiteReading in bulk
+            # Fetch HourlySiteReading in bulk for only the associated aisle leg IDs
             start_of_range = datetime.combine(target_date_from, datetime.min.time())
             end_of_range_exclusive = datetime.combine(
                 target_date_to + timedelta(days=1), datetime.min.time()
             )
 
-            range_data = HourlySiteReading.objects.filter(
-                aisle_group__virtual_siteID_id=site_id,
-                aisle_group__is_active=True,
-                reading_from__gte=start_of_range,
-                reading_from__lt=end_of_range_exclusive,
-                is_visible=True,
-            ).values("leg_id", "reading_from", "unit_consumption", "energy_saved")
+            range_data = (
+                HourlySiteReading.objects.filter(
+                    leg_id__in=str_leg_ids,
+                    reading_from__gte=start_of_range,
+                    reading_from__lt=end_of_range_exclusive,
+                    is_visible=True,
+                )
+                .filter(
+                    Q(associated_Site_id=site_id)
+                    | Q(aisle_group__virtual_siteID_id=site_id)
+                    | Q(aisle_group__site_id=site_id)
+                )
+                .values("leg_id", "reading_from", "unit_consumption", "energy_saved")
+            )
 
             # Map hourly data by (date, leg_id, hour)
             hourly_data_map = {}
@@ -10780,7 +10944,8 @@ class ParticularSiteSnapshotEnergySavingApiVB(APIView):
 
 
 class SiteConsumptionPingApi(APIView):
-    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = []
 
     @entryExit
     def post(self, request):
@@ -11245,7 +11410,7 @@ class MeterDisconnectionIngestView(APIView):
 class MeterDisconnectionListView(APIView):
     def get(self, request):
         queryset = MeterDisconnectionEvent.objects.all().order_by(
-            "-detection_window_end", "meter_number", "meter_id"
+            "-updated_at", "meter_number", "meter_id"
         )
 
         logged_site_id = request.query_params.get(
@@ -11268,11 +11433,11 @@ class MeterDisconnectionListView(APIView):
         if from_date:
             parsed_from = parse_datetime(from_date)
             if parsed_from:
-                queryset = queryset.filter(detection_window_start__gte=parsed_from)
+                queryset = queryset.filter(updated_at__gte=parsed_from)
         if to_date:
             parsed_to = parse_datetime(to_date)
             if parsed_to:
-                queryset = queryset.filter(detection_window_end__lte=parsed_to)
+                queryset = queryset.filter(updated_at__lte=parsed_to)
 
         total = queryset.count()
         try:
@@ -11298,6 +11463,7 @@ class MeterDisconnectionListView(APIView):
                 "results": serializer.data,
             }
         )
+
 
 class HomeGatewayStatusApi(APIView):
     permission_classes = [AllowAny]
@@ -11374,6 +11540,7 @@ class HomeGatewayStatusApi(APIView):
                 {"status": 500, "message": "Internal Server Error", "error": str(err)},
                 status=500,
             )
+
     def post(self, request):
         try:
             gateway_id = request.data.get("gateway_id")

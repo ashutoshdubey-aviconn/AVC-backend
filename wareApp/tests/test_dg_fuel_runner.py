@@ -27,6 +27,7 @@ class DgFuelRunnerTests(TestCase):
                 dg_start_date=timestamp,
                 dg_end_date=timestamp,
                 fetch_fuel_data=True,
+                daily_data_status="COMPLETED",
             )
 
     @patch("fetch_fuel_data.attempt_fetch_for_unit", return_value=False)
@@ -52,7 +53,9 @@ class DgFuelRunnerTests(TestCase):
     ):
         fixed_now = timezone.make_aware(datetime(2026, 9, 4, 14, 30, 0))
         mock_localtime.return_value = fixed_now
-        site = self._make_provider_site("Loconav alert site", "loconav", "DCGenerator-01")
+        site = self._make_provider_site(
+            "Loconav alert site", "loconav", "DCGenerator-01"
+        )
         mock_report.return_value = {
             "status": True,
             "data": {
@@ -81,7 +84,9 @@ class DgFuelRunnerTests(TestCase):
     def test_today_provider_alert_poll_is_idempotent(self, mock_report, mock_localtime):
         fixed_now = timezone.make_aware(datetime(2026, 9, 4, 14, 30, 0))
         mock_localtime.return_value = fixed_now
-        site = self._make_provider_site("Loconav idempotent site", "loconav", "DCGenerator-01")
+        site = self._make_provider_site(
+            "Loconav idempotent site", "loconav", "DCGenerator-01"
+        )
         mock_report.return_value = {
             "status": True,
             "data": {
@@ -106,10 +111,14 @@ class DgFuelRunnerTests(TestCase):
 
     @patch("fetch_fuel_data.timezone.localtime")
     @patch("fetch_fuel_data.fetch_roadcast_report")
-    def test_today_provider_alert_poll_saves_roadcast_events(self, mock_report, mock_localtime):
+    def test_today_provider_alert_poll_saves_roadcast_events(
+        self, mock_report, mock_localtime
+    ):
         fixed_now = timezone.make_aware(datetime(2026, 9, 4, 14, 30, 0))
         mock_localtime.return_value = fixed_now
-        site = self._make_provider_site("Roadcast alert site", "roadcast", "353691840557010")
+        site = self._make_provider_site(
+            "Roadcast alert site", "roadcast", "353691840557010"
+        )
         mock_report.return_value = {
             "refuels": [{"fuel_liters": 29.39, "epoch_ms": 1788064800000}],
             "thefts": [{"fuel_liters": 1.25, "epoch_ms": 1788072000000}],
@@ -144,7 +153,9 @@ class DgFuelRunnerTests(TestCase):
     ):
         fixed_now = timezone.make_aware(datetime(2026, 9, 4, 14, 30, 0))
         mock_localtime.return_value = fixed_now
-        loconav_site = self._make_provider_site("Loconav failure site", "loconav", "DCGenerator-01")
+        loconav_site = self._make_provider_site(
+            "Loconav failure site", "loconav", "DCGenerator-01"
+        )
         roadcast_site = self._make_provider_site(
             "Roadcast success site", "roadcast", "353691840557010"
         )
@@ -167,11 +178,22 @@ class DgFuelRunnerTests(TestCase):
             ).exists()
         )
 
-    @patch("fetch_fuel_data.retry_closed_dg_runs", return_value={"attempted": 1, "updated": 0, "failed": 1})
-    @patch("fetch_fuel_data.poll_today_provider_alerts", return_value={"attempted": 1, "refuels": 1, "thefts": 0, "failed_site_ids": [], "skipped_site_ids": []})
-    @patch("fetch_fuel_data.run_current_level_cycle", return_value={"dry_run": False, "proposed_samples": 0, "inserted": 0, "existing": 0})
-    def test_run_once_includes_today_provider_alerts(self, mock_level, mock_alerts, mock_retry):
+    @patch(
+        "fetch_fuel_data.run_dg_fuel_cycle",
+        return_value={
+            "sites_processed": 1,
+            "fuel_levels": {"created": 1, "existing": 0, "failed": 0},
+            "refuels": {"created": 1, "existing": 0},
+            "thefts": {"created": 0, "existing": 0},
+            "dg_units": {"created": 1, "updated": 0, "existing": 0, "unavailable": 0},
+            "dg_fuel": {"created": 1, "updated": 0, "existing": 0, "unavailable": 0},
+            "dg_per_litre": {"calculated": 1},
+            "sites": [],
+        },
+    )
+    def test_run_once_uses_dg_fuel_cycle(self, mock_cycle):
         summary = fetch_fuel_data.run_once()
 
-        self.assertIn("today_provider_alerts", summary)
-        self.assertEqual(summary["today_provider_alerts"]["refuels"], 1)
+        self.assertEqual(summary["sites_processed"], 1)
+        self.assertEqual(summary["refuels"]["created"], 1)
+        mock_cycle.assert_called_once()

@@ -4,9 +4,9 @@ import logging
 import time
 from datetime import date as date_type
 from datetime import datetime, time as datetime_time
-from typing import Optional
+from typing import Any
 
-from django.db import transaction
+from django.db import connections
 from django.utils import timezone as dj_timezone
 
 from wareApp.dg_fuel.normalization import as_float
@@ -20,20 +20,18 @@ from wareApp.fuel_providers import (
     fetch_roadcast_report,
 )
 from wareApp.dg_fuel.ingestion import record_fuel_alert
-from wareApp.models import (
-    AisleGroup,
-    DailySiteReading,
-    DGFuelAlertsData,
-    DgUnitConsumption,
-    NewAlarmsNotifications,
-    Site,
-)
-
+from wareApp.models import DailySiteReading, DGFuelAlertsData, DgUnitConsumption, NewAlarmsNotifications, Site
 
 logger = logging.getLogger(__name__)
 
 
-def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> Optional[float]:
+def _main_database_alias() -> str:
+    if "main" in connections.databases:
+        return "main"
+    return "default"
+
+
+def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
     if not unit or not unit.site or not unit.aisle_group:
         return None
 
@@ -70,8 +68,11 @@ def _daily_window(reading_date: date_type) -> tuple[datetime, datetime]:
         day_end = dj_timezone.make_aware(day_end, current_timezone)
     return day_start, day_end
 
+
 def reconcile_daily_unit_consumption(
-    site: Site, reading_date: Optional[date_type] = None
+    site: Site,
+    reading_date: date_type | None = None,
+    return_details: bool = False,
 ) -> dict:
     """Materialize DG unit rows from MAIN DailySiteReading for one site/day."""
     if site is None:
@@ -79,7 +80,7 @@ def reconcile_daily_unit_consumption(
 
     reading_date = reading_date or dj_timezone.now().date()
 
-    logger.info(
+    logger.debug(
         "Reconciling DG unit consumption site_id=%s reading_date=%s",
         site.id,
         reading_date,
@@ -92,10 +93,11 @@ def reconcile_daily_unit_consumption(
     updated = 0
     skipped = 0
     seen_aisles = set()
+    row_results = []
 
     # MAIN DB is authoritative for DailySiteReading.
     daily_readings = (
-        DailySiteReading.objects.using("main")
+        DailySiteReading.objects.using(_main_database_alias())
         .filter(
             associated_Site_id=site.id,
             reading_for=reading_date,
@@ -117,20 +119,20 @@ def reconcile_daily_unit_consumption(
 
         if unit_value is None:
             skipped += 1
-            logger.warning(
-                "Skipping DG unit reconciliation site_id=%s "
-                "aisle_group_id=%s reading_date=%s reason=%s",
-                site.id,
-                aisle_id,
-                reading_date,
-                "invalid_daily_unit_consumption",
-            )
+            if return_details:
+                row_results.append(
+                    {
+                        "aisle_group_id": aisle_id,
+                        "daily_reading_value": None,
+                        "status": "NOT AVAILABLE",
+                        "reason": "invalid_daily_unit_consumption",
+                    }
+                )
             continue
 
         # TEST DB
         unit = (
-            DgUnitConsumption.objects
-            .filter(
+            DgUnitConsumption.objects.filter(
                 site_id=site.id,
                 aisle_group_id=aisle_id,
                 created__date=reading_date,
@@ -141,6 +143,7 @@ def reconcile_daily_unit_consumption(
 
         if unit:
             update_fields = []
+            previous_value = unit.unit_consumption
 
             if unit.unit_consumption != unit_value:
                 unit.unit_consumption = unit_value
@@ -169,10 +172,23 @@ def reconcile_daily_unit_consumption(
             if update_fields:
                 unit.save(update_fields=update_fields)
 
+            if return_details:
+                row_results.append(
+                    {
+                        "aisle_group_id": aisle_id,
+                        "unit_id": unit.id,
+                        "daily_reading_value": unit_value,
+                        "previous_unit_consumption": previous_value,
+                        "unit_consumption": unit.unit_consumption,
+                        "fetch_fuel_data": unit.fetch_fuel_data,
+                        "status": "UPDATED" if update_fields else "EXISTING",
+                    }
+                )
+
             updated += 1
 
         else:
-            DgUnitConsumption.objects.create(
+            created_unit = DgUnitConsumption.objects.create(
                 site_id=site.id,
                 aisle_group_id=aisle_id,
                 unit_consumption=unit_value,
@@ -185,9 +201,22 @@ def reconcile_daily_unit_consumption(
                 fetch_fuel_data=True,
             )
 
+            if return_details:
+                row_results.append(
+                    {
+                        "aisle_group_id": aisle_id,
+                        "unit_id": created_unit.id,
+                        "daily_reading_value": unit_value,
+                        "previous_unit_consumption": None,
+                        "unit_consumption": created_unit.unit_consumption,
+                        "fetch_fuel_data": created_unit.fetch_fuel_data,
+                        "status": "CREATED",
+                    }
+                )
+
             created += 1
 
-    logger.info(
+    logger.debug(
         "DG unit reconciliation summary site_id=%s reading_date=%s "
         "created=%s updated=%s skipped=%s",
         site.id,
@@ -201,9 +230,11 @@ def reconcile_daily_unit_consumption(
         "created": created,
         "updated": updated,
         "skipped": skipped,
+        **({"rows": row_results} if return_details else {}),
     }
 
-def determine_provider(site: Site) -> Optional[str]:
+
+def determine_provider(site: Site) -> str | None:
     """Return the configured provider name for a site."""
     provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
     if provider in {"loconav", "roadcast"}:
@@ -213,7 +244,7 @@ def determine_provider(site: Site) -> Optional[str]:
 
 def _fetch_roadcast_fuel(
     vehicle_imei: str, start_dt: datetime, end_dt: datetime
-) -> Optional[float]:
+) -> float | None:
     try:
         return fetch_roadcast_fuel(vehicle_imei, start_dt, end_dt)
     except Exception:
@@ -222,7 +253,7 @@ def _fetch_roadcast_fuel(
 
 def _fetch_loconav_fuel(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
-) -> Optional[float]:
+) -> float | None:
     try:
         return fetch_loconav_fuel(vehicle_number, start_dt, end_dt)
     except Exception:
@@ -231,14 +262,16 @@ def _fetch_loconav_fuel(
 
 def _fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
-) -> Optional[dict]:
+) -> dict | None:
     try:
         return fetch_loconav_report(vehicle_number, start_dt, end_dt)
     except Exception:
         return None
 
 
-def _persist_provider_alerts(site: Site, unit: DgUnitConsumption, provider: str) -> None:
+def _persist_provider_alerts(
+    site: Site, unit: DgUnitConsumption, provider: str
+) -> None:
     if provider == "roadcast":
         try:
             report = fetch_roadcast_report(
@@ -295,10 +328,27 @@ def _persist_provider_alerts(site: Site, unit: DgUnitConsumption, provider: str)
             pass
 
 
-def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
+def attempt_fetch_for_unit(
+    unit: DgUnitConsumption, return_details: bool = False
+) -> Any:
     """Fetch consumed fuel for a closed DG run and persist the result."""
+    result: dict[str, Any] = {
+        "site_id": getattr(getattr(unit, "site", None), "id", None),
+        "unit_id": getattr(unit, "id", None),
+        "vehicle_number": getattr(getattr(unit, "site", None), "partner_dg_fuel_id", None),
+        "provider": determine_provider(getattr(unit, "site", None)) if unit else None,
+        "success": False,
+        "status": "NOT AVAILABLE",
+        "reason": None,
+        "fuel_value": None,
+        "confirmed_zero": False,
+        "database_action": None,
+        "previous_dg_fuel_consumption": getattr(unit, "dg_fuel_consumption", None),
+    }
+
     if not unit or not unit.dg_start_date or not unit.dg_end_date:
-        return False
+        result["reason"] = "missing_unit_dates"
+        return result if return_details else False
 
     if unit.unit_consumption is None:
         sync_daily_value = _daily_unit_consumption_for_unit(unit)
@@ -309,22 +359,20 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
     if unit.unit_consumption is None:
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
-        return False
+        result["reason"] = "daily_unit_consumption_missing"
+        return result if return_details else False
 
     site = unit.site
     provider = determine_provider(site)
+    result["provider"] = provider
     if provider is None:
-        logger.warning(
-            "Skipping DG fuel fetch site_id=%s unit_id=%s vehicle_number=%s due to missing or invalid provider configuration",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-        )
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
-        return False
+        result["reason"] = "missing_or_invalid_provider"
+        return result if return_details else False
 
     fuel_fetch_success = False
+    previous_value = unit.dg_fuel_consumption
     try:
         if provider == "roadcast":
             value = _fetch_roadcast_fuel(
@@ -338,33 +386,15 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
         value = None
 
     if value is None:
-        logger.warning(
-            "DG fuel fetch returned no usable value site_id=%s unit_id=%s vehicle_number=%s provider=%s dg_start_date=%s dg_end_date=%s unit_consumption=%s",
-            getattr(site, "id", None),
-            getattr(unit, "id", None),
-            getattr(site, "partner_dg_fuel_id", None),
-            provider,
-            unit.dg_start_date,
-            unit.dg_end_date,
-            unit.unit_consumption,
-        )
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
+        result.update({"reason": "provider_returned_no_usable_value", "status": "UNAVAILABLE"})
     else:
         normalized_value = as_float(value)
         if normalized_value is None:
-            logger.warning(
-                "DG fuel fetch returned invalid value site_id=%s unit_id=%s vehicle_number=%s provider=%s value=%r dg_start_date=%s dg_end_date=%s",
-                getattr(site, "id", None),
-                getattr(unit, "id", None),
-                getattr(site, "partner_dg_fuel_id", None),
-                provider,
-                value,
-                unit.dg_start_date,
-                unit.dg_end_date,
-            )
             unit.fetch_fuel_data = True
             unit.save(update_fields=["fetch_fuel_data"])
+            result.update({"reason": "provider_returned_invalid_value", "status": "INVALID"})
         else:
             try:
                 unit.dg_fuel_consumption = normalized_value
@@ -378,10 +408,29 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
                 )
                 unit.fetch_fuel_data = True
                 unit.save(update_fields=["fetch_fuel_data"])
+                result.update({"reason": "failed_to_persist_dg_fuel_value", "status": "ERROR"})
             else:
                 unit.fetch_fuel_data = False
                 unit.save(update_fields=["dg_fuel_consumption", "fetch_fuel_data"])
                 fuel_fetch_success = True
+
+                if previous_value is None:
+                    database_action = "CREATED"
+                elif previous_value == normalized_value:
+                    database_action = "EXISTING"
+                else:
+                    database_action = "UPDATED"
+
+                result.update(
+                    {
+                        "success": True,
+                        "status": "CONFIRMED ZERO" if normalized_value == 0 else "OK",
+                        "fuel_value": normalized_value,
+                        "confirmed_zero": normalized_value == 0,
+                        "database_action": database_action,
+                        "reason": None,
+                    }
+                )
 
     if fuel_fetch_success:
         if unit.unit_consumption is not None and unit.unit_consumption <= 0:
@@ -415,4 +464,6 @@ def attempt_fetch_for_unit(unit: DgUnitConsumption) -> bool:
 
     _persist_provider_alerts(site, unit, provider)
 
+    if return_details:
+        return result
     return fuel_fetch_success

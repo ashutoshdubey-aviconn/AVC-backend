@@ -37,7 +37,9 @@ def collect_loconav_levels(
             if level["vehicle_number"].replace("-", "").upper()
             == vehicle_number.replace("-", "").upper()
         ]
-        samples.extend({"site": site, "source": "loconav", **level} for level in matching)
+        samples.extend(
+            {"site": site, "source": "loconav", **level} for level in matching
+        )
         for level in matching:
             logger.info(
                 "LocoNav fuel sample collected site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s source=%s",

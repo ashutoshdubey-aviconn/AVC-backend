@@ -683,11 +683,14 @@ class DgFuelConsumptionDataApi_new(APIView):
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
                     logger.debug("i value: ", i)
+                    if i.unit_consumption is None or i.unit_consumption <= 0:
+                        continue
                     dg_unit_data.append({"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)})
-                    if i.dg_fuel_consumption > 0:
+                    if i.dg_fuel_consumption and i.dg_fuel_consumption > 0:
                         dg_fuel_data.append({"x": int(i.epoch_time), "y": i.dg_fuel_consumption})
-                        dg_unit_per_litre.append(
-                            {"x": int(i.epoch_time), "y": round(i.unit_consumption / i.dg_fuel_consumption, 2)})
+                        if i.unit_consumption > 0:
+                            dg_unit_per_litre.append(
+                                {"x": int(i.epoch_time), "y": round(i.unit_consumption / i.dg_fuel_consumption, 2)})
             else:
                 print('inside else')
                 dg_unit_data = []

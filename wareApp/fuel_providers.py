@@ -4,6 +4,8 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+from wareApp.dg_fuel.providers import parse_roadcast_report
+
 LOG = logging.getLogger(__name__)
 
 
@@ -108,61 +110,6 @@ def fetch_roadcast_fuel(
     return None
 
 
-def fetch_roadcast_report(
-    vehicle_imei: str, start_dt: datetime, end_dt: datetime
-) -> Optional[Dict[str, Any]]:
-    """Fetch and normalize a full Roadcast fuel report for a DG run window."""
-    url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    headers = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
-    params = {
-        "device_imei": vehicle_imei,
-        "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-        "to_time": end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-    }
-
-    r = _try_request(url, params=params, headers=headers, retries=2, timeout=8)
-    if r is not None and r.status_code == 200:
-        try:
-            j = r.json()
-            if isinstance(j, dict):
-                return j
-        except Exception:
-            LOG.debug(
-                "fetch_roadcast_report: could not parse primary JSON for %s",
-                vehicle_imei,
-            )
-
-    try:
-        map_url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
-        m = _try_request(map_url, timeout=8, retries=2)
-        if m is not None and m.status_code == 200:
-            mj = m.json()
-            for dev in mj.get("data", []) if isinstance(mj, dict) else []:
-                if str(dev.get("deviceImei")) == str(vehicle_imei) or str(
-                    dev.get("deviceId")
-                ) == str(vehicle_imei):
-                    mapped = dev.get("deviceImei")
-                    if mapped:
-                        params["device_imei"] = mapped
-                        r2 = _try_request(url, params=params, headers=headers, retries=2, timeout=8)
-                        if r2 is not None and r2.status_code == 200:
-                            try:
-                                j2 = r2.json()
-                                if isinstance(j2, dict):
-                                    return j2
-                            except Exception:
-                                LOG.debug(
-                                    "fetch_roadcast_report: parse failure on mapped imei %s",
-                                    mapped,
-                                )
-    except Exception:
-        LOG.debug(
-            "fetch_roadcast_report: mapping fallback failed for %s", vehicle_imei
-        )
-
-    return None
-
-
 def vehicle_variants(v: str) -> List[str]:
     if not v:
         return []
@@ -198,7 +145,7 @@ def fetch_loconav_fuel(
     end_ts = int(end_dt.timestamp())
 
     # First try the consolidated fuel endpoint which returns total consumption
-    for v in vehicle_variants(vehicle_number):
+    for v in [vehicle_number]:
         url = f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={v}&start_time={start_ts}&end_time={end_ts}"
         r = _try_request(url, headers=headers, timeout=8, retries=2)
         if r is None:
@@ -234,7 +181,7 @@ def fetch_loconav_fuel(
                                 return vval
 
     # Fallback: use interval_data to estimate consumption as initial - final (non-negative)
-    for v in vehicle_variants(vehicle_number):
+    for v in [vehicle_number]:
         url = f"https://marketplace.loconav.com/api/v1/vehicles/fuel/interval_data?start_time={start_ts}&end_time={end_ts}&interval=5&vehicle_number={v}"
         r = _try_request(url, headers=headers, timeout=8, retries=2)
         if r is None:
@@ -272,11 +219,113 @@ def fetch_loconav_fuel(
         v_last = _val(last)
         if v_first is None or v_last is None:
             continue
+        # Basic consumed as initial level minus final level
         consumed = v_first - v_last
+
+        # If levels increase (negative consumed), attempt to account for refuels/thefts
         if consumed <= 0:
-            # negative or zero indicates no consumption or refuel; we treat as 0
-            consumed = 0
-        return consumed
+            try:
+                # try to fetch alerts/refuel data for this vehicle/window and adjust
+                url_alerts = f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={v}&start_time={start_ts}&end_time={end_ts}"
+                ra = _try_request(url_alerts, headers=headers, timeout=8, retries=1)
+                refuel_sum = 0.0
+                theft_sum = 0.0
+                if ra is not None:
+                    try:
+                        rj = ra.json()
+                        refuels = detect_refuel_from_alerts(rj)
+                        thefts = detect_theft_from_alerts(rj)
+                        for rf in refuels:
+                            try:
+                                if (
+                                    rf.get("timestamp")
+                                    and start_ts <= int(rf.get("timestamp")) <= end_ts
+                                ):
+                                    refuel_sum += float(rf.get("value") or 0)
+                            except Exception:
+                                continue
+                        for tf in thefts:
+                            try:
+                                if (
+                                    tf.get("timestamp")
+                                    and start_ts <= int(tf.get("timestamp")) <= end_ts
+                                ):
+                                    theft_sum += float(tf.get("value") or 0)
+                            except Exception:
+                                continue
+                    except Exception:
+                        pass
+
+                adjusted = (v_first + refuel_sum - theft_sum) - v_last
+                if adjusted > 0:
+                    return adjusted
+            except Exception:
+                # Fall through to return zero
+                pass
+        # negative or zero indicates no consumption or could not adjust — return 0
+        return max(float(consumed), 0.0)
+
+    return None
+
+
+def fetch_roadcast_report(
+    vehicle_imei: str, start_dt: datetime, end_dt: datetime
+) -> Optional[Dict[str, Any]]:
+    url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
+    headers = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    params = {
+        "device_imei": vehicle_imei,
+        "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+        "to_time": end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+
+    response = _try_request(url, params=params, headers=headers, retries=2, timeout=8)
+    if response is not None and response.status_code == 200:
+        try:
+            payload = response.json()
+            if isinstance(payload, dict):
+                return parse_roadcast_report(payload)
+        except Exception:
+            LOG.debug(
+                "fetch_roadcast_report: could not parse primary JSON for %s",
+                vehicle_imei,
+            )
+
+    try:
+        map_url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
+        mapping_response = _try_request(map_url, timeout=8, retries=2)
+        if mapping_response is not None and mapping_response.status_code == 200:
+            mapping_payload = mapping_response.json()
+            for device in (
+                mapping_payload.get("data", [])
+                if isinstance(mapping_payload, dict)
+                else []
+            ):
+                if str(device.get("deviceImei")) == str(vehicle_imei) or str(
+                    device.get("deviceId")
+                ) == str(vehicle_imei):
+                    mapped = device.get("deviceImei")
+                    if not mapped:
+                        continue
+                    params["device_imei"] = mapped
+                    mapped_response = _try_request(
+                        url, params=params, headers=headers, retries=2, timeout=8
+                    )
+                    if (
+                        mapped_response is not None
+                        and mapped_response.status_code == 200
+                    ):
+                        try:
+                            mapped_payload = mapped_response.json()
+                            if isinstance(mapped_payload, dict):
+                                return parse_roadcast_report(mapped_payload)
+                        except Exception:
+                            LOG.debug(
+                                "fetch_roadcast_report: parse failure on mapped imei %s",
+                                mapped,
+                            )
+    except Exception:
+        LOG.debug("fetch_roadcast_report: mapping fallback failed for %s", vehicle_imei)
 
     return None
 
@@ -284,46 +333,37 @@ def fetch_loconav_fuel(
 def fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
-    """Fetch the Loconav fuel report payload for a DG-run window."""
     headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 
-    for v in vehicle_variants(vehicle_number):
+    for candidate in [vehicle_number]:
         url = (
             "https://marketplace.loconav.com/api/v1/vehicles/fuel"
-            f"?vehicle_number={v}&start_time={start_ts}&end_time={end_ts}"
+            f"?vehicle_number={candidate}&start_time={start_ts}&end_time={end_ts}"
         )
-        r = _try_request(url, headers=headers, timeout=8, retries=2)
-        if r is None:
+        response = _try_request(url, headers=headers, timeout=8, retries=2)
+        if response is None:
             continue
         try:
-            j = r.json()
+            payload = response.json()
         except Exception:
             continue
-        if isinstance(j, dict):
-            return j
+        if isinstance(payload, dict):
+            return payload
 
     return None
 
 
-def _loconav_alerts_container(alerts_json: Dict[str, Any]) -> Dict[str, Any]:
-    if not alerts_json or not isinstance(alerts_json, dict):
-        return {}
-
-    data = alerts_json.get("data") or {}
-    if isinstance(data, dict):
-        nested_alerts = data.get("alerts")
-        if isinstance(nested_alerts, dict):
-            return nested_alerts
-
-    root_alerts = alerts_json.get("alerts") or {}
-    return root_alerts if isinstance(root_alerts, dict) else {}
-
-
 def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     out = []
-    alerts = _loconav_alerts_container(alerts_json)
+    if not alerts_json or not isinstance(alerts_json, dict):
+        return out
+    alerts = alerts_json.get("data") or {}
+    if isinstance(alerts, dict):
+        alerts = alerts.get("alerts") or alerts
+    if not isinstance(alerts, dict):
+        alerts = alerts_json.get("alerts") or {}
     refuel = alerts.get("REFUELING_ALERT") or []
     for r in refuel:
         try:
@@ -336,7 +376,13 @@ def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any
 
 def detect_theft_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     out = []
-    alerts = _loconav_alerts_container(alerts_json)
+    if not alerts_json or not isinstance(alerts_json, dict):
+        return out
+    alerts = alerts_json.get("data") or {}
+    if isinstance(alerts, dict):
+        alerts = alerts.get("alerts") or alerts
+    if not isinstance(alerts, dict):
+        alerts = alerts_json.get("alerts") or {}
     theft = alerts.get("POSSIBLE_FUEL_THEFT_ALERT") or []
     for t in theft:
         try:
