@@ -3,7 +3,11 @@
 import logging
 from typing import Any, Callable, Dict, Iterable, List
 
-from .providers import parse_loconav_current_levels, parse_roadcast_current_levels
+from .providers import (
+    extract_roadcast_subscription_expired_errors,
+    parse_loconav_current_levels,
+    parse_roadcast_current_levels,
+)
 
 logger = logging.getLogger("wareApp.dg_fuel.collection")
 
@@ -65,7 +69,9 @@ def collect_loconav_levels(
 
 
 def collect_roadcast_levels(
-    sites: Iterable[Any], fetch_pull_api: Callable[[], Any]
+    sites: Iterable[Any],
+    fetch_pull_api: Callable[[], Any],
+    reference_date=None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """Fetch Roadcast once, map its samples to configured sites, and report gaps."""
     site_by_imei = {
@@ -75,7 +81,12 @@ def collect_roadcast_levels(
     }
     try:
         payload = fetch_pull_api()
-        levels = parse_roadcast_current_levels(payload, site_by_imei)
+        levels = parse_roadcast_current_levels(
+            payload, site_by_imei, reference_date=reference_date
+        )
+        subscription_expired_errors = extract_roadcast_subscription_expired_errors(
+            payload
+        )
     except Exception:
         logger.exception(
             "Roadcast pull_api collection failed configured_sites=%s",
@@ -85,11 +96,17 @@ def collect_roadcast_levels(
             "samples": [],
             "missing_vehicle_ids": [],
             "expired_vehicle_ids": [],
+            "subscription_expired_errors": [],
             "provider_request_failed": True,
         }
 
+    current_levels = [level for level in levels if level.get("is_current_sample")]
+    diagnostic_levels = [
+        level for level in levels if not level.get("is_current_sample")
+    ]
     returned_ids = {level["vehicle_number"] for level in levels}
     missing_vehicle_ids = sorted(set(site_by_imei) - returned_ids)
+    stale_vehicle_ids = sorted({level["vehicle_number"] for level in diagnostic_levels})
     for vehicle_id in missing_vehicle_ids:
         logger.warning(
             "Roadcast device unavailable or expired vehicle_id=%s known_vehicle_ids=%s",
@@ -98,9 +115,9 @@ def collect_roadcast_levels(
         )
     samples = [
         {"site": site_by_imei[level["vehicle_number"]], "source": "roadcast", **level}
-        for level in levels
+        for level in current_levels
     ]
-    for level in levels:
+    for level in current_levels:
         logger.info(
             "Roadcast fuel sample collected site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s source=%s",
             site_by_imei[level["vehicle_number"]].id,
@@ -109,9 +126,22 @@ def collect_roadcast_levels(
             level.get("epoch_ms"),
             "roadcast",
         )
+    for level in diagnostic_levels:
+        logger.info(
+            "Roadcast diagnostic telemetry site_id=%s vehicle_number=%s fuel_liters=%s epoch_ms=%s telemetry_state=%s provider_status=%s source=%s",
+            site_by_imei[level["vehicle_number"]].id,
+            level.get("vehicle_number"),
+            level.get("fuel_liters"),
+            level.get("epoch_ms"),
+            level.get("telemetry_state"),
+            level.get("provider_status"),
+            "roadcast",
+        )
     return {
         "samples": samples,
         "missing_vehicle_ids": missing_vehicle_ids,
+        "stale_vehicle_ids": stale_vehicle_ids,
         "expired_vehicle_ids": missing_vehicle_ids,
+        "subscription_expired_errors": subscription_expired_errors,
         "provider_request_failed": False,
     }

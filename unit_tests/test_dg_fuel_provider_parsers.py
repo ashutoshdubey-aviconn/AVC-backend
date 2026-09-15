@@ -1,6 +1,8 @@
 import unittest
+from datetime import datetime
 
 from wareApp.dg_fuel.providers import (
+    extract_roadcast_subscription_expired_errors,
     parse_loconav_current_levels,
     parse_roadcast_current_levels,
     parse_roadcast_report,
@@ -66,6 +68,51 @@ class DgFuelProviderParserTests(unittest.TestCase):
         self.assertEqual(levels[0]["vehicle_number"], "353691840557010")
         self.assertAlmostEqual(levels[0]["fuel_liters"], 275.4660194174757)
         self.assertEqual(levels[0]["epoch_ms"], 1788115480000)
+        self.assertEqual(levels[0]["telemetry_state"], "CURRENT")
+        self.assertTrue(levels[0]["is_current_sample"])
+
+    def test_classifies_stale_roadcast_current_level(self):
+        levels = parse_roadcast_current_levels(
+            {
+                "data": [
+                    {
+                        "deviceId": 346791,
+                        "deviceImei": "353691846234838",
+                        "deviceFixTime": "2026-09-10T05:05:22.000+0000",
+                        "deviceTime": "2026-09-10T05:05:22.000+0000",
+                        "fuel": 10.533980582524272,
+                        "ignition": "false",
+                        "lastUpdate": "2026-09-10T05:07:18.000000+0000",
+                        "latitude": "28.3945383",
+                        "longitude": "76.6999316",
+                        "name": "153",
+                        "status": "offline",
+                        "vehicle_status": "Dormant",
+                    }
+                ]
+            },
+            allowed_imeis=["353691846234838"],
+            reference_date=datetime(2026, 9, 14),
+        )
+        self.assertEqual(levels[0]["telemetry_state"], "STALE")
+        self.assertFalse(levels[0]["is_current_sample"])
+
+    def test_extracts_subscription_expired_errors(self):
+        errors = extract_roadcast_subscription_expired_errors(
+            {
+                "error": [
+                    {
+                        "error": "Subscription expired",
+                        "message": "The device with ID 281311 and name '124' has an expired subscription",
+                    }
+                ]
+            }
+        )
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(
+            errors[0]["message"],
+            "The device with ID 281311 and name '124' has an expired subscription",
+        )
 
     def test_parses_roadcast_report_and_parallel_events(self):
         report = parse_roadcast_report(
@@ -86,8 +133,12 @@ class DgFuelProviderParserTests(unittest.TestCase):
         )
         self.assertEqual(report["fuel_consumed"], 24.49)
         self.assertEqual(report["fuel_levels"][0]["epoch_ms"], 1788028800000)
-        self.assertEqual(report["refuels"], [{"fuel_liters": 29.39, "epoch_ms": 1788064800000}])
-        self.assertEqual(report["thefts"], [{"fuel_liters": 1.25, "epoch_ms": 1788072000000}])
+        self.assertEqual(
+            report["refuels"], [{"fuel_liters": 29.39, "epoch_ms": 1788064800000}]
+        )
+        self.assertEqual(
+            report["thefts"], [{"fuel_liters": 1.25, "epoch_ms": 1788072000000}]
+        )
 
     def test_roadcast_report_handles_missing_event_containers(self):
         report = parse_roadcast_report({"fuel_consumed": 0})

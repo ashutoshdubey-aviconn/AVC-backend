@@ -28,6 +28,7 @@ django.setup()
 from wareApp.dg_fuel.poller import collect_level_cycle
 from wareApp.dg_fuel.normalization import epoch_milliseconds
 from wareApp.dg_fuel.providers import (
+    extract_roadcast_subscription_expired_errors,
     parse_loconav_current_levels,
     parse_roadcast_current_levels,
 )
@@ -397,7 +398,7 @@ def _log_lines(lines):
         logger.info(line)
 
 
-def _fetch_site_fuel_level(site):
+def _fetch_site_fuel_level(site, reference_date=None):
     provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
     vehicle_number = (getattr(site, "partner_dg_fuel_id", None) or "").strip()
     result = {
@@ -429,22 +430,48 @@ def _fetch_site_fuel_level(site):
                 result["reason"] = "NO USABLE VALUE"
         elif provider == "roadcast":
             payload = fetch_roadcast()
-            levels = parse_roadcast_current_levels(payload, [vehicle_number])
-            if levels:
-                sample = max(levels, key=lambda item: item["epoch_ms"])
+            levels = parse_roadcast_current_levels(
+                payload, [vehicle_number], reference_date=reference_date
+            )
+            matching_levels = [
+                level
+                for level in levels
+                if str(level.get("device_imei") or level.get("vehicle_number"))
+                == vehicle_number
+            ]
+            if matching_levels:
+                sample = max(matching_levels, key=lambda item: item["epoch_ms"])
                 result["api_status"] = "SUCCESS"
+                result["telemetry_state"] = sample.get("telemetry_state")
+                result["last_update"] = sample.get("last_update")
+                result["provider_status"] = sample.get("provider_status")
+                result["device_id"] = sample.get("device_id")
+                result["device_name"] = sample.get("device_name")
                 result["fuel_liters"] = sample["fuel_liters"]
-                _, created = record_fuel_level(
-                    site=site,
-                    vehicle_number=sample["vehicle_number"],
-                    fuel_liters=sample["fuel_liters"],
-                    epoch_value=sample["epoch_ms"],
-                    source="roadcast",
-                )
-                result["database_status"] = "CREATED" if created else "EXISTING"
-                result["created"] = created
+                if sample.get("is_current_sample"):
+                    _, created = record_fuel_level(
+                        site=site,
+                        vehicle_number=sample["vehicle_number"],
+                        fuel_liters=sample["fuel_liters"],
+                        epoch_value=sample["epoch_ms"],
+                        source="roadcast",
+                    )
+                    result["database_status"] = "CREATED" if created else "EXISTING"
+                    result["created"] = created
+                else:
+                    result["database_status"] = "NOT CREATED"
+                    result["created"] = False
+                    result["reason"] = (
+                        sample.get("telemetry_state") or "STALE TELEMETRY"
+                    )
             else:
-                result["reason"] = "DEVICE UNAVAILABLE"
+                expired_errors = extract_roadcast_subscription_expired_errors(payload)
+                if expired_errors:
+                    result["reason"] = "SUBSCRIPTION EXPIRED"
+                    result["api_status"] = "SUBSCRIPTION_EXPIRED"
+                    result["subscription_expired_errors"] = expired_errors
+                else:
+                    result["reason"] = "DEVICE UNAVAILABLE"
         else:
             result["reason"] = "UNSUPPORTED PROVIDER"
     except Exception as exc:
@@ -590,23 +617,45 @@ def _run_site_cycle(site, cycle_start, cycle_end):
 
     _log_lines(["", f"SITE {site.id} | {provider_label} | {vehicle_number}"])
 
-    fuel_level_result = _fetch_site_fuel_level(site)
+    fuel_level_result = _fetch_site_fuel_level(site, reference_date=cycle_start.date())
     site_result["fuel_level"] = fuel_level_result
+    telemetry_state = (fuel_level_result.get("telemetry_state") or "").strip().upper()
     if (
         fuel_level_result["api_status"] != "SUCCESS"
         or fuel_level_result["fuel_liters"] is None
+        or telemetry_state not in {"", "CURRENT"}
     ):
+        extra_lines = []
+        if fuel_level_result.get("fuel_liters") is not None:
+            extra_lines.append(
+                f"    Fuel     : {fuel_level_result['fuel_liters']:.2f} L"
+            )
+        if fuel_level_result.get("telemetry_state"):
+            extra_lines.append(
+                f"    Telemetry: {fuel_level_result.get('telemetry_state')}"
+            )
+        if fuel_level_result.get("provider_status"):
+            extra_lines.append(
+                f"    Provider : {fuel_level_result.get('provider_status')}"
+            )
+        if fuel_level_result.get("last_update"):
+            extra_lines.append(f"    Updated  : {fuel_level_result.get('last_update')}")
+        if fuel_level_result.get("device_name"):
+            extra_lines.append(f"    Device   : {fuel_level_result.get('device_name')}")
         _log_lines(
             [
                 "[1] Fuel Level",
                 f"    API      : {fuel_level_result['api_status']} / {fuel_level_result.get('reason') or 'DEVICE UNAVAILABLE'}",
                 "    Database : NOT CREATED",
+                *extra_lines,
                 f"  >>> STOP SITE {site.id}",
-                "      Reason: no fuel level",
+                f"      Reason: {fuel_level_result.get('reason') or 'no current fuel level'}",
             ]
         )
         site_result["stopped"] = True
-        site_result["stop_reason"] = "no fuel level"
+        site_result["stop_reason"] = (
+            fuel_level_result.get("reason") or "no current fuel level"
+        )
         return site_result
 
     _log_lines(
@@ -614,6 +663,9 @@ def _run_site_cycle(site, cycle_start, cycle_end):
             "[1] Fuel Level",
             "    API      : SUCCESS",
             f"    Fuel     : {fuel_level_result['fuel_liters']:.2f} L",
+            f"    Telemetry: {fuel_level_result.get('telemetry_state') or 'CURRENT'}",
+            f"    Provider : {fuel_level_result.get('provider_status') or 'online'}",
+            f"    Updated  : {fuel_level_result.get('last_update') or 'CURRENT DAY'}",
             f"    Database : {fuel_level_result['database_status']}",
         ]
     )
