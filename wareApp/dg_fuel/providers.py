@@ -39,11 +39,46 @@ def _roadcast_telemetry_state(
     return "CURRENT"
 
 
-def extract_roadcast_subscription_expired_errors(payload: Any) -> List[Dict[str, Any]]:
+def extract_roadcast_subscription_expired_errors(
+    payload: Any, *, site: Any = None, vehicle_imei: Optional[str] = None
+) -> List[Dict[str, Any]]:
     if not isinstance(payload, dict):
         return []
 
     expired_errors = []
+    site_candidates = set()
+    if site is not None:
+        site_id = getattr(site, "id", None)
+        site_name = getattr(site, "site_name", None)
+        site_imei = getattr(site, "partner_dg_fuel_id", None)
+        for candidate in (site_id, site_name, site_imei):
+            if candidate is not None and str(candidate).strip():
+                site_candidates.add(str(candidate).strip().lower())
+    if vehicle_imei:
+        site_candidates.add(str(vehicle_imei).strip().lower())
+
+    def _matches_site(item: Dict[str, Any]) -> bool:
+        if not site_candidates:
+            return True
+        values = [
+            item.get("deviceId"),
+            item.get("device_id"),
+            item.get("device_name"),
+            item.get("name"),
+            item.get("error"),
+            item.get("message"),
+        ]
+        for value in values:
+            if value is None:
+                continue
+            normalized = str(value).strip().lower()
+            if not normalized:
+                continue
+            for candidate in site_candidates:
+                if candidate in normalized or normalized in candidate:
+                    return True
+        return False
+
     for item in _items(payload.get("error")):
         if not isinstance(item, dict):
             continue
@@ -54,6 +89,8 @@ def extract_roadcast_subscription_expired_errors(payload: Any) -> List[Dict[str,
             and "subscription expired" not in message_text
         ):
             continue
+        if not _matches_site(item):
+            continue
         expired_errors.append(
             {
                 "error": item.get("error"),
@@ -62,6 +99,51 @@ def extract_roadcast_subscription_expired_errors(payload: Any) -> List[Dict[str,
                 "device_name": item.get("name") or item.get("device_name"),
             }
         )
+    return expired_errors
+
+
+def extract_loconav_subscription_expired_errors(payload: Any) -> List[Dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+
+    phrases = (
+        "subscription expired",
+        "expired subscription",
+        "subscription has expired",
+    )
+    expired_errors: List[Dict[str, Any]] = []
+
+    def _walk(value: Any, field_path: str = "") -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                next_path = f"{field_path}.{key}" if field_path else str(key)
+                if isinstance(item, str):
+                    normalized_text = item.strip().lower()
+                    if any(phrase in normalized_text for phrase in phrases):
+                        expired_errors.append(
+                            {
+                                "field": next_path,
+                                "message": item,
+                            }
+                        )
+                elif isinstance(item, (dict, list)):
+                    _walk(item, next_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                next_path = f"{field_path}[{index}]" if field_path else f"[{index}]"
+                if isinstance(item, str):
+                    normalized_text = item.strip().lower()
+                    if any(phrase in normalized_text for phrase in phrases):
+                        expired_errors.append(
+                            {
+                                "field": next_path,
+                                "message": item,
+                            }
+                        )
+                elif isinstance(item, (dict, list)):
+                    _walk(item, next_path)
+
+    _walk(payload)
     return expired_errors
 
 
@@ -151,6 +233,48 @@ def _parallel_events(
     return events
 
 
+def _refill_timestamp_ms(value: Any) -> Optional[int]:
+    if isinstance(value, dict):
+        for candidate_key in ("end_time", "start_time", "timestamp", "time"):
+            timestamp_ms = epoch_milliseconds(value.get(candidate_key))
+            if timestamp_ms is not None:
+                return timestamp_ms
+        return None
+    return epoch_milliseconds(value)
+
+
+def _should_drop_leading_zero_fuel_level(
+    fuel_levels: List[Dict[str, Any]],
+    *,
+    initial_fuel_level: Optional[float],
+    fuel_level_at_end: Optional[float],
+    fuel_consumed: Optional[float],
+) -> bool:
+    if not fuel_levels:
+        return False
+
+    first_sample = fuel_levels[0]
+    first_value = as_float(first_sample.get("fuel_liters"))
+    if first_value is None or abs(first_value) > 1e-9:
+        return False
+
+    later_positive_sample_exists = any(
+        (as_float(sample.get("fuel_liters")) or 0) > 0 for sample in fuel_levels[1:]
+    )
+    if not later_positive_sample_exists:
+        return False
+
+    if initial_fuel_level is not None and initial_fuel_level > 0:
+        return True
+    if fuel_level_at_end is not None and fuel_level_at_end > 0:
+        return True
+    if fuel_consumed == 0 and (
+        initial_fuel_level is not None or fuel_level_at_end is not None
+    ):
+        return True
+    return False
+
+
 def parse_roadcast_report(payload: Any) -> Dict[str, Any]:
     """Normalize a Roadcast `pull_fuel_report` response for a DG-run window."""
     if not isinstance(payload, dict):
@@ -175,6 +299,17 @@ def parse_roadcast_report(payload: Any) -> Dict[str, Any]:
             continue
         fuel_levels.append({"fuel_liters": fuel_liters, "epoch_ms": timestamp_ms})
 
+    initial_fuel_level = as_float(payload.get("initial_fuel_level"))
+    fuel_level_at_end = as_float(payload.get("fuel_level_at_end"))
+    fuel_consumed = as_float(payload.get("fuel_consumed"))
+    if _should_drop_leading_zero_fuel_level(
+        fuel_levels,
+        initial_fuel_level=initial_fuel_level,
+        fuel_level_at_end=fuel_level_at_end,
+        fuel_consumed=fuel_consumed,
+    ):
+        fuel_levels = fuel_levels[1:]
+
     fillings = payload.get("fuel_fillings")
     theft_details = payload.get("fuel_stolen_details")
     fillings = fillings if isinstance(fillings, dict) else {}
@@ -183,18 +318,24 @@ def parse_roadcast_report(payload: Any) -> Dict[str, Any]:
         "device_id": payload.get("device_id"),
         "device_imei": payload.get("device_imei"),
         "device_name": payload.get("device_name"),
-        "fuel_consumed": as_float(payload.get("fuel_consumed")),
-        "initial_fuel_level": as_float(payload.get("initial_fuel_level")),
-        "fuel_level_at_end": as_float(payload.get("fuel_level_at_end")),
+        "fuel_consumed": fuel_consumed,
+        "initial_fuel_level": initial_fuel_level,
+        "fuel_level_at_end": fuel_level_at_end,
         "fuel_levels": fuel_levels,
         "fuel_fill_count": payload.get("fuel_fill_count", 0),
         "fuel_fillings": fillings,
-        "refuels": _parallel_events(
-            fillings.get("fuel_amounts"),
-            fillings.get("refill_time"),
-            "fuel_liters",
-            "epoch_ms",
-        ),
+        "refuels": [
+            {
+                "fuel_liters": as_float(fuel_amount),
+                "epoch_ms": timestamp_ms,
+            }
+            for fuel_amount, timestamp in zip(
+                _items(fillings.get("fuel_amounts")),
+                _items(fillings.get("refill_time")),
+            )
+            if as_float(fuel_amount) is not None
+            and (timestamp_ms := _refill_timestamp_ms(timestamp)) is not None
+        ],
         "fuel_stolen_count": payload.get("fuel_stolen_count", 0),
         "fuel_stolen_details": theft_details,
         "thefts": _parallel_events(

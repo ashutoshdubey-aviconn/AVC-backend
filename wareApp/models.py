@@ -1016,7 +1016,9 @@ class DgUnitConsumption(models.Model):
     is_dg_on = models.BooleanField(default=False)
     fetch_fuel_data = models.BooleanField(default=False)
     daily_data_status = models.CharField(
-        max_length=16, choices=DailyDataStatus.choices, default=DailyDataStatus.COMPLETED
+        max_length=16,
+        choices=DailyDataStatus.choices,
+        default=DailyDataStatus.COMPLETED,
     )
     daily_data_retry_count = models.PositiveIntegerField(default=0)
     daily_data_last_attempt_at = models.DateTimeField(blank=True, null=True)
@@ -1246,3 +1248,19 @@ class MeterDisconnectionEvent(models.Model):
 
     def __str__(self):
         return "{} {}".format(self.meter_name, self.status)
+
+
+class HomeGatewayStatus(models.Model):
+    home_gateway = models.ForeignKey(
+        HomeGatewayId, on_delete=models.CASCADE, related_name="locations"
+    )
+    latitude = models.DecimalField(
+        max_digits=20, decimal_places=15, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        max_digits=20, decimal_places=15, null=True, blank=True
+    )
+    status = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"

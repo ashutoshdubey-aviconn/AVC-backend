@@ -110,6 +110,19 @@ def fetch_roadcast_fuel(
     return None
 
 
+def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
+    url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api"
+    params = {"username": "Aviconn", "password": "Abc@1234"}
+    response = _try_request(url, params=params, timeout=8, retries=2)
+    if response is None or response.status_code != 200:
+        return None
+    try:
+        payload = response.json()
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def vehicle_variants(v: str) -> List[str]:
     if not v:
         return []

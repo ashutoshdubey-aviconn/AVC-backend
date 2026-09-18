@@ -197,3 +197,77 @@ class DgFuelRunnerTests(TestCase):
         self.assertEqual(summary["sites_processed"], 1)
         self.assertEqual(summary["refuels"]["created"], 1)
         mock_cycle.assert_called_once()
+
+    @patch("fetch_fuel_data._log_lines")
+    @patch(
+        "fetch_fuel_data._fetch_site_dg_fuel",
+        return_value=[
+            {
+                "status": "CREATED",
+                "fuel_value": 12.5,
+                "database_action": "CREATED",
+                "confirmed_zero": False,
+                "unit_consumption": 79.69,
+            }
+        ],
+    )
+    @patch(
+        "fetch_fuel_data.reconcile_daily_unit_consumption",
+        return_value={
+            "rows": [
+                {
+                    "aisle_group_id": 1,
+                    "status": "CREATED",
+                    "unit_id": 11,
+                    "daily_reading_value": 79.69,
+                    "fetch_fuel_data": True,
+                }
+            ]
+        },
+    )
+    @patch(
+        "fetch_fuel_data._fetch_site_alerts",
+        return_value={
+            "persisted_refuels": [
+                {"fuel_liters": 4.4, "epoch_value": 1788115579000, "created": True}
+            ],
+            "persisted_thefts": [],
+        },
+    )
+    @patch(
+        "fetch_fuel_data._fetch_site_fuel_level",
+        return_value={
+            "api_status": "STALE",
+            "fuel_liters": 268.11,
+            "telemetry_state": "STALE",
+            "provider_status": "offline",
+            "last_update": "2026-09-10T05:07:18.000000+0000",
+            "device_name": "153",
+            "database_status": "NOT CREATED",
+            "created": False,
+            "reason": "STALE TELEMETRY",
+        },
+    )
+    def test_run_site_cycle_continues_when_roadcast_telemetry_is_stale(
+        self,
+        mock_fuel_level,
+        mock_alerts,
+        mock_reconcile,
+        mock_dg_fuel,
+        mock_log_lines,
+    ):
+        site = self._make_provider_site(
+            "Roadcast stale site", "roadcast", "353691846234838"
+        )
+        cycle_start = timezone.make_aware(datetime(2026, 9, 14, 0, 0, 0))
+        cycle_end = timezone.make_aware(datetime(2026, 9, 14, 14, 30, 0))
+
+        result = fetch_fuel_data._run_site_cycle(site, cycle_start, cycle_end)
+
+        self.assertFalse(result["stopped"])
+        self.assertEqual(result["stop_reason"], None)
+        mock_alerts.assert_called_once()
+        mock_reconcile.assert_called_once()
+        mock_dg_fuel.assert_called_once()
+        mock_fuel_level.assert_called_once()
+        self.assertTrue(result["refuels"])

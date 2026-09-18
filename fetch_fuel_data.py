@@ -13,6 +13,7 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -178,6 +179,7 @@ def _today_provider_window():
         )
 
     current_time = timezone.localtime(current_time)
+
     start_time = current_time.replace(
         hour=0,
         minute=0,
@@ -375,12 +377,22 @@ def _provider_label(provider):
 
 def _cycle_window():
     current_time = timezone.now()
+
     if timezone.is_naive(current_time):
         current_time = timezone.make_aware(
-            current_time, timezone.get_current_timezone()
+            current_time,
+            timezone.get_current_timezone(),
         )
+
     current_time = timezone.localtime(current_time)
-    cycle_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    cycle_start = current_time.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
     return cycle_start, current_time
 
 
@@ -441,7 +453,6 @@ def _fetch_site_fuel_level(site, reference_date=None):
             ]
             if matching_levels:
                 sample = max(matching_levels, key=lambda item: item["epoch_ms"])
-                result["api_status"] = "SUCCESS"
                 result["telemetry_state"] = sample.get("telemetry_state")
                 result["last_update"] = sample.get("last_update")
                 result["provider_status"] = sample.get("provider_status")
@@ -449,6 +460,7 @@ def _fetch_site_fuel_level(site, reference_date=None):
                 result["device_name"] = sample.get("device_name")
                 result["fuel_liters"] = sample["fuel_liters"]
                 if sample.get("is_current_sample"):
+                    result["api_status"] = "SUCCESS"
                     _, created = record_fuel_level(
                         site=site,
                         vehicle_number=sample["vehicle_number"],
@@ -461,6 +473,7 @@ def _fetch_site_fuel_level(site, reference_date=None):
                 else:
                     result["database_status"] = "NOT CREATED"
                     result["created"] = False
+                    result["api_status"] = sample.get("telemetry_state") or "STALE"
                     result["reason"] = (
                         sample.get("telemetry_state") or "STALE TELEMETRY"
                     )
@@ -621,10 +634,21 @@ def _run_site_cycle(site, cycle_start, cycle_end):
     site_result["fuel_level"] = fuel_level_result
     telemetry_state = (fuel_level_result.get("telemetry_state") or "").strip().upper()
     if (
-        fuel_level_result["api_status"] != "SUCCESS"
-        or fuel_level_result["fuel_liters"] is None
-        or telemetry_state not in {"", "CURRENT"}
+        fuel_level_result["api_status"] == "SUCCESS"
+        and fuel_level_result["fuel_liters"] is not None
     ):
+        _log_lines(
+            [
+                "[1] Fuel Level",
+                "    API      : SUCCESS",
+                f"    Fuel     : {fuel_level_result['fuel_liters']:.2f} L",
+                f"    Telemetry: {fuel_level_result.get('telemetry_state') or 'CURRENT'}",
+                f"    Provider : {fuel_level_result.get('provider_status') or 'online'}",
+                f"    Updated  : {fuel_level_result.get('last_update') or 'CURRENT DAY'}",
+                f"    Database : {fuel_level_result['database_status']}",
+            ]
+        )
+    else:
         extra_lines = []
         if fuel_level_result.get("fuel_liters") is not None:
             extra_lines.append(
@@ -648,27 +672,9 @@ def _run_site_cycle(site, cycle_start, cycle_end):
                 f"    API      : {fuel_level_result['api_status']} / {fuel_level_result.get('reason') or 'DEVICE UNAVAILABLE'}",
                 "    Database : NOT CREATED",
                 *extra_lines,
-                f"  >>> STOP SITE {site.id}",
-                f"      Reason: {fuel_level_result.get('reason') or 'no current fuel level'}",
+                f"    Continue : historical processing will still run",
             ]
         )
-        site_result["stopped"] = True
-        site_result["stop_reason"] = (
-            fuel_level_result.get("reason") or "no current fuel level"
-        )
-        return site_result
-
-    _log_lines(
-        [
-            "[1] Fuel Level",
-            "    API      : SUCCESS",
-            f"    Fuel     : {fuel_level_result['fuel_liters']:.2f} L",
-            f"    Telemetry: {fuel_level_result.get('telemetry_state') or 'CURRENT'}",
-            f"    Provider : {fuel_level_result.get('provider_status') or 'online'}",
-            f"    Updated  : {fuel_level_result.get('last_update') or 'CURRENT DAY'}",
-            f"    Database : {fuel_level_result['database_status']}",
-        ]
-    )
 
     alert_result = _fetch_site_alerts(site, cycle_start, cycle_end)
     refuels = alert_result.get("persisted_refuels", [])

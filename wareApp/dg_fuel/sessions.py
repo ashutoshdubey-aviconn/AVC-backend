@@ -6,6 +6,7 @@ from datetime import date as date_type
 from datetime import datetime, time as datetime_time
 from typing import Any
 
+from django.conf import settings
 from django.db import connections
 from django.utils import timezone as dj_timezone
 
@@ -20,7 +21,14 @@ from wareApp.fuel_providers import (
     fetch_roadcast_report,
 )
 from wareApp.dg_fuel.ingestion import record_fuel_alert
-from wareApp.models import DailySiteReading, DGFuelAlertsData, DgUnitConsumption, NewAlarmsNotifications, Site
+from wareApp.models import (
+    DailySiteReading,
+    DGFuelAlertsData,
+    DgUnitConsumption,
+    HourlySiteReading,
+    NewAlarmsNotifications,
+    Site,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +53,7 @@ def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
         return None
 
     daily_reading = (
-        DailySiteReading.objects.filter(
+        DailySiteReading.objects.using(_main_database_alias()).filter(
             associated_Site=unit.site,
             aisle_group=unit.aisle_group,
             reading_for=reading_date,
@@ -62,11 +70,30 @@ def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
 def _daily_window(reading_date: date_type) -> tuple[datetime, datetime]:
     day_start = datetime.combine(reading_date, datetime_time.min)
     day_end = datetime.combine(reading_date, datetime_time.max.replace(microsecond=0))
-    if dj_timezone.is_naive(day_start):
+    if settings.USE_TZ and dj_timezone.is_naive(day_start):
         current_timezone = dj_timezone.get_current_timezone()
         day_start = dj_timezone.make_aware(day_start, current_timezone)
         day_end = dj_timezone.make_aware(day_end, current_timezone)
     return day_start, day_end
+
+
+def _best_dg_end_time_for_unit(
+    site: Site, aisle_group_id: int, reading_date: date_type
+) -> datetime | None:
+    hourly_reading = (
+        HourlySiteReading.objects.using(_main_database_alias())
+        .filter(
+            associated_Site_id=site.id,
+            aisle_group_id=aisle_group_id,
+            reading_from__date=reading_date,
+        )
+        .exclude(reading_to__isnull=True)
+        .order_by("-reading_to", "-id")
+        .first()
+    )
+    if hourly_reading and hourly_reading.reading_to:
+        return hourly_reading.reading_to
+    return None
 
 
 def reconcile_daily_unit_consumption(
@@ -87,7 +114,7 @@ def reconcile_daily_unit_consumption(
     )
 
     day_start, day_end = _daily_window(reading_date)
-    epoch_time = int(day_end.timestamp() * 1000)
+    epoch_time = int(day_start.timestamp() * 1000)
 
     created = 0
     updated = 0
@@ -130,6 +157,19 @@ def reconcile_daily_unit_consumption(
                 )
             continue
 
+        if unit_value < 1:
+            skipped += 1
+            if return_details:
+                row_results.append(
+                    {
+                        "aisle_group_id": aisle_id,
+                        "daily_reading_value": unit_value,
+                        "status": "IGNORED_FLUCTUATION",
+                        "reason": "below_threshold",
+                    }
+                )
+            continue
+
         # TEST DB
         unit = (
             DgUnitConsumption.objects.filter(
@@ -141,6 +181,7 @@ def reconcile_daily_unit_consumption(
             .first()
         )
 
+        best_dg_end_time = _best_dg_end_time_for_unit(site, aisle_id, reading_date)
         if unit:
             update_fields = []
             previous_value = unit.unit_consumption
@@ -157,8 +198,8 @@ def reconcile_daily_unit_consumption(
                 unit.dg_start_date = day_start
                 update_fields.append("dg_start_date")
 
-            if unit.dg_end_date != day_end:
-                unit.dg_end_date = day_end
+            if unit.dg_end_date != best_dg_end_time:
+                unit.dg_end_date = best_dg_end_time
                 update_fields.append("dg_end_date")
 
             if unit.epoch_time != epoch_time:
@@ -195,7 +236,7 @@ def reconcile_daily_unit_consumption(
                 dg_fuel_consumption=None,
                 created=day_start,
                 dg_start_date=day_start,
-                dg_end_date=day_end,
+                dg_end_date=best_dg_end_time,
                 epoch_time=epoch_time,
                 is_dg_on=False,
                 fetch_fuel_data=True,
@@ -352,14 +393,18 @@ def attempt_fetch_for_unit(
 
     if unit.unit_consumption is None:
         sync_daily_value = _daily_unit_consumption_for_unit(unit)
-        if sync_daily_value is not None:
+        if sync_daily_value is not None and sync_daily_value >= 1:
             unit.unit_consumption = sync_daily_value
             unit.save(update_fields=["unit_consumption"])
 
-    if unit.unit_consumption is None:
+    if unit.unit_consumption is None or unit.unit_consumption < 1:
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
-        result["reason"] = "daily_unit_consumption_missing"
+        result["reason"] = (
+            "daily_unit_consumption_missing"
+            if unit.unit_consumption is None
+            else "daily_unit_consumption_below_threshold"
+        )
         return result if return_details else False
 
     site = unit.site

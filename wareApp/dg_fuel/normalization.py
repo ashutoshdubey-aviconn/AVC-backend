@@ -1,5 +1,6 @@
 """Shared value and timestamp normalization for DG-fuel providers."""
 
+import re
 from datetime import datetime
 from typing import Any, Optional
 
@@ -29,6 +30,11 @@ def epoch_milliseconds(value: Any) -> Optional[int]:
 
     try:
         normalized_value = str(value).strip().replace("Z", "+00:00")
+        normalized_value = re.sub(
+            r"([+-]\d{2})(\d{2})$",
+            r"\1:\2",
+            normalized_value,
+        )
         parsed = datetime.fromisoformat(normalized_value)
     except (TypeError, ValueError):
         return None

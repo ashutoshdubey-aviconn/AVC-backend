@@ -1,7 +1,5 @@
-from django.urls import include, path
+from django.urls import path, include
 from wareApp.views import *
-
-# from recovery.views import RecoveryUploadAPIView
 
 # from wareApp.tests import *
 
@@ -130,9 +128,9 @@ urlpatterns = [
     path("liveLoadData/test", LiveDataApi.as_view()),
     path("fuel-data-trend-test", DgFuelMonthlyTrend_test.as_view()),
     path("loadDataExcel/test", LoadDataExcelDownloadMonthlyRange.as_view()),
-    path("monthly/data/test", EnergySavingMonthlyBarChartTestVB.as_view()),
+    path("monthly/data/test", EnergySavingMonthlyBarChart_new.as_view()),
     path("hourly/data/test", EnergySavingsHourlyBarChartVB.as_view()),
-    path("hourly/data/excel/test", EnergySavingsHourlyExcelDownloadVB.as_view()),
+    path("hourly/data/excel/V1", EnergySavingsHourlyExcelDownloadVB.as_view()),
     path("download/excel/test", DownloadExcelVB.as_view()),
     # path('newDailyApi/',EnergySavingMonthlyBarChartOptimized.as_view()),
     path("siteConsumptionPingsMosquitto/", SiteConsumptionPingApi.as_view()),
@@ -143,6 +141,6 @@ urlpatterns = [
     path("meter-disconnections/ingest/", MeterDisconnectionIngestView.as_view()),
     path("meter-disconnections/", MeterDisconnectionListView.as_view()),
     # path("fetchHomeGatewayId/", FetchHomeGatewayIdUsingProvisioning.as_view()),
-    # path("v1/recovery/", include("wareApp.recovery.urls")),
-    # path("recovery/upload/", RecoveryUploadAPIView.as_view(), name="recovery-upload"),
+    path("v1/recovery/", include("wareApp.recovery.urls")),
+    path("gateway-status/", HomeGatewayStatusApi.as_view()),
 ]

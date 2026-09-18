@@ -54,6 +54,7 @@ class DgFuelProviderParserTests(unittest.TestCase):
                         "deviceImei": "353691840557010",
                         "fuel": "275.4660194174757",
                         "lastUpdate": "2026-08-30T18:44:40.000000+0000",
+                        "ignition": "true",
                     },
                     {
                         "deviceImei": "unmapped",
@@ -70,6 +71,35 @@ class DgFuelProviderParserTests(unittest.TestCase):
         self.assertEqual(levels[0]["epoch_ms"], 1788115480000)
         self.assertEqual(levels[0]["telemetry_state"], "CURRENT")
         self.assertTrue(levels[0]["is_current_sample"])
+        self.assertEqual(levels[0]["ignition"], "true")
+
+    def test_parses_offline_roadcast_current_level_as_diagnostic(self):
+        levels = parse_roadcast_current_levels(
+            {
+                "data": [
+                    {
+                        "deviceImei": "353691846234838",
+                        "fuel": 10.533980582524272,
+                        "lastUpdate": "2026-09-14T05:07:18.000000+0000",
+                        "status": "offline",
+                    }
+                ]
+            },
+            allowed_imeis=["353691846234838"],
+            reference_date=datetime(2026, 9, 14),
+        )
+        self.assertEqual(levels[0]["telemetry_state"], "OFFLINE")
+        self.assertFalse(levels[0]["is_current_sample"])
+
+    def test_missing_last_update_is_skipped(self):
+        self.assertEqual(
+            parse_roadcast_current_levels(
+                {"data": [{"deviceImei": "353691840557010", "fuel": 10}]},
+                allowed_imeis=["353691840557010"],
+                reference_date=datetime(2026, 9, 14),
+            ),
+            [],
+        )
 
     def test_classifies_stale_roadcast_current_level(self):
         levels = parse_roadcast_current_levels(
@@ -138,6 +168,59 @@ class DgFuelProviderParserTests(unittest.TestCase):
         )
         self.assertEqual(
             report["thefts"], [{"fuel_liters": 1.25, "epoch_ms": 1788072000000}]
+        )
+
+    def test_drops_synthetic_leading_zero_fuel_sample(self):
+        report = parse_roadcast_report(
+            {
+                "initial_fuel_level": 41.06,
+                "fuel_level_at_end": 41.12,
+                "fuel_consumed": 0,
+                "fuel_data": [
+                    {"fuel": 0.0, "time": 1788115020},
+                    {"fuel": 37.9, "time": 1788115200},
+                    {"fuel": 37.82, "time": 1788115260},
+                ],
+            }
+        )
+        self.assertEqual(
+            report["fuel_levels"],
+            [
+                {"fuel_liters": 37.9, "epoch_ms": 1788115200000},
+                {"fuel_liters": 37.82, "epoch_ms": 1788115260000},
+            ],
+        )
+
+    def test_keeps_real_zero_fuel_sample_when_no_synthetic_signals_exist(self):
+        report = parse_roadcast_report(
+            {
+                "fuel_consumed": 0,
+                "fuel_data": [{"fuel": 0.0, "time": 1788115020}],
+            }
+        )
+        self.assertEqual(
+            report["fuel_levels"],
+            [{"fuel_liters": 0.0, "epoch_ms": 1788115020000}],
+        )
+
+    def test_parses_roadcast_refill_window_dicts(self):
+        report = parse_roadcast_report(
+            {
+                "fuel_consumed": 2.94,
+                "fuel_fill_count": 1,
+                "fuel_fillings": {
+                    "fuel_amounts": [8.6],
+                    "refill_time": [
+                        {
+                            "start_time": "2026-09-14 17:07:22",
+                            "end_time": "2026-09-14 17:14:52",
+                        }
+                    ],
+                },
+            }
+        )
+        self.assertEqual(
+            report["refuels"], [{"fuel_liters": 8.6, "epoch_ms": 1789386292000}]
         )
 
     def test_roadcast_report_handles_missing_event_containers(self):

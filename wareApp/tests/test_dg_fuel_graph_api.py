@@ -1,10 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 from django.test import TestCase
+from django.utils import timezone
 from unittest.mock import patch
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory
 
 from wareApp.models import (
+    AisleGroup,
     DGAlertsData,
     DGFuelAlertsData,
     DgUnitConsumption,
@@ -20,35 +23,66 @@ from wareApp.views import (
 
 class DgFuelGraphApiTests(TestCase):
     def setUp(self):
+        self.client = APIClient()
         self.site = Site.objects.create(
             site_name="DG graph API test site",
             partner_dg_fuel_id="353691846842382",
             partner_dg_provider="roadcast",
         )
         self.timestamp = datetime(2026, 9, 3, 10, 30)
-        DGFuelAlertsData.objects.create(
-            site=self.site,
-            vehicle_number=self.site.partner_dg_fuel_id,
-            alert_name="refuel",
-            fuel_consumption=12.5,
-            epoch_time="1788422400000",
-            created=self.timestamp,
-        )
-        DGFuelAlertsData.objects.create(
-            site=self.site,
-            vehicle_number=self.site.partner_dg_fuel_id,
-            alert_name="theft",
-            fuel_consumption=2.25,
-            epoch_time="1788426000000",
+        DGAlertsData.objects.create(
+            alert_data={
+                "alert_type": "RefuelingAlert",
+                "timestamp": 1788422400,
+                "refueled_in_liters": 12.5,
+                "vehicle_number": self.site.partner_dg_fuel_id,
+            },
             created=self.timestamp,
         )
         DGAlertsData.objects.create(
             alert_data={
                 "alert_type": "theft",
-                "timestamp": 1788433200,
-                "value": 9.75,
+                "timestamp": 1788426000,
+                "value": 2.25,
                 "vehicle_number": self.site.partner_dg_fuel_id,
-            }
+            },
+            created=self.timestamp,
+        )
+
+    def make_fuel_row(self, created, fuel_consumption):
+        epoch_ms = int(created.timestamp() * 1000)
+        return DgFuelConsumptionData.objects.create(
+            site=self.site,
+            vehicle_number=self.site.partner_dg_fuel_id,
+            fuel_consumption=fuel_consumption,
+            epoch_time=str(epoch_ms),
+            created=created,
+        )
+
+    def make_unit_row(
+        self, site, aisle_group, created, unit_consumption, fuel_consumption
+    ):
+        return DgUnitConsumption.objects.create(
+            site=site,
+            aisle_group=aisle_group,
+            unit_consumption=unit_consumption,
+            dg_fuel_consumption=fuel_consumption,
+            dg_start_date=created - timedelta(hours=1),
+            dg_end_date=created,
+            created=created,
+            epoch_time=str(int(created.timestamp() * 1000)),
+            fetch_fuel_data=False,
+            is_dg_on=False,
+        )
+
+    def make_alert_row(self, site, alert_name, created, fuel_consumption):
+        return DGFuelAlertsData.objects.create(
+            site=site,
+            vehicle_number=site.partner_dg_fuel_id,
+            alert_name=alert_name,
+            fuel_consumption=fuel_consumption,
+            epoch_time=str(int(created.timestamp() * 1000)),
+            created=created,
         )
 
     class _FakeValuesQuerySet(list):
@@ -66,16 +100,21 @@ class DgFuelGraphApiTests(TestCase):
         request.META["REMOTE_ADDR"] = remote_addr
         return request
 
-    def test_normalized_alerts_are_returned_by_daily_graph_api(self):
-        request = self.make_json_request(
-            "/api/dgFuelConsumptionData/",
-            {"site_id": self.site.id, "date": "2026/09/03"},
-            "10.0.0.1",
-        )
+    def api_post(self, path, payload):
+        return self.client.post(path, payload, format="json")
 
-        response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
+    def test_normalized_alerts_are_returned_by_daily_graph_api(self):
+        with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ):
+            response = self.api_post(
+                "/api/dgFuelConsumptionData/",
+                {"site_id": self.site.id, "date": "2026/09/03"},
+            )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "OK")
         self.assertEqual(
             response.data["refuel_alert"]["data"],
             [{"x": 1788422400000, "y": 12.5}],
@@ -95,9 +134,14 @@ class DgFuelGraphApiTests(TestCase):
             "10.0.0.2",
         )
 
-        response = DgFuelConsumptionDataApi_new.as_view()(request)
+        with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ):
+            response = DgFuelConsumptionDataApi_new.as_view()(request)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "OK")
         self.assertEqual(
             response.data["refuel_alert"]["data"],
             [{"x": 1788422400000, "y": 12.5}],
@@ -114,24 +158,27 @@ class DgFuelGraphApiTests(TestCase):
             partner_dg_provider="loconav",
         )
         refuel_seconds = int(datetime(2026, 9, 3, 10, 52).timestamp())
-        DGFuelAlertsData.objects.create(
-            site=site,
-            vehicle_number=site.partner_dg_fuel_id,
-            alert_name="refuel",
-            fuel_consumption=40.82,
-            epoch_time=str(refuel_seconds),
+        DGAlertsData.objects.create(
+            alert_data={
+                "alert_type": "deviceFuelFill",
+                "timestamp": refuel_seconds,
+                "refueled_in_liters": 40.82,
+                "vehicle_number": site.partner_dg_fuel_id,
+            },
             created=self.timestamp,
         )
 
-        request = self.make_json_request(
-            "/api/dgFuelConsumptionData/",
-            {"site_id": site.id, "date": "2026/09/03"},
-            "10.0.0.3",
-        )
-
-        response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
+        with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._loconav_subscription_expired",
+            return_value=False,
+        ):
+            response = self.api_post(
+                "/api/dgFuelConsumptionData/",
+                {"site_id": site.id, "date": "2026/09/03"},
+            )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "OK")
         self.assertEqual(
             response.data["refuel_alert"]["data"],
             [{"x": refuel_seconds * 1000, "y": 40.82}],
@@ -163,6 +210,9 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
@@ -171,6 +221,44 @@ class DgFuelGraphApiTests(TestCase):
         self.assertEqual(response.data["dg_unit_data"]["data"], [])
         self.assertEqual(response.data["dg_fuel_data"]["data"], [])
         self.assertEqual(response.data["dg_unit_per_litre_data"]["data"], [])
+
+    def test_roadcast_expired_returns_empty_graph_response(self):
+        site = Site.objects.create(
+            site_name="124",
+            partner_dg_fuel_id="353691846842382",
+            partner_dg_provider="roadcast",
+        )
+        aisle = AisleGroup.objects.create(
+            site=site, aisleGroupName="DG Roadcast Expired", power_source=1
+        )
+        self.make_unit_row(site, aisle, datetime(2026, 9, 4, 23, 59, 59), 3.63, 2.5)
+
+        with patch("wareApp.views.fetch_roadcast_pull_api") as mock_pull_api:
+            mock_pull_api.return_value = {
+                "data": [],
+                "error": [
+                    {
+                        "error": "Subscription expired",
+                        "message": "The device with ID 322105 and name '124' has an expired subscription",
+                    }
+                ],
+                "status": "success",
+            }
+            response = self.api_post(
+                "/api/dgFuelConsumptionData/",
+                {"site_id": site.id, "date": "2026/09/04"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "SUBSCRIPTION_EXPIRED")
+        self.assertEqual(response.data["message"], "DG fuel subscription expired")
+        self.assertEqual(response.data["fuel_level"]["data"], [])
+        self.assertEqual(response.data["data"], [])
+        self.assertEqual(response.data["refuel_alert"]["data"], [])
+        self.assertEqual(response.data["theft_alert"]["data"], [])
+        self.assertEqual(response.data["dg_unit_data"]["data"], [])
+        self.assertEqual(response.data["dg_fuel_consumed"]["data"], [])
+        self.assertEqual(response.data["dg_unit_per_litre"]["data"], [])
 
     def test_zero_unit_rows_are_not_mapped_in_graph_series(self):
         site = Site.objects.create(
@@ -198,6 +286,9 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
@@ -206,6 +297,77 @@ class DgFuelGraphApiTests(TestCase):
         self.assertEqual(response.data["dg_unit_data"]["data"], [])
         self.assertEqual(response.data["dg_fuel_data"]["data"], [])
         self.assertEqual(response.data["dg_unit_per_litre_data"]["data"], [])
+
+    def test_loconav_expired_returns_empty_graph_response(self):
+        site = Site.objects.create(
+            site_name="35",
+            partner_dg_fuel_id="DG-LOCONAV-EXP",
+            partner_dg_provider="loconav",
+        )
+        aisle = AisleGroup.objects.create(
+            site=site, aisleGroupName="DG Loconav Expired", power_source=1
+        )
+        self.make_unit_row(
+            site,
+            aisle,
+            datetime(2026, 9, 4, 23, 59, 59),
+            4.25,
+            2.5,
+        )
+
+        with patch(
+            "wareApp.views.fetch_loconav_report",
+            return_value={"message": "Subscription expired for this vehicle"},
+        ):
+            response = self.api_post(
+                "/api/dgFuelConsumptionData/",
+                {"site_id": site.id, "date": "2026/09/04"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "SUBSCRIPTION_EXPIRED")
+        self.assertEqual(response.data["message"], "DG fuel subscription expired")
+        self.assertEqual(response.data["fuel_level"]["data"], [])
+        self.assertEqual(response.data["data"], [])
+        self.assertEqual(response.data["refuel_alert"]["data"], [])
+        self.assertEqual(response.data["theft_alert"]["data"], [])
+        self.assertEqual(response.data["dg_unit_data"]["data"], [])
+        self.assertEqual(response.data["dg_fuel_consumed"]["data"], [])
+        self.assertEqual(response.data["dg_unit_per_litre"]["data"], [])
+
+    def test_loconav_offline_payload_is_not_marked_expired(self):
+        site = Site.objects.create(
+            site_name="DG graph loconav offline site",
+            partner_dg_fuel_id="DG-LOCONAV-OFF",
+            partner_dg_provider="loconav",
+        )
+        aisle = AisleGroup.objects.create(
+            site=site, aisleGroupName="DG Loconav Offline", power_source=1
+        )
+        created = datetime(2026, 9, 4, 23, 59, 59)
+        self.make_unit_row(site, aisle, created, 4.25, 2.5)
+        DgFuelConsumptionData.objects.create(
+            site=site,
+            vehicle_number=site.partner_dg_fuel_id,
+            fuel_consumption=37.75,
+            epoch_time=str(int((created - timedelta(hours=2)).timestamp() * 1000)),
+            created=created - timedelta(hours=2),
+        )
+
+        with patch(
+            "wareApp.views.fetch_loconav_report",
+            return_value={"status": "offline", "message": "vehicle unavailable"},
+        ):
+            response = self.api_post(
+                "/api/dgFuelConsumptionData/",
+                {"site_id": site.id, "date": "2026/09/04"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["provider_status"], "OK")
+        self.assertNotEqual(response.data["data"], [])
+        self.assertEqual(response.data["dg_unit_data"]["data"][0]["y"], 4.25)
+        self.assertEqual(response.data["dg_fuel_consumed"]["data"][0]["y"], 2.5)
 
     def test_dg_unit_graph_is_anchored_to_selected_day_start(self):
         site = Site.objects.create(
@@ -234,6 +396,9 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
@@ -247,6 +412,7 @@ class DgFuelGraphApiTests(TestCase):
             response.data["dg_fuel_data"]["data"],
             [{"x": selected_day_start, "y": 2.5}],
         )
+        self.assertEqual(response.data["provider_status"], "OK")
 
     def test_custom_range_hides_dg_series_when_provider_fuel_is_unavailable(self):
         site = Site.objects.create(
@@ -274,6 +440,9 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
@@ -312,6 +481,9 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
@@ -346,11 +518,14 @@ class DgFuelGraphApiTests(TestCase):
                 }
             ]
         )
-        DgFuelConsumptionData.objects.create(
-            site=site,
-            fuel_consumption=50.0,
-            epoch_time="1757030400",
-            created=datetime(2026, 9, 4, 8, 0),
+        fuel_rows = self._FakeValuesQuerySet(
+            [
+                SimpleNamespace(
+                    epoch_time="1757030400",
+                    fuel_consumption=50.0,
+                    created=datetime(2026, 9, 4, 8, 0),
+                )
+            ]
         )
 
         request = self.make_json_request(
@@ -360,7 +535,12 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ), patch(
             "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+        ), patch(
+            "wareApp.views.DgFuelConsumptionData.objects.filter", return_value=fuel_rows
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
                 request
@@ -408,7 +588,13 @@ class DgFuelGraphApiTests(TestCase):
             "10.0.0.9",
         )
 
-        response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(request)
+        with patch(
+            "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+            return_value=False,
+        ):
+            response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
+                request
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -417,3 +603,201 @@ class DgFuelGraphApiTests(TestCase):
         self.assertEqual(
             response.data["theft_alert"]["data"], [{"x": 1757034000000, "y": 2.75}]
         )
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_historical_day_with_data_adds_boundary_points(self, mock_expired):
+        selected_day = datetime(2026, 9, 4)
+        points = [
+            (datetime(2026, 9, 4, 9, 0), 38.5),
+            (datetime(2026, 9, 4, 10, 0), 38.2),
+            (datetime(2026, 9, 4, 16, 0), 37.9),
+        ]
+        for created, fuel in points:
+            self.make_fuel_row(created, fuel)
+
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": "2026/09/04"},
+            "10.0.0.11",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        fuel_points = response.data["data"]
+        self.assertEqual(
+            fuel_points,
+            [
+                {"x": int(datetime(2026, 9, 4, 0, 0).timestamp() * 1000), "y": 38.5},
+                {"x": int(datetime(2026, 9, 4, 9, 0).timestamp() * 1000), "y": 38.5},
+                {"x": int(datetime(2026, 9, 4, 10, 0).timestamp() * 1000), "y": 38.2},
+                {"x": int(datetime(2026, 9, 4, 16, 0).timestamp() * 1000), "y": 37.9},
+                {
+                    "x": int(datetime(2026, 9, 4, 23, 59, 59).timestamp() * 1000),
+                    "y": 37.9,
+                },
+            ],
+        )
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_historical_day_without_data_uses_previous_value(self, mock_expired):
+        previous_day = datetime(2026, 9, 14, 16, 0)
+        self.make_fuel_row(previous_day, 41.06)
+
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": "2026/09/15"},
+            "10.0.0.12",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["data"],
+            [
+                {"x": int(datetime(2026, 9, 15, 0, 0).timestamp() * 1000), "y": 41.06},
+                {
+                    "x": int(datetime(2026, 9, 15, 23, 59, 59).timestamp() * 1000),
+                    "y": 41.06,
+                },
+            ],
+        )
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_historical_day_without_data_and_no_previous_returns_empty(
+        self, mock_expired
+    ):
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": "2026/09/15"},
+            "10.0.0.13",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"], [])
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_current_day_with_data_adds_start_boundary_only(self, mock_expired):
+        today = timezone.now().date()
+        self.make_fuel_row(
+            datetime.combine(today, datetime.min.time()) + timedelta(hours=9), 38.5
+        )
+        self.make_fuel_row(
+            datetime.combine(today, datetime.min.time()) + timedelta(hours=10), 38.2
+        )
+        self.make_fuel_row(
+            datetime.combine(today, datetime.min.time()) + timedelta(hours=16), 37.9
+        )
+
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": today.strftime("%Y/%m/%d")},
+            "10.0.0.14",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        fuel_points = response.data["data"]
+        self.assertEqual(
+            fuel_points[0]["x"],
+            int(datetime.combine(today, datetime.min.time()).timestamp() * 1000),
+        )
+        self.assertEqual(fuel_points[0]["y"], 38.5)
+        self.assertNotIn(
+            {
+                "x": int(
+                    datetime.combine(
+                        today, datetime.max.replace(microsecond=0)
+                    ).timestamp()
+                    * 1000
+                ),
+                "y": 37.9,
+            },
+            fuel_points,
+        )
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_current_day_without_data_uses_previous_and_now(self, mock_expired):
+        today = timezone.now().date()
+        previous_day = today - timedelta(days=1)
+        self.make_fuel_row(
+            datetime.combine(previous_day, datetime.min.time()) + timedelta(hours=16),
+            41.06,
+        )
+
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": today.strftime("%Y/%m/%d")},
+            "10.0.0.15",
+        )
+
+        before = timezone.now()
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+        after = timezone.now()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["data"]), 2)
+        self.assertEqual(response.data["data"][0]["y"], 41.06)
+        self.assertEqual(response.data["data"][1]["y"], 41.06)
+        self.assertGreater(response.data["data"][1]["x"], response.data["data"][0]["x"])
+        self.assertGreaterEqual(
+            response.data["data"][1]["x"], int(before.timestamp() * 1000) - 1000
+        )
+        self.assertLessEqual(
+            response.data["data"][1]["x"], int(after.timestamp() * 1000) + 5000
+        )
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=False,
+    )
+    def test_current_day_without_data_and_no_previous_returns_empty(self, mock_expired):
+        today = timezone.now().date()
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": today.strftime("%Y/%m/%d")},
+            "10.0.0.16",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"], [])
+
+    @patch(
+        "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
+        return_value=True,
+    )
+    def test_expired_device_returns_empty_series(self, mock_expired):
+        previous_day = datetime(2026, 9, 14, 16, 0)
+        self.make_fuel_row(previous_day, 41.06)
+
+        request = self.make_json_request(
+            "/api/dgFuelConsumptionData_test/",
+            {"site_id": self.site.id, "date": "2026/09/15"},
+            "10.0.0.17",
+        )
+
+        response = DgFuelConsumptionDataApi_new.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"], [])

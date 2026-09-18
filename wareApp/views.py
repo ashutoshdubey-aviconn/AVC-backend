@@ -8,6 +8,7 @@ from django.contrib.sessions.models import Session
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate
+from django.conf import settings
 
 #############################
 from rest_framework.views import APIView
@@ -21,33 +22,61 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from wareApp.models import *
 from wareApp import sendmail
 from wareApp.serializers import *
-from wareApp.utility import entryExit
+from wareApp.utility import entryExit, logger
+try:
+    from wareApp.dg_fuel.normalization import epoch_milliseconds
+    from wareApp.dg_fuel.providers import (
+        extract_loconav_subscription_expired_errors,
+        extract_roadcast_subscription_expired_errors,
+    )
+    from wareApp.fuel_providers import fetch_loconav_report, fetch_roadcast_pull_api
+except ImportError:
+    def epoch_milliseconds(value):
+        if value is None or isinstance(value, bool):
+            return None
 
+        try:
+            numeric_value = int(float(str(value).strip()))
+        except (TypeError, ValueError):
+            numeric_value = None
 
-# Replace real logger with a no-op logger to avoid noisy debug calls in views
-class _NoopLogger:
-    def debug(self, *args, **kwargs):
-        return None
+        if numeric_value is not None:
+            return (
+                numeric_value
+                if numeric_value >= 1000000000000
+                else numeric_value * 1000
+            )
 
-    def info(self, *args, **kwargs):
-        return None
+        try:
+            normalized_value = str(value).strip().replace("Z", "+00:00")
+            normalized_value = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", normalized_value)
+            parsed = datetime.fromisoformat(normalized_value)
+        except (TypeError, ValueError):
+            return None
 
-    def warning(self, *args, **kwargs):
-        return None
+        return int(parsed.timestamp() * 1000)
 
-    def error(self, *args, **kwargs):
-        return None
+    def extract_loconav_subscription_expired_errors(payload):
+        return []
 
+    def extract_roadcast_subscription_expired_errors(payload, *, site=None, vehicle_imei=None):
+        return []
 
-logger = _NoopLogger()
+    def fetch_loconav_report(*args, **kwargs):
+        return {}
+
+    def fetch_roadcast_pull_api(*args, **kwargs):
+        return {}
 
 #################################
 from datetime import timedelta, datetime, time
+from django.utils import timezone
 from telnetlib import STATUS
 import time
 from collections import defaultdict
 from django.http import HttpResponse
 import pandas as pd
+import requests
 from django.db.models import Q
 from io import BytesIO
 from django.db.models.functions import TruncMonth, TruncMinute
@@ -55,6 +84,18 @@ from django.utils.dateparse import parse_datetime
 import re
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+
+DG_FUEL_DB_ALIAS = "secondary"
+
+
+def _dg_fuel_db_alias():
+    databases = getattr(settings, "DATABASES", {})
+    return DG_FUEL_DB_ALIAS if DG_FUEL_DB_ALIAS in databases else "default"
+
+
+def _dg_fuel_queryset(model_manager):
+    return model_manager.using(_dg_fuel_db_alias())
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -303,8 +344,6 @@ class SuperAdminSnapShot(APIView):
         for users in all_users:
             print("users : ", users)
             customer_data = {}
-            all_live_sites = Site.objects.filter(customer=users, is_live=True)
-            print("all_live_sites", all_live_sites)
             total_sites = Site.objects.filter(customer=users).count()
             total_live_sites = all_live_sites.count()
             print("live_sites", total_live_sites)
@@ -784,6 +823,306 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     permission_classes = [AllowAny]
 
+    @staticmethod
+    def _row_value(row, key, default=None):
+        if isinstance(row, dict):
+            return row.get(key, default)
+        return getattr(row, key, default)
+
+    @staticmethod
+    def _graph_epoch_ms(value, offset_minutes=0):
+        epoch_ms = epoch_milliseconds(value)
+        if epoch_ms is None:
+            return None
+        return epoch_ms + (offset_minutes * 60 * 1000)
+
+    @staticmethod
+    def _dg_graph_base_time(row):
+        value = DgFuelConsumptionDataApi_new._row_value(row, "dg_end_date")
+        return epoch_milliseconds(value)
+
+    @staticmethod
+    def _day_bounds(selected_date):
+        day_start = datetime.combine(selected_date, datetime.min.time())
+        day_end = datetime.combine(selected_date, datetime.max.time().replace(microsecond=0))
+        if timezone.is_naive(day_start):
+            current_timezone = timezone.get_current_timezone()
+            day_start = timezone.make_aware(day_start, current_timezone)
+            day_end = timezone.make_aware(day_end, current_timezone)
+        return day_start, day_end
+
+    @staticmethod
+    def _fuel_point_from_row(row):
+        fuel_value = DgFuelConsumptionDataApi_new._row_value(row, "fuel_consumption")
+        epoch_value = DgFuelConsumptionDataApi_new._row_value(row, "epoch_time")
+        if fuel_value is None or epoch_value is None:
+            return None
+        epoch_ms = epoch_milliseconds(epoch_value)
+        if epoch_ms is None:
+            return None
+        try:
+            normalized_fuel = round(float(fuel_value), 2)
+        except (TypeError, ValueError):
+            return None
+        return {"x": epoch_ms, "y": normalized_fuel}
+
+    @staticmethod
+    def _latest_known_fuel_before(site_id, selected_date):
+        previous = (
+            _dg_fuel_queryset(DgFuelConsumptionData.objects).filter(
+                site=site_id, created__date__lt=selected_date
+            )
+            .order_by("-created", "-id")
+            .first()
+        )
+        if previous is None:
+            return None
+        fuel_value = DgFuelConsumptionDataApi_new._row_value(
+            previous, "fuel_consumption"
+        )
+        if fuel_value is None:
+            return None
+        try:
+            return round(float(fuel_value), 2)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _roadcast_subscription_expired(site, selected_date):
+        provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
+        if provider != "roadcast":
+            return False
+
+        vehicle_imei = (getattr(site, "partner_dg_fuel_id", None) or "").strip()
+        if not vehicle_imei:
+            return False
+
+        try:
+            payload = fetch_roadcast_pull_api()
+        except Exception:
+            return False
+
+        return bool(
+            extract_roadcast_subscription_expired_errors(
+                payload, site=site, vehicle_imei=vehicle_imei
+            )
+        )
+
+    @staticmethod
+    def _loconav_subscription_expired(site, selected_date):
+        provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
+        if provider != "loconav":
+            return False
+
+        vehicle_number = (getattr(site, "partner_dg_fuel_id", None) or "").strip()
+        if not vehicle_number:
+            return False
+
+        day_start, day_end = DgFuelConsumptionDataApi_new._day_bounds(selected_date)
+        try:
+            payload = fetch_loconav_report(vehicle_number, day_start, day_end)
+        except Exception:
+            return False
+
+        return bool(extract_loconav_subscription_expired_errors(payload))
+
+    @staticmethod
+    def _get_provider_status(site, selected_date):
+        provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
+        if provider == "roadcast":
+            return (
+                "SUBSCRIPTION_EXPIRED"
+                if DgFuelConsumptionDataApi_new._roadcast_subscription_expired(
+                    site, selected_date
+                )
+                else "OK"
+            )
+        if provider == "loconav":
+            return (
+                "SUBSCRIPTION_EXPIRED"
+                if DgFuelConsumptionDataApi_new._loconav_subscription_expired(
+                    site, selected_date
+                )
+                else "OK"
+            )
+        return "OK"
+
+    @staticmethod
+    def _expired_graph_response():
+        return {
+            "status": 200,
+            "provider_status": "SUBSCRIPTION_EXPIRED",
+            "message": "DG fuel subscription expired",
+            "fuel_level": {
+                "name": "Fuel Level",
+                "data": [],
+                "type": "column",
+            },
+            "data": [],
+            "refuel_alert": {
+                "name": "Refuel",
+                "data": [],
+                "type": "column",
+            },
+            "theft_alert": {
+                "name": "Fuel Drain",
+                "data": [],
+                "type": "column",
+            },
+            "dg_unit_data": {
+                "name": "DG_Unit_Consumption",
+                "data": [],
+                "type": "column",
+            },
+            "dg_fuel_data": {
+                "name": "DG_Fuel_Consumed",
+                "data": [],
+                "type": "column",
+            },
+            "dg_fuel_consumed": {
+                "name": "DG_Fuel_Consumed",
+                "data": [],
+                "type": "column",
+            },
+            "dg_unit_per_litre_data": {
+                "name": "Dg_Unit_Per_Ltr",
+                "data": [],
+                "type": "column",
+            },
+            "dg_unit_per_litre": {
+                "name": "Dg_Unit_Per_Ltr",
+                "data": [],
+                "type": "column",
+            },
+            "sample": "false",
+        }
+
+    @staticmethod
+    def _fuel_level_series_for_day(site, selected_date, provider_status=None):
+        today = timezone.now().date()
+        day_start, day_end = DgFuelConsumptionDataApi_new._day_bounds(selected_date)
+        day_start_ms = epoch_milliseconds(day_start)
+        day_end_ms = epoch_milliseconds(day_end)
+
+        if provider_status is None:
+            provider_status = DgFuelConsumptionDataApi_new._get_provider_status(
+                site, selected_date
+            )
+
+        if provider_status == "SUBSCRIPTION_EXPIRED":
+            return []
+
+        actual_points = []
+
+        fuel_rows = _dg_fuel_queryset(DgFuelConsumptionData.objects).filter(
+            site=site.id, created__date=selected_date
+        ).order_by("created")
+        for row in fuel_rows:
+            point = DgFuelConsumptionDataApi_new._fuel_point_from_row(row)
+            if point is not None:
+                actual_points.append(point)
+
+        if not actual_points:
+            previous_fuel = DgFuelConsumptionDataApi_new._latest_known_fuel_before(
+                site.id, selected_date
+            )
+            if previous_fuel is None:
+                return []
+            if selected_date == today:
+                current_point = {
+                    "x": epoch_milliseconds(timezone.now()),
+                    "y": previous_fuel,
+                }
+                return [
+                    {"x": day_start_ms, "y": previous_fuel},
+                    current_point,
+                ]
+            return [
+                {"x": day_start_ms, "y": previous_fuel},
+                {"x": day_end_ms, "y": previous_fuel},
+            ]
+
+        series = []
+        first_point = actual_points[0]
+        last_point = actual_points[-1]
+
+        if first_point["x"] != day_start_ms:
+            series.append({"x": day_start_ms, "y": first_point["y"]})
+
+        series.extend(actual_points)
+
+        if selected_date != today and last_point["x"] != day_end_ms:
+            series.append({"x": day_end_ms, "y": last_point["y"]})
+
+        deduped_series = []
+        seen_timestamps = set()
+        for point in series:
+            timestamp = point["x"]
+            if timestamp in seen_timestamps:
+                continue
+            seen_timestamps.add(timestamp)
+            deduped_series.append(point)
+        return deduped_series
+
+    @staticmethod
+    def _fuel_level_series_for_range(site, from_date, end_date):
+        points = []
+        current_date = from_date
+        while current_date <= end_date:
+            points.extend(
+                DgFuelConsumptionDataApi_new._fuel_level_series_for_day(
+                    site, current_date
+                )
+            )
+            current_date += timedelta(days=1)
+
+        deduped_series = []
+        seen_timestamps = set()
+        for point in sorted(points, key=lambda item: item["x"]):
+            timestamp = point["x"]
+            if timestamp in seen_timestamps:
+                continue
+            seen_timestamps.add(timestamp)
+            deduped_series.append(point)
+        return deduped_series
+
+    @staticmethod
+    def _normalized_alert_series(site_id, start_date, end_date):
+        refuel_data = []
+        theft_data = []
+        alerts = _dg_fuel_queryset(DGFuelAlertsData.objects).filter(
+            site=site_id,
+            created__date__gte=start_date,
+            created__date__lte=end_date,
+            alert_name__in=["refuel", "theft"],
+        ).order_by("created")
+
+        for alert in alerts:
+            epoch_ms = epoch_milliseconds(
+                DgFuelConsumptionDataApi_new._row_value(alert, "epoch_time")
+            )
+            if epoch_ms is None:
+                continue
+            alert_name = str(
+                DgFuelConsumptionDataApi_new._row_value(alert, "alert_name", "")
+            ).lower()
+            fuel_value = DgFuelConsumptionDataApi_new._row_value(
+                alert, "fuel_consumption"
+            )
+            if fuel_value is None:
+                continue
+            try:
+                normalized_fuel = round(float(fuel_value), 2)
+            except (TypeError, ValueError):
+                continue
+            point = {"x": epoch_ms, "y": normalized_fuel}
+            if alert_name == "refuel":
+                refuel_data.append(point)
+            elif alert_name == "theft":
+                theft_data.append(point)
+
+        return refuel_data, theft_data
+
     @entryExit
     def post(self, request):
         data = request.data
@@ -792,43 +1131,57 @@ class DgFuelConsumptionDataApi_new(APIView):
             site_id = data.get("site_id")
             date = data.get("date")
             site = Site.objects.get(id=site_id)
-            selected_date = datetime.strptime(date, "%Y/%m/%d")
-            vehical_number = site.partner_dg_fuel_id.upper()
+            selected_date = datetime.strptime(date, "%Y/%m/%d").date()
             print(selected_date)
             date = date.replace("/", "-")
             print(date)
-            final_data = []
-            fuel_data = DgFuelConsumptionData.objects.filter(
-                site=site_id, created__date=selected_date.date()
-            ).order_by("created")
-            for i in fuel_data:
-                final_data.append(
-                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
-                )
-            dg_data = DgUnitConsumption.objects.filter(
-                site=site_id,
-                created__date=selected_date.date(),
-                daily_data_status=DgUnitConsumption.DailyDataStatus.COMPLETED,
+            provider_status = DgFuelConsumptionDataApi_new._get_provider_status(
+                site, selected_date
             )
+            if provider_status == "SUBSCRIPTION_EXPIRED":
+                return Response(DgFuelConsumptionDataApi_new._expired_graph_response())
+
+            final_data = DgFuelConsumptionDataApi_new._fuel_level_series_for_day(
+                site, selected_date, provider_status=provider_status
+            )
+            dg_data = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
+                site=site_id, created__date=selected_date
+            )
+            logger.debug(final_data)
+            logger.debug(dg_data)
             print("dg data: ", dg_data)
             dg_unit_data = []
             dg_fuel_data = []
             dg_unit_per_litre = []
             if dg_data.exists():
+                logger.debug("enside dg data conditions")
                 for i in dg_data:
-                    dg_unit_data.append(
-                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
+                    logger.debug("i value: %s", i)
+                    base_epoch_ms = DgFuelConsumptionDataApi_new._dg_graph_base_time(i)
+                    if base_epoch_ms is None:
+                        continue
+                    if i.unit_consumption is None or i.dg_fuel_consumption is None:
+                        continue
+                    unit_consumption = float(i.unit_consumption)
+                    dg_fuel_consumption = float(i.dg_fuel_consumption)
+                    if unit_consumption < 1:
+                        continue
+                    dg_unit_data.append({"x": base_epoch_ms, "y": round(unit_consumption, 2)})
+                    dg_fuel_data.append(
+                        {
+                            "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                                base_epoch_ms, 1
+                            ),
+                            "y": round(dg_fuel_consumption, 2),
+                        }
                     )
-                    if i.dg_fuel_consumption > 0:
-                        dg_fuel_data.append(
-                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
-                        )
+                    if dg_fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": int(i.epoch_time),
-                                "y": round(
-                                    i.unit_consumption / i.dg_fuel_consumption, 2
+                                "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                                    base_epoch_ms, 3
                                 ),
+                                "y": round(unit_consumption / dg_fuel_consumption, 2),
                             }
                         )
             else:
@@ -836,36 +1189,13 @@ class DgFuelConsumptionDataApi_new(APIView):
                 dg_unit_data = []
                 dg_fuel_data = []
                 dg_unit_per_litre = []
-            fuel_alerts = DGAlertsData.objects.all()
-            refuel_data = []
-            theft_data = []
-
-            print(vehical_number)
-            refuel_alerts_for_site = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & Q(alert_data__contains="RefuelingAlert")
-                & Q(created__date=selected_date.date())
-            )
-            print(selected_date)
-            print(len(refuel_alerts_for_site))
-            refueling_alerts = [i.alert_data for i in refuel_alerts_for_site]
-            for i in refueling_alerts:
-                print(i)
-                epoch_time = datetime.strptime(
-                    i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                ).timestamp()
-                refuel_data.append(
-                    {"x": int(epoch_time) * 1000, "y": i.get("refueled_in_liters")}
+            refuel_data, theft_data = (
+                DgFuelConsumptionDataApi_new._normalized_alert_series(
+                    site_id,
+                    selected_date,
+                    selected_date,
                 )
-
-            theft_alerts = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & Q(alert_data__contains="theft")
-                & Q(created__date=selected_date.date())
             )
-            theft_alerts = [i.alert_data for i in theft_alerts]
-            for i in theft_alerts:
-                theft_data.append({"x": i.timestamp * 1000, "y": i.get("value")})
 
             refuel_final_data = {
                 "name": "Refuel",
@@ -883,7 +1213,6 @@ class DgFuelConsumptionDataApi_new(APIView):
                 "type": "column",
             }
             dg_fuel_final_data = {
-                "name": "DG_Fuel_Consumed",
                 "data": dg_fuel_data,
                 "type": "column",
             }
@@ -895,12 +1224,20 @@ class DgFuelConsumptionDataApi_new(APIView):
             return Response(
                 {
                     "status": 200,
+                    "provider_status": provider_status,
+                    "fuel_level": {
+                        "name": "Fuel Level",
+                        "data": final_data,
+                        "type": "column",
+                    },
                     "data": final_data,
                     "refuel_alert": refuel_final_data,
                     "theft_alert": theft_final_data,
                     "dg_unit_data": dg_unit_final_data,
                     "dg_fuel_data": dg_fuel_final_data,
+                    "dg_fuel_consumed": dg_fuel_final_data,
                     "dg_unit_per_litre_data": dg_unit_per_litre_data,
+                    "dg_unit_per_litre": dg_unit_per_litre_data,
                     "sample": "false",
                 }
             )
@@ -5813,6 +6150,26 @@ class DownloadFluctuatedPowerFactor(APIView):
 
 
 class LoadGraphApiForMainsDgDailyData(APIView):
+    @staticmethod
+    def _series_color(series_name):
+        normalized_name = str(series_name or "").strip().lower()
+        match = re.search(r"(\d+)$", normalized_name)
+        series_index = int(match.group(1)) if match else 1
+
+        if "dg" in normalized_name:
+            palette = {
+                1: "#FFD580",
+                2: "#FFB347",
+                3: "#FF9F5A",
+            }
+            return palette.get(series_index, "#FFD580")
+
+        palette = {
+            1: "#90EE90",
+            2: "#B6F2B6",
+        }
+        return palette.get(series_index, "#90EE90")
+
     def post(self, request):
         data = request.data
         try:
@@ -5823,6 +6180,7 @@ class LoadGraphApiForMainsDgDailyData(APIView):
             all_aisles = AisleGroup.objects.filter(site=site_id).order_by("id")
             final_data = []
             for aisle in all_aisles:
+                series_color = self._series_color(aisle.aisleGroupName)
                 hourly_data = (
                     MainsDgLoadData.objects.using("secondary")
                     .filter(
@@ -5832,7 +6190,7 @@ class LoadGraphApiForMainsDgDailyData(APIView):
                     )
                     .order_by("created")
                 )
-                res = {"name": aisle.aisleGroupName}
+                res = {"name": aisle.aisleGroupName, "color": series_color}
                 if hourly_data.exists():
                     res["data"] = []
                     for i in hourly_data:
@@ -5841,7 +6199,7 @@ class LoadGraphApiForMainsDgDailyData(APIView):
                             {
                                 "x": int(i.epoch_time),
                                 "y": round(load_data, 3),
-                                "color": aisle.load_graph_color,
+                                "color": series_color,
                             }
                         )
                 final_data.append(res)
@@ -5876,17 +6234,13 @@ class DgFuelConsumptionDataApi(APIView):
         try:
             site_id = data.get("site_id")
             date = data.get("date")
-            selected_date = datetime.strptime(date, "%Y/%m/%d")
-            final_data = []
-            fuel_data = DgFuelConsumptionData.objects.filter(
-                site=site_id, created__date=selected_date.date()
-            ).order_by("created")
-            for i in fuel_data:
-                final_data.append(
-                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
-                )
-            dg_data = DgUnitConsumption.objects.filter(
-                site=site_id, created__date=selected_date.date()
+            selected_date = datetime.strptime(date, "%Y/%m/%d").date()
+            site = Site.objects.get(id=site_id)
+            final_data = DgFuelConsumptionDataApi_new._fuel_level_series_for_day(
+                site, selected_date
+            )
+            dg_data = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
+                site=site_id, created__date=selected_date
             )
             logger.debug(final_data)
             logger.debug(dg_data)
@@ -5897,37 +6251,51 @@ class DgFuelConsumptionDataApi(APIView):
             if dg_data.exists():
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
-                    logger.debug("i value: ", i)
+                    logger.debug("i value: %s", i)
+                    unit_consumption = getattr(i, "unit_consumption", None)
+                    dg_fuel_consumption = getattr(i, "dg_fuel_consumption", None)
+                    epoch_ms = epoch_milliseconds(getattr(i, "epoch_time", None))
+                    if (
+                        unit_consumption is None
+                        or dg_fuel_consumption is None
+                        or epoch_ms is None
+                        or float(unit_consumption) < 1
+                    ):
+                        continue
                     dg_unit_data.append(
-                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
+                        {"x": epoch_ms, "y": round(unit_consumption, 2)}
                     )
-                    if i.dg_fuel_consumption > 0:
+                    if dg_fuel_consumption is not None:
                         dg_fuel_data.append(
-                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
+                            {"x": epoch_ms, "y": round(dg_fuel_consumption, 2)}
                         )
+                    if dg_fuel_consumption and dg_fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": int(i.epoch_time),
-                                "y": round(
-                                    i.unit_consumption / i.dg_fuel_consumption, 2
-                                ),
+                                "x": epoch_ms,
+                                "y": round(unit_consumption / dg_fuel_consumption, 2),
                             }
                         )
-            # fuel_alerts = DGAlertsData.objects.all()
             refuel_data = []
             theft_data = []
-            fuel_alerts = DGFuelAlertsData.objects.filter(
-                site=site_id, created__date=selected_date.date()
+            fuel_alerts = _dg_fuel_queryset(DGFuelAlertsData.objects).filter(
+                site=site_id, created__date=selected_date
             ).order_by("created")
             if fuel_alerts.exists():
                 for i in fuel_alerts:
                     if i.alert_name == "refuel":
                         refuel_data.append(
-                            {"x": int(i.epoch_time) * 1000, "y": i.fuel_consumption}
+                            {
+                                "x": epoch_milliseconds(i.epoch_time),
+                                "y": round(i.fuel_consumption, 2),
+                            }
                         )
                     elif i.alert_name == "theft":
                         theft_data.append(
-                            {"x": int(i.epoch_time) * 1000, "y": i.fuel_consumption}
+                            {
+                                "x": epoch_milliseconds(i.epoch_time),
+                                "y": round(i.fuel_consumption, 2),
+                            }
                         )
             refuel_final_data = {
                 "name": "Refuel",
@@ -5957,12 +6325,20 @@ class DgFuelConsumptionDataApi(APIView):
             return Response(
                 {
                     "status": 200,
+                    "provider_status": "OK",
+                    "fuel_level": {
+                        "name": "Fuel Level",
+                        "data": final_data,
+                        "type": "column",
+                    },
                     "data": final_data,
                     "refuel_alert": refuel_final_data,
                     "theft_alert": theft_final_data,
                     "dg_unit_data": dg_unit_final_data,
                     "dg_fuel_data": dg_fuel_final_data,
+                    "dg_fuel_consumed": dg_fuel_final_data,
                     "dg_unit_per_litre_data": dg_unit_per_litre_data,
+                    "dg_unit_per_litre": dg_unit_per_litre_data,
                 }
             )
         except Exception as err:
@@ -5981,17 +6357,11 @@ class DgFuelConsumptionDataCustomRangeApi(APIView):
             end_date = data.get("end_date")
             from_date = datetime.strptime(from_date, "%Y-%m-%d")
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
-            final_data = []
-            fuel_data = DgFuelConsumptionData.objects.filter(
-                site=site_id,
-                created__date__gte=from_date.date(),
-                created__date__lte=end_date.date(),
-            ).order_by("created")
-            for i in fuel_data:
-                final_data.append(
-                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
-                )
-            dg_data = DgUnitConsumption.objects.filter(
+            site = Site.objects.get(id=site_id)
+            final_data = DgFuelConsumptionDataApi_new._fuel_level_series_for_range(
+                site, from_date.date(), end_date.date()
+            )
+            dg_data = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                 site=site_id,
                 created__date__gte=from_date.date(),
                 created__date__lte=end_date.date(),
@@ -6005,25 +6375,33 @@ class DgFuelConsumptionDataCustomRangeApi(APIView):
             if dg_data.exists():
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
-                    logger.debug("i value: ", i)
+                    logger.debug("i value: %s", i)
+                    unit_consumption = getattr(i, "unit_consumption", None)
+                    dg_fuel_consumption = getattr(i, "dg_fuel_consumption", None)
+                    epoch_ms = epoch_milliseconds(getattr(i, "epoch_time", None))
+                    if (
+                        unit_consumption is None
+                        or dg_fuel_consumption is None
+                        or epoch_ms is None
+                        or float(unit_consumption) < 1
+                    ):
+                        continue
                     dg_unit_data.append(
-                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
+                        {"x": epoch_ms, "y": round(unit_consumption, 2)}
                     )
-                    if i.dg_fuel_consumption > 0:
-                        dg_fuel_data.append(
-                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
-                        )
+                    dg_fuel_data.append(
+                        {"x": epoch_ms, "y": round(dg_fuel_consumption, 2)}
+                    )
+                    if dg_fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": int(i.epoch_time),
-                                "y": round(
-                                    i.unit_consumption / i.dg_fuel_consumption, 2
-                                ),
+                                "x": epoch_ms,
+                                "y": round(unit_consumption / dg_fuel_consumption, 2),
                             }
                         )
             refuel_data = []
             theft_data = []
-            fuel_alerts = DGFuelAlertsData.objects.filter(
+            fuel_alerts = _dg_fuel_queryset(DGFuelAlertsData.objects).filter(
                 site=site_id,
                 created__date__gte=from_date.date(),
                 created__date__lte=end_date.date(),
@@ -6032,11 +6410,17 @@ class DgFuelConsumptionDataCustomRangeApi(APIView):
                 for i in fuel_alerts:
                     if i.alert_name == "refuel":
                         refuel_data.append(
-                            {"x": int(i.epoch_time) * 1000, "y": i.fuel_consumption}
+                            {
+                                "x": epoch_milliseconds(i.epoch_time),
+                                "y": round(i.fuel_consumption, 2),
+                            }
                         )
                     elif i.alert_name == "theft":
                         theft_data.append(
-                            {"x": int(i.epoch_time) * 1000, "y": i.fuel_consumption}
+                            {
+                                "x": epoch_milliseconds(i.epoch_time),
+                                "y": round(i.fuel_consumption, 2),
+                            }
                         )
 
             refuel_final_data = {
@@ -6072,7 +6456,9 @@ class DgFuelConsumptionDataCustomRangeApi(APIView):
                     "theft_alert": theft_final_data,
                     "dg_unit_data": dg_unit_final_data,
                     "dg_fuel_data": dg_fuel_final_data,
+                    "dg_fuel_consumed": dg_fuel_final_data,
                     "dg_unit_per_litre_data": dg_unit_per_litre_data,
+                    "dg_unit_per_litre": dg_unit_per_litre_data,
                 }
             )
         except Exception as err:
@@ -6812,11 +7198,11 @@ def DGfuelMonthlyTrendMultipleAisles(site_id):
             month_list.append(modified_date)
 
             # Fuel data for the month
-            fuel_data = DgFuelConsumptionData.objects.filter(
+            fuel_data = _dg_fuel_queryset(DgFuelConsumptionData.objects).filter(
                 site=site_id, created__year=month.year, created__month=month.month
             ).order_by("created")
 
-            dg_fuel_alert_data = DGFuelAlertsData.objects.filter(
+            dg_fuel_alert_data = _dg_fuel_queryset(DGFuelAlertsData.objects).filter(
                 site=site_id,
                 created__year=month.year,
                 created__month=month.month,
@@ -6919,7 +7305,7 @@ class DgFuelMonthlyTrend(APIView):
                     )
                 )
                 fuel = list(
-                    DgUnitConsumption.objects.filter(
+                    _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                         site_id=site_id,
                         created__range=(start_date, datetime.now().date()),
                     )
@@ -6929,10 +7315,10 @@ class DgFuelMonthlyTrend(APIView):
                     .order_by("month")
                     .values_list("total_units", flat=True)
                 )
-                fuel_data = DgFuelConsumptionData.objects.filter(
+                fuel_data = _dg_fuel_queryset(DgFuelConsumptionData.objects).filter(
                     site=site_id, created__year=month.year, created__month=month.month
                 ).order_by("created")
-                dg_fuel_alert_data = DGFuelAlertsData.objects.filter(
+                dg_fuel_alert_data = _dg_fuel_queryset(DGFuelAlertsData.objects).filter(
                     site=site_id,
                     created__year=month.year,
                     created__month=month.month,
@@ -8258,130 +8644,77 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
                 site.partner_dg_fuel_id.upper() if site.partner_dg_fuel_id else ""
             )
 
+            provider_status = DgFuelConsumptionDataApi_new._get_provider_status(
+                site, selected_date
+            )
+            if provider_status == "SUBSCRIPTION_EXPIRED":
+                return Response(DgFuelConsumptionDataApi_new._expired_graph_response())
+
             # 1. Fetch Fuel Consumption Data
-            fuel_qs = (
-                DgFuelConsumptionData.objects.filter(
-                    site=site_id, created__date=selected_date
-                )
-                .order_by("created")
-                .values("epoch_time", "fuel_consumption")
+            final_data = DgFuelConsumptionDataApi_new._fuel_level_series_for_day(
+                site, selected_date, provider_status=provider_status
             )
 
-            final_data = []
-            for i in fuel_qs:
-                if i["epoch_time"] is not None and i["fuel_consumption"] is not None:
-                    final_data.append(
-                        {
-                            "x": int(i["epoch_time"]),
-                            "y": round(i["fuel_consumption"], 2),
-                        }
-                    )
-
             # 2. Fetch DG Unit Consumption Data
-            dg_qs = DgUnitConsumption.objects.filter(
+            dg_qs = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                 site=site_id, created__date=selected_date
-            ).values("epoch_time", "unit_consumption", "dg_fuel_consumption")
+            ).values(
+                "epoch_time",
+                "unit_consumption",
+                "dg_fuel_consumption",
+                "fetch_fuel_data",
+                "created",
+                "dg_end_date",
+                "dg_start_date",
+            )
 
             dg_unit_data, dg_fuel_data, dg_unit_per_litre = [], [], []
             for i in dg_qs:
                 if (
-                    i["epoch_time"] is None
-                    or i["unit_consumption"] is None
+                    i["unit_consumption"] is None
                     or i["dg_fuel_consumption"] is None
+                    or i.get("fetch_fuel_data", False)
                 ):
                     continue
-                x_val = int(i["epoch_time"])
                 u_cons = i["unit_consumption"]
                 f_cons = i["dg_fuel_consumption"]
-
-                dg_unit_data.append({"x": x_val, "y": round(u_cons, 2)})
-                if f_cons > 0:
-                    dg_fuel_data.append({"x": x_val, "y": round(f_cons, 2)})
-                    dg_unit_per_litre.append(
-                        {"x": x_val, "y": round(u_cons / f_cons, 2)}
-                    )
-
-            # 3. Fetch Alerts (Combined Refuel and Theft for optimization)
-            refuel_data = []
-            theft_data = []
-
-            if vehical_number:
-                alerts_qs = DGAlertsData.objects.filter(
-                    Q(alert_data__contains=vehical_number)
-                    & (
-                        Q(alert_data__contains="RefuelingAlert")
-                        | Q(alert_data__contains="deviceFuelFill")
-                        | Q(alert_data__contains="theft")
-                        | Q(alert_data__contains="deviceFuelDrop")
-                    )
-                    & Q(created__date=selected_date)
-                ).values_list("alert_data", flat=True)
-            else:
-                alerts_qs = []
-
-            for i in alerts_qs:
-                try:
-                    alert_type = i.get("alert_type") or i.get("eventType")
-                    ts = (
-                        i.get("event_time")
-                        or i.get("dateTimeStamp")
-                        or i.get("timestamp")
-                    )
-
-                    if isinstance(ts, dict):
-                        ts = ts.get("value") or ts.get("time")
-
-                    if not ts:
-                        continue
-
-                    if isinstance(ts, (int, float)):
-                        epoch_time = float(ts)
-                    else:
-                        epoch_time = date_parser.parse(ts).timestamp()
-
-                    # Handle Refuel
-                    if alert_type in ["RefuelingAlert", "deviceFuelFill"]:
-                        fuel_val = i.get("refueled_in_liters") or 0
-                        if not fuel_val:
-                            f_change = i.get("fuelChange", {})
-                            if isinstance(f_change, dict):
-                                fuel_val = f_change.get("fuel_change", 0)
-                            elif isinstance(f_change, str) and "ltr" in f_change:
-                                fuel_split = f_change.split("ltr")[0].strip()
-                                fuel_val = float(fuel_split) if fuel_split else 0
-
-                        try:
-                            fuel_val = float(fuel_val)
-                            refuel_data.append(
-                                {"x": int(epoch_time * 1000), "y": fuel_val}
-                            )
-                        except ValueError:
-                            pass
-
-                    # Handle Theft
-                    elif alert_type in ["theft", "deviceFuelDrop"]:
-                        val = i.get("value")
-                        if val is None:
-                            f_change = i.get("fuelChange", "")
-                            if isinstance(f_change, str) and "ltr" in f_change:
-                                val_split = f_change.split("ltr")[0].strip()
-                                val = float(val_split) if val_split else 0
-                            elif isinstance(f_change, dict):
-                                val = f_change.get("fuel_change", 0)
-                            else:
-                                val = 0
-
-                        try:
-                            val = float(val)
-                            theft_data.append({"x": int(epoch_time * 1000), "y": val})
-                        except ValueError:
-                            pass
-
-                except Exception:
+                base_epoch_ms = DgFuelConsumptionDataApi_new._dg_graph_base_time(i)
+                if base_epoch_ms is None:
                     continue
+
+                if float(u_cons) < 1:
+                    continue
+
+                dg_unit_data.append({"x": base_epoch_ms, "y": round(u_cons, 2)})
+                dg_fuel_data.append(
+                    {
+                        "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                            base_epoch_ms, 1
+                        ),
+                        "y": round(f_cons, 2),
+                    }
+                )
+                if f_cons > 0:
+                    dg_unit_per_litre.append(
+                        {
+                            "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                                base_epoch_ms, 3
+                            ),
+                            "y": round(u_cons / f_cons, 2),
+                        }
+                    )
+
+            refuel_data, theft_data = (
+                DgFuelConsumptionDataApi_new._normalized_alert_series(
+                    site_id,
+                    selected_date,
+                    selected_date,
+                )
+            )
 
             response_payload = {
                 "status": 200,
+                "provider_status": provider_status,
                 "data": final_data,
                 "refuel_alert": {
                     "name": "Refuel",
@@ -8403,7 +8736,17 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
                     "data": dg_fuel_data,
                     "type": "column",
                 },
+                "dg_fuel_consumed": {
+                    "name": "DG_Fuel_Consumed",
+                    "data": dg_fuel_data,
+                    "type": "column",
+                },
                 "dg_unit_per_litre_data": {
+                    "name": "Dg_Unit_Per_Ltr",
+                    "data": dg_unit_per_litre,
+                    "type": "column",
+                },
+                "dg_unit_per_litre": {
                     "name": "Dg_Unit_Per_Ltr",
                     "data": dg_unit_per_litre,
                     "type": "column",
@@ -8495,6 +8838,12 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
 class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
     permission_classes = [AllowAny]
 
+    @staticmethod
+    def _normalized_alert_series(site_id, start_date, end_date):
+        return DgFuelConsumptionDataApi_new._normalized_alert_series(
+            site_id, start_date, end_date
+        )
+
     @entryExit
     def post(self, request):
         data = request.data
@@ -8506,17 +8855,15 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             vehical_number = site.partner_dg_fuel_id.upper()
             from_date = datetime.strptime(from_date, "%Y-%m-%d")
             end_date = datetime.strptime(end_date, "%Y-%m-%d")
-            final_data = []
-            fuel_data = DgFuelConsumptionData.objects.filter(
-                site=site_id,
-                created__date__gte=from_date.date(),
-                created__date__lte=end_date.date(),
-            ).order_by("created")
-            for i in fuel_data:
-                final_data.append(
-                    {"x": int(i.epoch_time), "y": round(i.fuel_consumption, 2)}
-                )
-            dg_data = DgUnitConsumption.objects.filter(
+            provider_status = DgFuelConsumptionDataApi_new._get_provider_status(
+                site, from_date.date()
+            )
+            if provider_status == "SUBSCRIPTION_EXPIRED":
+                return Response(DgFuelConsumptionDataApi_new._expired_graph_response())
+            final_data = DgFuelConsumptionDataApi_new._fuel_level_series_for_range(
+                site, from_date.date(), end_date.date()
+            )
+            dg_data = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                 site=site_id,
                 created__date__gte=from_date.date(),
                 created__date__lte=end_date.date(),
@@ -8530,82 +8877,51 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             if dg_data.exists():
                 logger.debug("enside dg data conditions")
                 for i in dg_data:
-                    logger.debug("i value: ", i)
-                    dg_unit_data.append(
-                        {"x": int(i.epoch_time), "y": round(i.unit_consumption, 2)}
+                    logger.debug("i value: %s", i)
+                    if DgFuelConsumptionDataApi_new._row_value(
+                        i, "fetch_fuel_data", False
+                    ):
+                        continue
+                    unit_consumption = DgFuelConsumptionDataApi_new._row_value(
+                        i, "unit_consumption"
                     )
-                    if i.dg_fuel_consumption > 0:
-                        dg_fuel_data.append(
-                            {"x": int(i.epoch_time), "y": i.dg_fuel_consumption}
-                        )
+                    dg_fuel_consumption = DgFuelConsumptionDataApi_new._row_value(
+                        i, "dg_fuel_consumption"
+                    )
+                    if unit_consumption is None or dg_fuel_consumption is None:
+                        continue
+                    unit_consumption = float(unit_consumption)
+                    dg_fuel_consumption = float(dg_fuel_consumption)
+                    if unit_consumption < 1:
+                        continue
+                    base_epoch_ms = DgFuelConsumptionDataApi_new._dg_graph_base_time(i)
+                    if base_epoch_ms is None:
+                        continue
+                    dg_unit_data.append(
+                        {"x": base_epoch_ms, "y": round(unit_consumption, 2)}
+                    )
+                    dg_fuel_data.append(
+                        {
+                            "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                                base_epoch_ms, 1
+                            ),
+                            "y": round(dg_fuel_consumption, 2),
+                        }
+                    )
+                    if dg_fuel_consumption > 0:
                         dg_unit_per_litre.append(
                             {
-                                "x": int(i.epoch_time),
-                                "y": round(
-                                    i.unit_consumption / i.dg_fuel_consumption, 2
+                                "x": DgFuelConsumptionDataApi_new._graph_epoch_ms(
+                                    base_epoch_ms, 3
                                 ),
+                                "y": round(unit_consumption / dg_fuel_consumption, 2),
                             }
                         )
-            refuel_data = []
-            theft_data = []
-            refueling_alerts = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & (
-                    Q(alert_data__contains="RefuelingAlert")
-                    | Q(alert_data__contains="deviceFuelFill")
-                )
-                & Q(created__date__gte=from_date.date())
-                & Q(created__date__lte=end_date.date())
+            refuel_data, theft_data = self._normalized_alert_series(
+                site_id,
+                from_date.date(),
+                end_date.date(),
             )
-            refueling_alerts = [i.alert_data for i in refueling_alerts]
-            for i in refueling_alerts:
-                epoch_time = (
-                    datetime.strptime(
-                        i.get("event_time")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                    if i.get("event_time", "") != ""
-                    else datetime.strptime(
-                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                )
-                refuel_data.append(
-                    {
-                        "x": int(epoch_time) * 1000,
-                        "y": float(
-                            i.get(
-                                "refueled_in_liters",
-                                i.get("fuelChange", "").split("ltr")[0],
-                            )
-                        ),
-                    }
-                )
-
-            theft_alerts = DGAlertsData.objects.filter(
-                Q(alert_data__contains=vehical_number)
-                & (
-                    Q(alert_data__contains="theft")
-                    | Q(alert_data__contains="deviceFuelDrop")
-                )
-                & Q(created__date__gte=from_date.date())
-                & Q(created__date__lte=end_date.date())
-            )
-            theft_alerts = [i.alert_data for i in theft_alerts]
-            for i in theft_alerts:
-                epoch_time = (
-                    i.timestamp
-                    if i.get("timestamp", "") != ""
-                    else datetime.strptime(
-                        i.get("dateTimeStamp", "")[:-6], "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp()
-                )
-                theft_data.append(
-                    {
-                        "x": epoch_time * 1000,
-                        "y": float(
-                            i.get("value", i.get("fuelChange", "").split("ltr")[0])
-                        ),
-                    }
-                )
 
             refuel_final_data = {
                 "name": "Refuel",
@@ -8635,12 +8951,20 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
             return Response(
                 {
                     "status": 200,
+                    "provider_status": provider_status,
+                    "fuel_level": {
+                        "name": "Fuel Level",
+                        "data": final_data,
+                        "type": "column",
+                    },
                     "data": final_data,
                     "refuel_alert": refuel_final_data,
                     "theft_alert": theft_final_data,
                     "dg_unit_data": dg_unit_final_data,
                     "dg_fuel_data": dg_fuel_final_data,
+                    "dg_fuel_consumed": dg_fuel_final_data,
                     "dg_unit_per_litre_data": dg_unit_per_litre_data,
+                    "dg_unit_per_litre": dg_unit_per_litre_data,
                 }
             )
         except Exception as err:
@@ -8831,7 +9155,7 @@ class DGFuelDataExcelExport(APIView):
             vehical_number = site.partner_dg_fuel_id.upper()
 
             dg_fuel_values = (
-                DgFuelConsumptionData.objects.filter(
+                _dg_fuel_queryset(DgFuelConsumptionData.objects).filter(
                     site=site_id, created__date__range=(from_date, end_date)
                 )
                 .annotate(minute_bucket=TruncMinute("created"))
@@ -8851,10 +9175,9 @@ class DGFuelDataExcelExport(APIView):
                 for i in dg_fuel_values
             ]
 
-            dg_data = DgUnitConsumption.objects.filter(
+            dg_data = _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                 site=site_id, created__date__range=(from_date.date(), end_date.date())
             ).order_by("-created")
-
             dg_fuel_unit_data = [
                 {
                     "Start_Date": i.dg_start_date.strftime("%d-%b-%Y"),
@@ -8877,65 +9200,36 @@ class DGFuelDataExcelExport(APIView):
                 Q(created__date__range=(from_date.date(), end_date.date())),
             )
 
-            refuel_theft_data = []
-            for alert in alerts:
-                i = alert.alert_data
-                try:
-                    alert_type = i.get("alert_type") or i.get("eventType")
-                    if alert_type not in [
-                        "RefuelingAlert",
-                        "theft",
-                        "deviceFuelDrop",
-                        "deviceFuelFill",
-                    ]:
-                        continue
-
-                    ts_raw = (
-                        i.get("event_time")
-                        or i.get("dateTimeStamp")
-                        or i.get("timestamp")
-                    )
-                    if isinstance(ts_raw, dict):
-                        ts_raw = ts_raw.get("value") or ts_raw.get("time")
-
-                    if not ts_raw:
-                        continue
-
-                    if isinstance(ts_raw, (int, float)):
-                        dt = datetime.fromtimestamp(
-                            ts_raw if ts_raw > 1e11 else ts_raw
-                        )  # Handle ms vs s roughly
-                        if ts_raw > 1e11:
-                            dt = datetime.fromtimestamp(ts_raw / 1000)
-                    else:
-                        dt = date_parser.parse(ts_raw)
-
-                    activity = (
+            refuel_theft_data = [
+                {
+                    "Date": datetime.strptime(
+                        i.get("event_time", i.get("dateTimeStamp")[:-6]),
+                        "%Y-%m-%dT%H:%M:%S.%f",
+                    ).strftime("%d-%b-%Y"),
+                    "Time": datetime.strptime(
+                        i.get("event_time", i.get("dateTimeStamp")[:-6]),
+                        "%Y-%m-%dT%H:%M:%S.%f",
+                    ).strftime("%H:%M"),
+                    "Activity": (
                         "Refuel"
-                        if alert_type in ["RefuelingAlert", "deviceFuelFill"]
+                        if i.get("alert_type", i.get("eventType"))
+                        in ["RefuelingAlert", "deviceFuelFill"]
                         else "Theft"
-                    )
-
-                    fuel_val = i.get("refueled_in_liters") or i.get("value")
-                    if fuel_val is None:
-                        f_change = i.get("fuelChange", "")
-                        if isinstance(f_change, str) and "ltr" in f_change:
-                            fuel_val = f_change.split("ltr")[0]
-                        elif isinstance(f_change, dict):
-                            fuel_val = f_change.get("fuel_change", 0)
-                        else:
-                            fuel_val = 0
-
-                    refuel_theft_data.append(
-                        {
-                            "Date": dt.strftime("%d-%b-%Y"),
-                            "Time": dt.strftime("%H:%M"),
-                            "Activity": activity,
-                            "Fuel(in Litres)": round(float(fuel_val), 2),
-                        }
-                    )
-                except Exception:
-                    continue
+                    ),
+                    "Fuel(in Litres)": round(
+                        float(
+                            i.get(
+                                "refueled_in_liters",
+                                i.get("fuelChange").split("ltr")[0],
+                            )
+                        ),
+                        2,
+                    ),
+                }
+                for i in [alert.alert_data for alert in alerts]
+                if i.get("alert_type", i.get("eventType"))
+                in ["RefuelingAlert", "theft", "deviceFuelDrop", "deviceFuelFill"]
+            ]
 
             current_date = datetime.now().strftime("%d-%B-%Y")
             io_buffer = BytesIO()
@@ -9368,7 +9662,7 @@ class DgFuelMonthlyTrend_test(APIView):
 
             # DG fuel consumption (from DgUnitConsumption)
             dg_fuel_raw = (
-                DgUnitConsumption.objects.filter(
+                _dg_fuel_queryset(DgUnitConsumption.objects).filter(
                     site_id=site_id, created__gte=start_date, created__lt=end_date
                 )
                 .annotate(month=TruncMonth("created"))
@@ -10945,7 +11239,6 @@ class ParticularSiteSnapshotEnergySavingApiVB(APIView):
 
 class SiteConsumptionPingApi(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = []
 
     @entryExit
     def post(self, request):
@@ -10973,29 +11266,107 @@ class SiteConsumptionPingApi(APIView):
 
             response_data = []
             for p in pings:
-                response_data.append(
-                    {
-                        "site_id": p.site.id if p.site else None,
-                        "site_name": p.site.site_name if p.site else None,
-                        "home_gateway_id": p.home_gateway_id,
-                        "consumption_ping_time": (
-                            p.consumption_ping_time.strftime("%Y-%m-%d %H:%M:%S")
-                            if p.consumption_ping_time
-                            else None
-                        ),
-                        "updated_on": (
-                            p.updated_on.strftime("%Y-%m-%d %H:%M:%S")
-                            if p.updated_on
-                            else None
-                        ),
-                    }
-                )
+                response_data.append({
+                    "site_id": p.site.id if p.site else None,
+                    "site_name": p.site.site_name if p.site else None,
+                    "home_gateway_id": p.home_gateway_id,
+                    "consumption_ping_time": p.consumption_ping_time.strftime("%Y-%m-%d %H:%M:%S") if p.consumption_ping_time else None,
+                    "updated_on": p.updated_on.strftime("%Y-%m-%d %H:%M:%S") if p.updated_on else None,
+                })
 
-            # Sort by consumption_ping_time ascending (oldest first)
-            response_data.sort(key=lambda x: x.get("consumption_ping_time") or "")
+            response_data.sort(key=lambda x: 0 if x.get("unit_consumption") == 0.0 else 1)
             return Response({"result": 1, "data": response_data})
         except Exception as err:
             return Response({"result": 0, "msg": str(err)})
+
+
+# class SiteCeleryPingApi(APIView):
+#     permission_classes = [AllowAny]
+#     authentication_classes = []
+
+#     @entryExit
+#     def post(self, request):
+#         try:
+#             data = request.data
+#             user_id = data.get("id", "")
+#             site_id = data.get("siteId", "")
+#             # pagination params
+#             try:
+#                 page = int(data.get("page", 1))
+#             except Exception:
+#                 page = 1
+#             try:
+#                 page_size = int(data.get("page_size", 50))
+#             except Exception:
+#                 page_size = 50
+#             if page < 1:
+#                 page = 1
+#             if page_size < 1:
+#                 page_size = 50
+#             if page_size > 500:
+#                 page_size = 500
+
+#             qs = SiteCeleryPing.objects.all()
+
+#             if site_id:
+#                 qs = qs.filter(site_id=site_id)
+#             elif user_id:
+#                 try:
+#                     customer = User.objects.get(id=int(user_id))
+#                     if customer.UserType == 5:
+#                         user_sites = CustomerSiteManager.objects.get(customer=customer).associated_site.all()
+#                     else:
+#                         user_sites = Site.objects.filter(customer=customer)
+#                     qs = qs.filter(site__in=user_sites)
+#                 except Exception:
+#                     pass
+
+#             # Optimize: annotate a sort key for zero consumption and let DB do ordering.
+#             from django.db.models import Case, When, IntegerField
+
+#             qs = qs.select_related("site").annotate(
+#                 zero_consumption=Case(
+#                     When(unit_consumption__exact=0, then=0),
+#                     default=1,
+#                     output_field=IntegerField(),
+#                 )
+#             ).order_by("zero_consumption", "-celery_ping_time")
+
+#             total = qs.count()
+
+#             start = (page - 1) * page_size
+#             end = start + page_size
+
+#             # Use values() to fetch only required fields and avoid model instantiation overhead
+#             page_qs = qs.values(
+#                 "site_id",
+#                 "site__site_name",
+#                 "home_gateway_id",
+#                 "leg_id",
+#                 "aisle_group",
+#                 "unit_consumption",
+#                 "celery_ping_time",
+#                 "updated_on",
+#             )[start:end]
+
+#             response_data = []
+#             for p in page_qs:
+#                 celery_ping_time = p.get("celery_ping_time")
+#                 updated_on = p.get("updated_on")
+#                 response_data.append({
+#                     "site_id": p.get("site_id"),
+#                     "site_name": p.get("site__site_name"),
+#                     "home_gateway_id": p.get("home_gateway_id"),
+#                     "leg_id": p.get("leg_id"),
+#                     "aisle_group": p.get("aisle_group"),
+#                     "unit_consumption": p.get("unit_consumption"),
+#                     "celery_ping_time": celery_ping_time.strftime("%Y-%m-%d %H:%M:%S") if celery_ping_time else None,
+#                     "updated_on": updated_on.strftime("%Y-%m-%d %H:%M:%S") if updated_on else None,
+#                 })
+
+#             return Response({"result": 1, "data": response_data, "pagination": {"total": total, "page": page, "page_size": page_size}})
+#         except Exception as err:
+#             return Response({"result": 0, "msg": str(err)})
 
 
 class SiteCeleryPingApi(APIView):
@@ -11008,6 +11379,7 @@ class SiteCeleryPingApi(APIView):
             data = request.data
             user_id = data.get("id", "")
             site_id = data.get("siteId", "")
+
             # pagination params
             try:
                 page = int(data.get("page", 1))
@@ -11044,17 +11416,13 @@ class SiteCeleryPingApi(APIView):
             # Optimize: annotate a sort key for zero consumption and let DB do ordering.
             from django.db.models import Case, When, IntegerField
 
-            qs = (
-                qs.select_related("site")
-                .annotate(
-                    zero_consumption=Case(
-                        When(unit_consumption__exact=0, then=0),
-                        default=1,
-                        output_field=IntegerField(),
-                    )
+            qs = qs.select_related("site").annotate(
+                zero_consumption=Case(
+                    When(unit_consumption__exact=0, then=0),
+                    default=1,
+                    output_field=IntegerField(),
                 )
-                .order_by("zero_consumption", "-celery_ping_time")
-            )
+            ).order_by("zero_consumption", "-celery_ping_time")
 
             total = qs.count()
 
@@ -11077,38 +11445,18 @@ class SiteCeleryPingApi(APIView):
             for p in page_qs:
                 celery_ping_time = p.get("celery_ping_time")
                 updated_on = p.get("updated_on")
-                response_data.append(
-                    {
-                        "site_id": p.get("site_id"),
-                        "site_name": p.get("site__site_name"),
-                        "home_gateway_id": p.get("home_gateway_id"),
-                        "leg_id": p.get("leg_id"),
-                        "aisle_group": p.get("aisle_group"),
-                        "unit_consumption": p.get("unit_consumption"),
-                        "celery_ping_time": (
-                            celery_ping_time.strftime("%Y-%m-%d %H:%M:%S")
-                            if celery_ping_time
-                            else None
-                        ),
-                        "updated_on": (
-                            updated_on.strftime("%Y-%m-%d %H:%M:%S")
-                            if updated_on
-                            else None
-                        ),
-                    }
-                )
+                response_data.append({
+                    "site_id": p.get("site_id"),
+                    "site_name": p.get("site__site_name"),
+                    "home_gateway_id": p.get("home_gateway_id"),
+                    "leg_id": p.get("leg_id"),
+                    "aisle_group": p.get("aisle_group"),
+                    "unit_consumption": p.get("unit_consumption"),
+                    "celery_ping_time": celery_ping_time.strftime("%Y-%m-%d %H:%M:%S") if celery_ping_time else None,
+                    "updated_on": updated_on.strftime("%Y-%m-%d %H:%M:%S") if updated_on else None,
+                })
 
-            return Response(
-                {
-                    "result": 1,
-                    "data": response_data,
-                    "pagination": {
-                        "total": total,
-                        "page": page,
-                        "page_size": page_size,
-                    },
-                }
-            )
+            return Response({"result": 1, "data": response_data, "pagination": {"total": total, "page": page, "page_size": page_size}})
         except Exception as err:
             return Response({"result": 0, "msg": str(err)})
 
