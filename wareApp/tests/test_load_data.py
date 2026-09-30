@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -138,6 +138,76 @@ class LoadDataTests(SimpleTestCase):
                 ("MainsDgLoadData", [8.5, 12.5]),
             ],
         )
+
+    def test_rollup_supports_gateway_intervals_from_five_to_three_hundred_seconds(
+        self,
+    ):
+        site = SimpleNamespace(id=1)
+        aisle_group = SimpleNamespace(id=7, aisleGroupName="Mains-1")
+        bucket_start = datetime(2026, 9, 30, 12, 0)
+        observed_at = datetime(2026, 9, 30, 12, 5)
+
+        for interval_seconds in (5, 10, 12, 30, 60, 120, 300):
+            with self.subTest(interval_seconds=interval_seconds):
+                raw_readings = QuerySet(
+                    [
+                        SimpleNamespace(
+                            aisle_group_id=7,
+                            aisle_group=aisle_group,
+                            load_data=float(sample_index + 1),
+                            epoch_time=str(sample_index),
+                            created=bucket_start + timedelta(seconds=offset_seconds),
+                        )
+                        for sample_index, offset_seconds in enumerate(
+                            range(0, 60, interval_seconds)
+                        )
+                    ]
+                )
+                saved = []
+
+                with (
+                    patch.object(
+                        rollups.RawLoadData.objects,
+                        "filter",
+                        return_value=raw_readings,
+                    ),
+                    patch.object(
+                        rollups.HourlyLoadData.objects,
+                        "filter",
+                        return_value=QuerySet(),
+                    ),
+                    patch.object(
+                        rollups.DailyLoadData.objects,
+                        "filter",
+                        return_value=QuerySet(),
+                    ),
+                    patch(
+                        "wareApp.load_data.rollups._bucket_has_rows",
+                        return_value=False,
+                    ),
+                    patch(
+                        "wareApp.load_data.rollups._save_extrema",
+                        side_effect=lambda model, _site, _aisle, readings: saved.append(
+                            (
+                                model.__name__,
+                                [
+                                    reading.load_data
+                                    for reading in rollups._extrema(readings)
+                                ],
+                            )
+                        ),
+                    ),
+                ):
+                    rollups.roll_up_completed_load_data(site, observed_at)
+
+                expected_values = [1.0, float(len(raw_readings))]
+                self.assertEqual(
+                    saved,
+                    [
+                        ("HourlyLoadData", expected_values),
+                        ("MainsDgLoadData", expected_values),
+                    ],
+                )
 
     def test_celery_registers_mqtt_client_task(self):
         app.autodiscover_tasks(force=True)
