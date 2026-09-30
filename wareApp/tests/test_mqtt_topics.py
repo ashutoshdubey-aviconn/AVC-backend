@@ -207,7 +207,9 @@ class GatewayTopicParserTests(SimpleTestCase):
         ):
             client.on_message(client, None, message)
 
-        self.assertIn("Queue1 consumption processing failed for site 156", logs.output[0])
+        self.assertIn(
+            "Queue1 consumption processing failed for site 156", logs.output[0]
+        )
 
     def test_queue_one_queues_supply_time_for_processing(self):
         client = FakeMqttClient()
@@ -221,8 +223,28 @@ class GatewayTopicParserTests(SimpleTestCase):
         )
         with (
             patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
+            patch("wareApp.tasks.process_supply_time_message.apply_async") as enqueue,
+        ):
+            client.on_message(client, None, message)
+
+        enqueue.assert_called_once_with(
+            args=(156, "gateway-01", "b'payload'"), queue="queue1_processing"
+        )
+
+    def test_queue_one_queues_load_runtime_recovery_for_processing(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        site = SimpleNamespace(id=156, site_name="Test site")
+        message = SimpleNamespace(
+            topic="/Acclivate/iOmniControl/156/gateway-01/in/recovery/loadRuntime",
+            payload=b"payload",
+        )
+        with (
+            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
             patch(
-                "wareApp.tasks.process_supply_time_message.apply_async"
+                "wareApp.tasks.process_load_runtime_recovery_message.apply_async"
             ) as enqueue,
         ):
             client.on_message(client, None, message)

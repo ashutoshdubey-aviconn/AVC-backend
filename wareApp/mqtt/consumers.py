@@ -1979,6 +1979,17 @@ def run_mqtt_client1():
                     )
 
             elif "loadRuntime" in msg_subtype:
+                from wareApp.tasks import process_load_runtime_recovery_message
+
+                process_load_runtime_recovery_message.apply_async(
+                    args=(site.id, gw_id, message), queue="queue1_processing"
+                )
+                logger.info(
+                    "Queued loadRuntime recovery for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
+                return
                 print("############### inside Load RUn time @@@@@@@@@@@@@@@@@@@")
                 try:
                     powerSource, recovery_hours, recovery_load_time = re.search(
