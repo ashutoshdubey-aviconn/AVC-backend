@@ -565,6 +565,7 @@ def run_mqtt_client1():
                     leg_id=aisle_group_id,
                     reading_for=date.date(),
                 )
+                daily_record = daily_entry.first()
                 print("Now checking condition for entry or update in hourly reading.")
                 aisle_group = AisleGroup.objects.filter(
                     site=site, attached_leg_id=str(aisle_group_id)
@@ -599,11 +600,9 @@ def run_mqtt_client1():
                     aisle_group_status = True
                 if aisle_group.is_active:
                     aisle_group_active = True
-                if hourly_entry.exists():
-                    # new_consumption = hourly_entry[0].unit_consumption + new_unit_consumption
-                    hourly_entry.update(
-                        unit_consumption=current_hour_gw_unit_consumption
-                    )
+                if hourly_entry.update(
+                    unit_consumption=current_hour_gw_unit_consumption
+                ):
                     print(
                         "The hourly reading for leg id {} in site {} updated".format(
                             aisle_group_id, site.site_name
@@ -694,9 +693,9 @@ def run_mqtt_client1():
                         ####### Note: In a running current hour we keep adding delta units consumption in daily unit consumption.##
                         ##### this is done since gateway do not send daily unit consumption data in consumption packets #####
                         ##### komal to add code here. ##########
-                        if daily_entry.exists():
-                            dateofDailyEntry = daily_entry[0].reading_for
-                            dailyUnitConsumption = daily_entry[0].unit_consumption
+                        if daily_record:
+                            dateofDailyEntry = daily_record.reading_for
+                            dailyUnitConsumption = daily_record.unit_consumption
 
                             print("dateofDailyEntry : ", dateofDailyEntry)
                             print("daily Unit consumption ", dailyUnitConsumption)
@@ -725,14 +724,14 @@ def run_mqtt_client1():
                                 if totalConsumptionofAllHours != dailyUnitConsumption:
                                     ### Now Daily Entry synced with sum of houly Data
                                     print("inside tryy")
-                                    daily_entry_instance = daily_entry[0]
+                                    daily_entry_instance = daily_record
                                     daily_entry_instance.unit_consumption = (
                                         totalConsumptionofAllHours
                                     )
                                     daily_entry_instance.save()
                                     print(
                                         "daily unit after update",
-                                        daily_entry[0].unit_consumption,
+                                        daily_record.unit_consumption,
                                     )
                                     print(
                                         "Now daily entry synced with sum of hourly data"
@@ -865,10 +864,10 @@ def run_mqtt_client1():
                     site_baseline = aisle_group_baseline.baseline_value
                     for i in aisle_entry.filter(reading_from__gte=today):
                         daily_saving += i.energy_saved
-                if daily_entry.exists():
+                if daily_record:
                     print("Updating daily consumption data.")
                     new_consumption = (
-                        daily_entry[0].unit_consumption + new_unit_consumption
+                        daily_record.unit_consumption + new_unit_consumption
                     )
                     daily_entry.update(
                         unit_consumption=new_consumption,
