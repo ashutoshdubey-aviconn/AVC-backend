@@ -1539,11 +1539,12 @@ def run_mqtt_client1():
                     reading_from__gte=dateHourLowerLimitCheck,
                     reading_from__lte=dateHourUpperLimitCheck,
                 )
+                current_hour_record = current_hour_runtime.first()
                 print("Checking conditions for run time entry.")
-                if current_hour_runtime.exists():
+                if current_hour_record:
                     print("Updating the supply run time for {}.".format(source))
                     new_run_time = (
-                        current_hour_runtime[0].hourly_run_time + source_run_time
+                        current_hour_record.hourly_run_time + source_run_time
                     )
                     current_hour_runtime.update(hourly_run_time=new_run_time)
                     print("Supply run time for {} updated of {}".format(source, site))
@@ -1559,7 +1560,8 @@ def run_mqtt_client1():
                         # logic to save percentage run for different power sources.
                         today = datetime.now()
                         print("run time objects is :", run_time)
-                        monthly_load_share = (run_time.last()).reading_from
+                        last_runtime_entry = run_time.last()
+                        monthly_load_share = last_runtime_entry.reading_from
                         print("monthly load share is : ", monthly_load_share)
                         if (
                             today.month != monthly_load_share.month
@@ -1653,11 +1655,8 @@ def run_mqtt_client1():
                             )
                         )
                     else:
-                        if (
-                            run_time.count() > 0
-                        ):  # If not the first ever entry for this site.
+                        if last_runtime_entry:  # If not the first ever entry for this site.
                             print("Previous hour entry not found, data loss suspected.")
-                            last_runtime_entry = run_time.last()
                             loss_time = (
                                 today - last_runtime_entry.reading_from
                             ).total_seconds()
