@@ -1737,15 +1737,15 @@ def run_mqtt_client1():
                     # daily_consumptions = map(float, consumptions)
                     aisle_group = AisleGroup.objects.filter(
                         site=site, attached_leg_id=aisle_group_id
-                    )
+                    ).first()
                     aisle_group_status, aisle_group_active, daily_saving = (
                         False,
                         False,
                         0.0,
                     )
-                    if aisle_group[0].is_visible:
+                    if aisle_group.is_visible:
                         aisle_group_status = True
-                    if aisle_group[0].is_active:
+                    if aisle_group.is_active:
                         aisle_group_active = True
                     # if len(dates) == len(consumptions) :  # for advance recovery mechanism
                     for i in range(len(dates) - 1):
@@ -1759,6 +1759,7 @@ def run_mqtt_client1():
                             leg_id=aisle_group_id,
                             reading_for=date,
                         )
+                        daily_record = daily_entry.first()
                         daily_saving, aisle_group_baseline = 0.0, 0.0
                         if aisle_group_active:
                             aisle_group_baseline = SiteBaseline.objects.filter(
@@ -1766,11 +1767,9 @@ def run_mqtt_client1():
                                 leg_id=str(aisle_group_id),
                                 baseline_from__lte=date,
                                 baseline_to__gte=date,
-                            )
+                            ).first()
                             if aisle_group_baseline:
-                                aisle_group_baseline = aisle_group_baseline[
-                                    0
-                                ].baseline_value
+                                aisle_group_baseline = aisle_group_baseline.baseline_value
                             else:
                                 aisle_group_baseline = (
                                     SiteBaseline.objects.filter(
@@ -1782,13 +1781,13 @@ def run_mqtt_client1():
                                 )
                             print("Now calculating saving for {}.".format(date))
                             daily_saving = aisle_group_baseline - daily_unit_consumption
-                        if daily_entry.exists():
+                        if daily_record:
                             print(
                                 "Updating the recovery unit in aisle group {} for {}".format(
                                     aisle_group_id, date
                                 )
                             )
-                            if daily_entry[0].unit_consumption < daily_unit_consumption:
+                            if daily_record.unit_consumption < daily_unit_consumption:
                                 daily_entry.update(
                                     unit_consumption=daily_unit_consumption,
                                     daily_baseline_value=aisle_group_baseline,
@@ -1803,7 +1802,7 @@ def run_mqtt_client1():
                                 print(
                                     "Existing daily unit consumption is greater , so no update:{} -- {} -- {}".format(
                                         aisle_group_id,
-                                        daily_entry[0].unit_consumption,
+                                            daily_record.unit_consumption,
                                         daily_unit_consumption,
                                     )
                                 )
@@ -1811,7 +1810,7 @@ def run_mqtt_client1():
                             print("Creating new daily consumption entry for recovery.")
                             DailySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=aisle_group,
                                 leg_id=aisle_group_id,
                                 unit_consumption=daily_unit_consumption,
                                 daily_baseline_value=aisle_group_baseline,
@@ -1853,15 +1852,15 @@ def run_mqtt_client1():
                     # hourly_consumptions = map(float, hourly_consumptions)
                     aisle_group = AisleGroup.objects.filter(
                         site=site, attached_leg_id=aisle_group_id
-                    )
+                    ).first()
                     aisle_group_status, aisle_group_active, daily_saving = (
                         False,
                         False,
                         0.0,
                     )
-                    if aisle_group[0].is_visible:
+                    if aisle_group.is_visible:
                         aisle_group_status = True
-                    if aisle_group[0].is_active:
+                    if aisle_group.is_active:
                         aisle_group_active = True
                     # if len(hours) == len(hourly_consumptions) :  # for advance recovery mechanism
                     for i in range(len(hours) - 1):
@@ -1894,11 +1893,11 @@ def run_mqtt_client1():
                                 leg_id=str(aisle_group_id),
                                 baseline_from__lte=dateHour.date(),
                                 baseline_to__gte=dateHour.date(),
-                            )
+                            ).first()
                             if aisle_group_baseline:
                                 leg_hourly_baseline = (
-                                    aisle_group_baseline[0].baseline_value
-                                    / aisle_group_baseline[0].working_hours
+                                    aisle_group_baseline.baseline_value
+                                    / aisle_group_baseline.working_hours
                                 )
                             else:
                                 aisle_group_baseline = SiteBaseline.objects.filter(
@@ -1913,16 +1912,15 @@ def run_mqtt_client1():
                             hourly_saving = (
                                 leg_hourly_baseline - hourly_unit_consumption
                             )
-                        if hourly_entry.exists():
+                        if hourly_entry.update(
+                            unit_consumption=hourly_unit_consumption,
+                            hourly_baseline_value=leg_hourly_baseline,
+                            energy_saved=hourly_saving,
+                        ):
                             print(
                                 "Updating the recovery unit in aisle group {} for {}".format(
                                     aisle_group_id, dateHour
                                 )
-                            )
-                            hourly_entry.update(
-                                unit_consumption=hourly_unit_consumption,
-                                hourly_baseline_value=leg_hourly_baseline,
-                                energy_saved=hourly_saving,
                             )
                             print(
                                 "Updated with {} units consumption and {} units saving.".format(
@@ -1937,7 +1935,7 @@ def run_mqtt_client1():
                             )
                             HourlySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=aisle_group,
                                 leg_id=aisle_group_id,
                                 unit_consumption=hourly_unit_consumption,
                                 hourly_baseline_value=leg_hourly_baseline,
