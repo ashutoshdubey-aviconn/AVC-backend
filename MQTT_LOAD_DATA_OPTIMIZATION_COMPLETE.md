@@ -75,9 +75,9 @@ flowchart LR
 
 ## Full Optimization Phase 1: SupplyTime Handoff
 
-`SupplyTime` is the first queue-1 family moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places the compact payload on `queue1_processing`. The processing worker performs the database updates, monthly aggregation, and any recovery publish.
+`SupplyTime` and `recovery/loadRuntime` are moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places compact payloads on `queue1_processing`. The processing worker performs runtime database updates, monthly aggregation, and any recovery publish.
 
-This creates a durable RabbitMQ handoff and keeps the Paho callback independent of SupplyTime database latency. The active implementation is in `wareApp/mqtt/supply_time.py` and `wareApp.tasks.process_supply_time_message`.
+This creates a durable RabbitMQ handoff and keeps the Paho callback independent of runtime database latency. The active implementations are `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp.tasks.process_supply_time_message`, and `wareApp.tasks.process_load_runtime_recovery_message`.
 
 ## Logging Contract
 
@@ -123,7 +123,7 @@ The SupplyTime handoff also requires a separate worker:
 celery -A warehouse worker --queues=queue1_processing --concurrency=1 --loglevel=INFO
 ```
 
-Live validation confirmed that queue-1 enqueued a malformed SupplyTime packet and the processing worker isolated its parse failure without a database write.
+Live validation confirmed that queue-1 enqueued malformed SupplyTime and `recovery/loadRuntime` packets, and the processing worker isolated both parse failures without database writes.
 
 ## Deliberate Boundary
 
