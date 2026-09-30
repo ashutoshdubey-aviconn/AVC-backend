@@ -568,12 +568,12 @@ def run_mqtt_client1():
                 print("Now checking condition for entry or update in hourly reading.")
                 aisle_group = AisleGroup.objects.filter(
                     site=site, attached_leg_id=str(aisle_group_id)
-                )
+                ).first()
                 aisle_group_status, aisle_group_active = False, False
                 site_baseline, leg_hourly_baseline = 0.0, 0.0
                 # for sensor aisle unit consumption
                 try:
-                    sensor_aisle = aisle_group[0].on_sensor_power
+                    sensor_aisle = aisle_group.on_sensor_power
                     if sensor_aisle:
                         print("storing sensor aisle data in sensor aisle table")
                         msg_time = time.split(":")[1:]
@@ -582,7 +582,7 @@ def run_mqtt_client1():
                         entry_time = datetime.strptime(msg_time, "%Y-%m-%d %H:%M:%S.%f")
                         SensorAisleUnitConsumption.objects.create(
                             associated_Site=site,
-                            aisle_group=aisle_group[0],
+                            aisle_group=aisle_group,
                             leg_id=aisle_group_id,
                             unit_consumption=new_unit_consumption,
                             reading_for=entry_time,
@@ -595,9 +595,9 @@ def run_mqtt_client1():
                 except Exception as err:
                     print("Error while storing sensor aisle data ", err)
                 # ends here
-                if aisle_group[0].is_visible:
+                if aisle_group.is_visible:
                     aisle_group_status = True
-                if aisle_group[0].is_active:
+                if aisle_group.is_active:
                     aisle_group_active = True
                 if hourly_entry.exists():
                     # new_consumption = hourly_entry[0].unit_consumption + new_unit_consumption
@@ -705,7 +705,7 @@ def run_mqtt_client1():
 
                                 oneDayHourlyData = HourlySiteReading.objects.filter(
                                     associated_Site=site,
-                                    aisle_group=aisle_group[0],
+                                    aisle_group=aisle_group,
                                     reading_from__date=date.date(),
                                     reading_to__date=date.date(),
                                 )
@@ -752,7 +752,7 @@ def run_mqtt_client1():
 
                         HourlySiteReading.objects.create(
                             associated_Site=site,
-                            aisle_group=aisle_group[0],
+                            aisle_group=aisle_group,
                             leg_id=aisle_group_id,
                             unit_consumption=new_unit_consumption,
                             hourly_baseline_value=leg_hourly_baseline,
@@ -830,7 +830,7 @@ def run_mqtt_client1():
                                 site_baseline = aisle_group_baseline.baseline_value
                             HourlySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=aisle_group,
                                 leg_id=aisle_group_id,
                                 unit_consumption=new_unit_consumption,
                                 hourly_baseline_value=leg_hourly_baseline,
@@ -841,7 +841,7 @@ def run_mqtt_client1():
 
                             DailySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=aisle_group,
                                 leg_id=aisle_group_id,
                                 unit_consumption=new_unit_consumption,
                                 daily_baseline_value=site_baseline,
@@ -883,7 +883,7 @@ def run_mqtt_client1():
                     s = site
                     DailySiteReading.objects.create(
                         associated_Site=s,
-                        aisle_group=aisle_group[0],
+                        aisle_group=aisle_group,
                         leg_id=aisle_group_id,
                         unit_consumption=new_unit_consumption,
                         daily_baseline_value=site_baseline,
