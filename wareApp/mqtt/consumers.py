@@ -9,6 +9,11 @@ from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
 from wareApp.sendmail import *
 from wareApp.load_data import handle_load_data_message
+from wareApp.mqtt.routing import (
+    QUEUE_ONE_SUBSCRIPTIONS,
+    QUEUE_TWO_SUBSCRIPTIONS,
+    subscribe,
+)
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
 def run_mqtt_client1():
     # app = Celery('mqtt_client', broker='amqp://guest@localhost/')
@@ -20,7 +25,7 @@ def run_mqtt_client1():
 
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
-        client.subscribe("/Acclivate/iOmniControl/#")
+        subscribe(client, QUEUE_ONE_SUBSCRIPTIONS)
 
     def send_mail_for_alarms(site_id, aisle_id, alarm_type):
         from_mail = settings.EMAIL_HOST_USER
@@ -1980,7 +1985,7 @@ def run_mqtt_client2():
 
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
-        client.subscribe("/Acclivate/iOmniControl/#")
+        subscribe(client, QUEUE_TWO_SUBSCRIPTIONS)
 
     def send_mail_for_alarms(site_id, aisle_id, alarm_type):
         from_mail = settings.EMAIL_HOST_USER
