@@ -5,6 +5,9 @@ from paho.mqtt import publish as mqtt_publish
 from warehouse.celery import app
 from wareApp.models import Site
 from wareApp.mqtt.consumers import run_mqtt_client1, run_mqtt_client2
+from wareApp.mqtt.daily_consumption_recovery import (
+    handle_daily_consumption_recovery_message,
+)
 from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
 from wareApp.mqtt.supply_time import handle_supply_time_message
 
@@ -60,3 +63,18 @@ def process_load_runtime_recovery_message(site_id, gateway_id, message):
         return
 
     handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
+
+
+@app.task(queue="queue1_processing")
+def process_daily_consumption_recovery_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning(
+            "Ignoring queued dailyConsumption recovery for missing site %s from gateway %s",
+            site_id,
+            gateway_id,
+        )
+        return
+
+    handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)

@@ -1738,6 +1738,17 @@ def run_mqtt_client1():
 
         if "recovery" in msg_type:
             if "dailyConsumption" in msg_subtype:
+                from wareApp.tasks import process_daily_consumption_recovery_message
+
+                process_daily_consumption_recovery_message.apply_async(
+                    args=(site.id, gw_id, message), queue="queue1_processing"
+                )
+                logger.info(
+                    "Queued dailyConsumption recovery for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
+                return
                 try:
                     print(
                         "Starting recovery for daily consumption for site {}.".format(
