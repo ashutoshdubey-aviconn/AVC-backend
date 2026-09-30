@@ -9,6 +9,7 @@ from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
 from wareApp.sendmail import *
 from wareApp.load_data import handle_load_data_message
+from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
 from warehouse.celery import app
 
 
@@ -460,17 +461,20 @@ def mqtt_client1():
         print("######################")
         message = str(msg.payload)
         print("message_value :", message)
-        head = (msg.topic).split("/")
-        locationId = head[3]
-        gw_id = head[4]
+        try:
+            topic = parse_gateway_topic(msg.topic)
+        except TopicParseError as error:
+            print(f"Ignoring malformed LoadData topic: {error}")
+            return
+
+        location_id = topic.site_id
+        gw_id = topic.gateway_id
+        msg_type = [topic.message_type]
         print(gw_id)
-        msg_type = (head[6]).split("_")
         print("msg_type : ", msg_type)
-        msg_subtype = head[7]
         print("This is the message type: ", msg_type)
-        location_id = int(locationId)
-        site = Site.objects.get(id=int(locationId))
-        print("Location Id is : ", int(locationId))
+        site = Site.objects.get(id=location_id)
+        print("Location Id is : ", location_id)
         print("Site Name : {}".format(site.site_name))
 
         if "consumption" in msg_type:
