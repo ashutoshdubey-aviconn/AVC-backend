@@ -17,6 +17,7 @@ from wareApp.mqtt.routing import (
     QUEUE_TWO_SUBSCRIPTIONS,
     subscribe,
 )
+from wareApp.mqtt.supply_time import handle_supply_time_message
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
 
 logger = logging.getLogger(__name__)
@@ -1522,6 +1523,15 @@ def run_mqtt_client1():
                 # load graph data code starts from here
 
         elif "SupplyTime" in msg_type:
+            from wareApp.tasks import process_supply_time_message
+
+            process_supply_time_message.apply_async(
+                args=(site.id, gw_id, message), queue="queue1_processing"
+            )
+            logger.info(
+                "Queued SupplyTime for site %s from gateway %s", location_id, gw_id
+            )
+            return
             try:
                 print("Calculating the load run time for ")
                 time_source = message.split(",")
