@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
@@ -11,6 +12,10 @@ from wareApp.mqtt.routing import (
     queue_for_gateway_topic,
 )
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
+from wareApp.management.commands.simulate_mqtt_gateway_traffic import (
+    Command as SimulatorCommand,
+)
+from wareApp.load_data import handler as load_data_handler
 from wareApp import tasks
 
 
@@ -99,6 +104,56 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         self.assertEqual(queue_one_client.subscriptions, list(QUEUE_ONE_SUBSCRIPTIONS))
         self.assertEqual(queue_two_client.subscriptions, list(QUEUE_TWO_SUBSCRIPTIONS))
+
+    def test_gateway_simulator_emits_messages_for_both_queues(self):
+        messages = SimulatorCommand()._messages(
+            156, "967", "simulation-gateway-01", all_topics=True
+        )
+        queues = {queue_for_gateway_topic(topic) for topic, _payload in messages}
+
+        self.assertEqual(queues, {QUEUE_ONE, QUEUE_TWO})
+        self.assertEqual(len(messages), 8)
+
+    def test_gateway_simulator_can_emit_only_load_data(self):
+        messages = SimulatorCommand()._messages(
+            156, "967", "simulation-gateway-01", all_topics=False, load_data_only=True
+        )
+
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(queue_for_gateway_topic(messages[0][0]), QUEUE_TWO)
+
+    def test_load_data_handler_saves_updates_and_rolls_up(self):
+        site = SimpleNamespace(is_loadGraph_visible=True)
+        reading = SimpleNamespace(
+            leg_id="967",
+            load_value=31766.992,
+            epoch_time="1790800402065",
+            created="2026-10-01T02:03:22",
+        )
+        aisle_group = object()
+
+        with (
+            patch(
+                "wareApp.load_data.handler.parse_load_data_message",
+                return_value=reading,
+            ),
+            patch(
+                "wareApp.load_data.handler.AisleGroup.objects.get",
+                return_value=aisle_group,
+            ),
+            patch("wareApp.load_data.handler.save_raw_load_reading") as save_raw,
+            patch(
+                "wareApp.load_data.handler.update_monthly_min_max_load"
+            ) as update_monthly,
+            patch("wareApp.load_data.handler.roll_up_load_data_if_due") as roll_up,
+        ):
+            load_data_handler.handle_load_data_message(
+                object(), site, 156, "gateway-01", "payload", ["LoadData"]
+            )
+
+        save_raw.assert_called_once_with(site, aisle_group, reading)
+        update_monthly.assert_called_once_with(site, aisle_group, reading)
+        roll_up.assert_called_once_with(site, reading.created)
 
 
 class FakeMqttClient:

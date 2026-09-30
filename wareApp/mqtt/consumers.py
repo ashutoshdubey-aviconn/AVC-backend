@@ -1,3 +1,5 @@
+import logging
+
 import paho.mqtt.client as mqtt
 import re
 import math
@@ -15,7 +17,17 @@ from wareApp.mqtt.routing import (
     subscribe,
 )
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
+
+logger = logging.getLogger(__name__)
+
+
+def _log_legacy_message(*values, **_kwargs):
+    logger.debug(" ".join(str(value) for value in values))
+
+
 def run_mqtt_client1():
+    print = _log_legacy_message
+
     # app = Celery('mqtt_client', broker='amqp://guest@localhost/')
 
     # The callback for when the client receives a CONNACK response from the server.
@@ -1965,7 +1977,7 @@ def run_mqtt_client1():
     client.on_message = on_message
 
     client.connect("127.0.0.1", 1883, 60)
-    print("MQTT Client 1 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    logger.info("Queue1 MQTT client started")
     # client.username_pw_set("djgpjqqt","AfTkXiiaov8c")
 
     # Blocking call that processes network traffic, dispatches callbacks and
@@ -1975,7 +1987,7 @@ def run_mqtt_client1():
     client.loop_forever()
 
 
-def run_mqtt_client2():
+def _run_mqtt_client2_legacy():
     # app = Celery('mqtt_client', broker='amqp://guest@localhost/')
 
     # The callback for when the client receives a CONNACK response from the server.
@@ -2642,4 +2654,60 @@ def run_mqtt_client2():
     # handles reconnecting.
     # Other loop*() functions are available that give a threaded interface and a
     # manual interface.
+    client.loop_forever()
+
+
+def run_mqtt_client2():
+    """Run the isolated LoadData MQTT consumer for queue2."""
+
+    def on_connect(client, userdata, flags, rc):
+        if rc:
+            logger.error("Queue2 MQTT connection rejected: rc=%s", rc)
+            return
+
+        subscribe(client, QUEUE_TWO_SUBSCRIPTIONS)
+        logger.info("Queue2 MQTT connected; subscribed to LoadData topics")
+
+    def on_message(client, userdata, msg):
+        try:
+            topic = parse_gateway_topic(msg.topic)
+        except TopicParseError as error:
+            logger.warning("Ignoring malformed LoadData topic %r: %s", msg.topic, error)
+            return
+
+        if topic.message_type != "LoadData":
+            logger.warning("Ignoring unexpected queue2 topic: %s", msg.topic)
+            return
+
+        try:
+            site = Site.objects.get(id=topic.site_id)
+        except Site.DoesNotExist:
+            logger.warning(
+                "Ignoring LoadData for missing site %s from gateway %s",
+                topic.site_id,
+                topic.gateway_id,
+            )
+            return
+
+        try:
+            handle_load_data_message(
+                client,
+                site,
+                topic.site_id,
+                topic.gateway_id,
+                str(msg.payload),
+                [topic.message_type],
+            )
+        except Exception:
+            logger.exception(
+                "Failed to process LoadData for site %s from gateway %s",
+                topic.site_id,
+                topic.gateway_id,
+            )
+
+    client = mqtt.Client("server_paho_client_2")
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect("127.0.0.1", 1883, 60)
+    logger.info("Queue2 LoadData MQTT client started")
     client.loop_forever()

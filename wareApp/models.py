@@ -880,6 +880,11 @@ class RawLoadData(models.Model):
     created = models.DateTimeField(blank=True, null=True)
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["site", "created"], name="idx_rawload_site_created"),
+        ]
+
     def __str__(self):
         return str(self.load_data)
 
@@ -901,6 +906,10 @@ class HourlyLoadData(models.Model):
             models.Index(
                 fields=["aisle_group", "created"], name="idx_load_aislegroup_created"
             ),
+            models.Index(
+                fields=["site", "aisle_group", "created"],
+                name="idx_hourlyload_rollup",
+            ),
         ]
 
     def __str__(self):
@@ -916,6 +925,14 @@ class DailyLoadData(models.Model):
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
     updated_on = models.DateTimeField(auto_now=datetime.now())
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["site", "aisle_group", "created"],
+                name="idx_dailyload_rollup",
+            ),
+        ]
 
     def __str__(self):
         return str(self.load_data)

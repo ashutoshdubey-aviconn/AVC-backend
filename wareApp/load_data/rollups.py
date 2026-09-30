@@ -1,6 +1,6 @@
+import os
 from collections import defaultdict
 from datetime import timedelta
-import os
 from threading import Lock
 
 from wareApp.models import DailyLoadData, HourlyLoadData, MainsDgLoadData, RawLoadData
@@ -41,24 +41,36 @@ def _extrema(readings):
     return sorted((minimum, maximum), key=_epoch_sort_key)
 
 
-def _bucket_has_rows(model, site, aisle_group, bucket_start, bucket_end):
-    return model.objects.filter(
+def _materialized_buckets(model, site, window_start, window_end, bucket_function):
+    rows = model.objects.filter(
         site=site,
-        aisle_group=aisle_group,
-        created__gte=bucket_start,
-        created__lt=bucket_end,
-    ).exists()
+        created__gte=window_start,
+        created__lt=window_end,
+    ).values_list("aisle_group_id", "created")
+    return {
+        (aisle_group_id, bucket_function(created))
+        for aisle_group_id, created in rows
+        if aisle_group_id is not None and created is not None
+    }
 
 
 def _save_extrema(model, site, aisle_group, readings):
-    for reading in _extrema(readings):
-        model.objects.create(
-            site=site,
-            aisle_group=aisle_group,
-            load_data=reading.load_data,
-            created=reading.created,
-            epoch_time=reading.epoch_time,
-        )
+    extrema = _extrema(readings)
+    if not extrema:
+        return
+
+    model.objects.bulk_create(
+        [
+            model(
+                site=site,
+                aisle_group=aisle_group,
+                load_data=reading.load_data,
+                created=reading.created,
+                epoch_time=reading.epoch_time,
+            )
+            for reading in extrema
+        ]
+    )
 
 
 def _group_by_bucket(readings, bucket_function):
@@ -87,19 +99,23 @@ def roll_up_completed_load_data(site, observed_at):
             created__lt=completed_minute,
         )
         .select_related("aisle_group")
-        .order_by("aisle_group_id", "created")
+        .order_by("created")
+    )
+    hourly_buckets = _materialized_buckets(
+        HourlyLoadData,
+        site,
+        raw_window_start,
+        completed_minute,
+        _minute_bucket,
     )
 
-    for (_, bucket_start), readings in _group_by_bucket(
+    for bucket_key, readings in _group_by_bucket(
         raw_readings, _minute_bucket
     ).items():
-        aisle_group = readings[0].aisle_group
-        bucket_end = bucket_start + timedelta(minutes=1)
-        if _bucket_has_rows(
-            HourlyLoadData, site, aisle_group, bucket_start, bucket_end
-        ):
+        if bucket_key in hourly_buckets:
             continue
 
+        aisle_group = readings[0].aisle_group
         _save_extrema(HourlyLoadData, site, aisle_group, readings)
         _save_extrema(MainsDgLoadData, site, aisle_group, readings)
 
@@ -114,15 +130,21 @@ def roll_up_completed_load_data(site, observed_at):
         .select_related("aisle_group")
         .order_by("aisle_group_id", "created")
     )
+    daily_buckets = _materialized_buckets(
+        DailyLoadData,
+        site,
+        hourly_window_start,
+        completed_hour,
+        _hour_bucket,
+    )
 
-    for (_, bucket_start), readings in _group_by_bucket(
+    for bucket_key, readings in _group_by_bucket(
         hourly_readings, _hour_bucket
     ).items():
-        aisle_group = readings[0].aisle_group
-        bucket_end = bucket_start + timedelta(hours=1)
-        if _bucket_has_rows(DailyLoadData, site, aisle_group, bucket_start, bucket_end):
+        if bucket_key in daily_buckets:
             continue
 
+        aisle_group = readings[0].aisle_group
         _save_extrema(DailyLoadData, site, aisle_group, readings)
 
 

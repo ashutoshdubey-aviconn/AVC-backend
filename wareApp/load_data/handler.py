@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 import math
 
@@ -6,6 +7,9 @@ from wareApp.load_data.monthly import update_monthly_min_max_load
 from wareApp.load_data.parser import parse_load_data_message
 from wareApp.load_data.raw import save_raw_load_reading
 from wareApp.load_data.rollups import roll_up_load_data_if_due
+
+
+logger = logging.getLogger(__name__)
 
 
 def _handle_load_data_message(client, site, location_id, gw_id, message, msg_type):
@@ -813,8 +817,25 @@ def _handle_load_data_message(client, site, location_id, gw_id, message, msg_typ
 
 def handle_load_data_message(client, site, location_id, gw_id, message, msg_type):
     try:
-        return _handle_load_data_message(
-            client, site, location_id, gw_id, message, msg_type
+        if "LoadData" not in msg_type:
+            logger.warning("Ignoring unexpected LoadData message type: %s", msg_type)
+            return
+
+        reading = parse_load_data_message(message)
+        aisle_group = AisleGroup.objects.get(
+            site=site, attached_leg_id=str(reading.leg_id)
         )
-    except Exception as err:
-        print("LoadData message skipped for site {}: {}".format(location_id, err))
+        save_raw_load_reading(site, aisle_group, reading)
+
+        if site.is_loadGraph_visible:
+            update_monthly_min_max_load(site, aisle_group, reading)
+        roll_up_load_data_if_due(site, reading.created)
+        logger.info(
+            "Saved LoadData for site %s, leg %s, value %s, epoch %s",
+            location_id,
+            reading.leg_id,
+            reading.load_value,
+            reading.epoch_time,
+        )
+    except Exception:
+        logger.exception("LoadData message skipped for site %s", location_id)
