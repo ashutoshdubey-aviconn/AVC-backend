@@ -1207,6 +1207,7 @@ def run_mqtt_client1():
                     Supply_Source=power_source,
                     Meter_Number=meter_number,
                 )
+                load_record = load_entry.first()
                 if site.show_voltage_alarms and (
                     r_volts > 0 and y_volts > 0 and b_volts > 0
                 ):
@@ -1238,9 +1239,10 @@ def run_mqtt_client1():
                         site_id=site, power_source=power_source, parameter_type=0
                     ).order_by("-created")
                     print("fetch_last_entries:", fetch_last_entries)
-                    if fetch_last_entries.count() > 6:
+                    recent_voltage_entries = list(fetch_last_entries[:7])
+                    if len(recent_voltage_entries) > 6:
                         check_high_volt_alarm = True
-                        for i in fetch_last_entries[0:5]:
+                        for i in recent_voltage_entries[:5]:
                             print(
                                 "r_Phase value for high vlotage:",
                                 i.r_phase,
@@ -1307,9 +1309,10 @@ def run_mqtt_client1():
                         site_id=site, power_source=power_source, parameter_type=1
                     ).order_by("-created")
                     print("fetch_last_entries for low voltage : ", fetch_last_entries)
-                    if fetch_last_entries.count() > 6:
+                    recent_voltage_entries = list(fetch_last_entries[:7])
+                    if len(recent_voltage_entries) > 6:
                         check_low_volt_alarm = True
-                        for i in fetch_last_entries[0:5]:
+                        for i in recent_voltage_entries[:5]:
                             print(
                                 "r_Phase value for low vlotage:",
                                 i.r_phase,
@@ -1357,12 +1360,12 @@ def run_mqtt_client1():
                                 }
                                 send_alarm_for_low_voltage(data)
                 print("Now checking condition for entry or update.")
-                if load_entry.exists():
+                if load_record:
                     print("Updating the load parameters.")
                     # for min and max load starts here
                     r_pf = y_pf = b_pf = 0.0
-                    min_load = load_entry[0].min_load
-                    max_load = load_entry[0].max_load
+                    min_load = load_record.min_load
+                    max_load = load_record.max_load
                     if site.is_pf_visible:
                         if len(load) == 14:
                             r_pf = float(load[11].split(":")[1])
