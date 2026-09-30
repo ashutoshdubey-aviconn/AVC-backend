@@ -466,6 +466,7 @@ def run_mqtt_client1():
         location_id = topic.site_id
         gw_id = topic.gateway_id
         msg_type = [topic.message_type]
+        msg_subtype = topic.message_subtype
         print(gw_id)
         print("msg_type : ", msg_type)
         print("This is the message type: ", msg_type)
