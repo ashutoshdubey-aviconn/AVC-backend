@@ -36,8 +36,11 @@ flowchart LR
     B --> Q2[queue2 Celery worker\nLoadData-only subscription]
 
     Q1 --> T1[Validate topic and site]
-    T1 --> C1[Consumption / FireAlarm / Load\nSupplyTime / Recovery handlers]
+    T1 --> C1[Consumption / FireAlarm / Load\nRecovery handlers]
     C1 --> DB1[(Operational tables)]
+    T1 --> P1[queue1_processing]
+    P1 --> S1[SupplyTime processing worker]
+    S1 --> DB1
 
     Q2 --> T2[Validate topic and site]
     T2 --> P[LoadData parser]
@@ -69,6 +72,12 @@ flowchart LR
 - Reduced repeated queryset evaluation in consumption, fire-alarm, load, SupplyTime, and recovery paths by caching records obtained with `.first()`.
 - Replaced safe `exists()` followed immediately by `update()` patterns with update row-count checks.
 - Replaced voltage history `count()` plus slice queries with a bounded seven-row read while retaining the existing six-reading threshold and newest-five evaluation.
+
+## Full Optimization Phase 1: SupplyTime Handoff
+
+`SupplyTime` is the first queue-1 family moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places the compact payload on `queue1_processing`. The processing worker performs the database updates, monthly aggregation, and any recovery publish.
+
+This creates a durable RabbitMQ handoff and keeps the Paho callback independent of SupplyTime database latency. The active implementation is in `wareApp/mqtt/supply_time.py` and `wareApp.tasks.process_supply_time_message`.
 
 ## Logging Contract
 
@@ -107,6 +116,14 @@ mqtt_client2.apply_async(queue="queue2")
 ```
 
 Use one long-running task per queue. Starting duplicates creates duplicate MQTT subscribers and may duplicate business processing.
+
+The SupplyTime handoff also requires a separate worker:
+
+```bash
+celery -A warehouse worker --queues=queue1_processing --concurrency=1 --loglevel=INFO
+```
+
+Live validation confirmed that queue-1 enqueued a malformed SupplyTime packet and the processing worker isolated its parse failure without a database write.
 
 ## Deliberate Boundary
 
