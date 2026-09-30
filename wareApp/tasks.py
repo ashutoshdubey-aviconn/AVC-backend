@@ -1,7 +1,6 @@
 import paho.mqtt.client as mqtt
 import re
 import math
-from celery import Celery
 from wareApp.models import *
 from datetime import datetime, timedelta, timezone
 from datetime import datetime
@@ -9,7 +8,7 @@ from warehouse import settings
 from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
 from wareApp.sendmail import *
-app = Celery("warehouse", broker="amqp://guest@localhost//")
+from warehouse.celery import app
 
 
 @app.task(queue="queue1")
