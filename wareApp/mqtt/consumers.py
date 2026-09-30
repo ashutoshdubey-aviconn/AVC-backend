@@ -12,6 +12,7 @@ from django.utils import timezone
 from wareApp.sendmail import *
 from wareApp.load_data import handle_load_data_message
 from wareApp.mqtt.routing import (
+    QUEUE_ONE_MESSAGE_TYPES,
     QUEUE_ONE_SUBSCRIPTIONS,
     QUEUE_TWO_SUBSCRIPTIONS,
     subscribe,
@@ -32,12 +33,14 @@ def run_mqtt_client1():
 
     # The callback for when the client receives a CONNACK response from the server.
     def on_connect(client, userdata, flags, rc):
-        # logMessage(Constants.TRACE_FLAG_INFO, "Connected with result code " + str(rc))
-        print("Connected with result code " + str(rc))
+        if rc:
+            logger.error("Queue1 MQTT connection rejected: rc=%s", rc)
+            return
 
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
         subscribe(client, QUEUE_ONE_SUBSCRIPTIONS)
+        logger.info("Queue1 MQTT connected; subscribed to non-LoadData topics")
 
     def send_mail_for_alarms(site_id, aisle_id, alarm_type):
         from_mail = settings.EMAIL_HOST_USER
@@ -477,7 +480,11 @@ def run_mqtt_client1():
         try:
             topic = parse_gateway_topic(msg.topic)
         except TopicParseError as error:
-            print(f"Ignoring malformed queue 1 topic: {error}")
+            logger.warning("Ignoring malformed queue1 topic %r: %s", msg.topic, error)
+            return
+
+        if topic.message_type not in QUEUE_ONE_MESSAGE_TYPES:
+            logger.warning("Ignoring unexpected queue1 topic: %s", msg.topic)
             return
 
         location_id = topic.site_id
@@ -487,7 +494,15 @@ def run_mqtt_client1():
         print(gw_id)
         print("msg_type : ", msg_type)
         print("This is the message type: ", msg_type)
-        site = Site.objects.get(id=location_id)
+        try:
+            site = Site.objects.get(id=location_id)
+        except Site.DoesNotExist:
+            logger.warning(
+                "Ignoring queue1 message for missing site %s from gateway %s",
+                location_id,
+                gw_id,
+            )
+            return
         print("Location Id is : ", location_id)
         print("Site Name : {}".format(site.site_name))
 
@@ -865,7 +880,7 @@ def run_mqtt_client1():
                 else:
                     print("Creating new daily consumption entry.")
                     # komal to add code for previous day all hours(24) to daily entry
-                    s = Site.objects.get(id=int(location_id))
+                    s = site
                     DailySiteReading.objects.create(
                         associated_Site=s,
                         aisle_group=aisle_group[0],

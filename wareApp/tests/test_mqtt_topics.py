@@ -155,6 +155,40 @@ class GatewayTopicParserTests(SimpleTestCase):
         update_monthly.assert_called_once_with(site, aisle_group, reading)
         roll_up.assert_called_once_with(site, reading.created)
 
+    def test_queue_one_ignores_malformed_topics(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        with self.assertLogs("wareApp.mqtt.consumers", "WARNING") as logs:
+            client.on_message(
+                client,
+                None,
+                SimpleNamespace(topic="/invalid/topic", payload=b"payload"),
+            )
+
+        self.assertIn("Ignoring malformed queue1 topic", logs.output[0])
+
+    def test_queue_one_ignores_messages_for_missing_sites(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        message = SimpleNamespace(
+            topic="/Acclivate/iOmniControl/999999/gateway-01/in/consumption/state",
+            payload=b"payload",
+        )
+        with (
+            patch(
+                "wareApp.mqtt.consumers.Site.objects.get",
+                side_effect=consumers.Site.DoesNotExist,
+            ),
+            self.assertLogs("wareApp.mqtt.consumers", "WARNING") as logs,
+        ):
+            client.on_message(client, None, message)
+
+        self.assertIn("Ignoring queue1 message for missing site 999999", logs.output[0])
+
 
 class FakeMqttClient:
     def __init__(self):
