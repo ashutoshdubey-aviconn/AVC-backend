@@ -941,15 +941,16 @@ def run_mqtt_client1():
                         Site=site, Meter_Number=meter_number
                     )
                     print("fire_site :", fire_pump_alarm)
-                    if fire_pump_alarm.exists():
+                    fire_pump_record = fire_pump_alarm.first()
+                    if fire_pump_record:
                         print("inside hydrant pump")
-                        initial_r_volt = fire_pump_alarm[0].r_volt
+                        initial_r_volt = fire_pump_record.r_volt
                         print("initial_r_volt", initial_r_volt)
-                        initial_y_volt = fire_pump_alarm[0].y_volt
+                        initial_y_volt = fire_pump_record.y_volt
                         print("initial_y_volt", initial_y_volt)
-                        initial_b_volt = fire_pump_alarm[0].b_volt
+                        initial_b_volt = fire_pump_record.b_volt
                         print("initial_b_volt", initial_b_volt)
-                        initial_motor_status = fire_pump_alarm[0].motor_status
+                        initial_motor_status = fire_pump_record.motor_status
                         fire_pump_alarm.update(
                             r_volt=r_volt,
                             y_volt=y_volt,
@@ -958,13 +959,13 @@ def run_mqtt_client1():
                             Meter_Number=meter_number,
                             Updated_on=datetime.now(),
                         )
-                        updated_r_volt = fire_pump_alarm[0].r_volt
+                        updated_r_volt = r_volt
                         print("updated_r_volt", updated_r_volt)
-                        updated_y_volt = fire_pump_alarm[0].y_volt
-                        updated_b_volt = fire_pump_alarm[0].b_volt
-                        deviceName = fire_pump_alarm[0].aisleGroup
+                        updated_y_volt = y_volt
+                        updated_b_volt = b_volt
+                        deviceName = fire_pump_record.aisleGroup
                         print("devicename:", deviceName)
-                        aisleGrpObject = AisleGroup.objects.get(id=deviceName.id)
+                        aisleGrpObject = deviceName
                         print("aisle grp object ", aisleGrpObject)
                         mail_difference_time = 600
                         if (
@@ -977,10 +978,10 @@ def run_mqtt_client1():
                             alarm_type = "Motor-On in Auto-Mode"
                             check_previous_mail = Email_History.objects.filter(
                                 fire_site=site, deviceName=aisleGrpObject, email_for=5
-                            ).order_by("-created")
-                            if check_previous_mail.exists():
+                            ).order_by("-created").first()
+                            if check_previous_mail:
                                 print("mail exists")
-                                last_mail_time = check_previous_mail[0].created
+                                last_mail_time = check_previous_mail.created
                                 difference = datetime.now() - last_mail_time
                                 print("calculating time differnce from previous mail")
                                 print("differnce is : ", difference.total_seconds())
@@ -1022,10 +1023,10 @@ def run_mqtt_client1():
                             alarm_type = "Motor-On in Manual-Mode"
                             check_previous_mail = Email_History.objects.filter(
                                 fire_site=site, deviceName=aisleGrpObject, email_for=5
-                            ).order_by("-created")
-                            if check_previous_mail.exists():
+                            ).order_by("-created").first()
+                            if check_previous_mail:
                                 print("mail exists")
-                                last_mail_time = check_previous_mail[0].created
+                                last_mail_time = check_previous_mail.created
                                 difference = datetime.now() - last_mail_time
                                 print("calculating time differnce from previous mail")
                                 print("differnce is : ", difference.total_seconds())
