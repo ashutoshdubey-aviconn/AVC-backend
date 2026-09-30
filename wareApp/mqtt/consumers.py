@@ -593,8 +593,12 @@ def run_mqtt_client1():
                                 aisle_group_id
                             )
                         )
-                except Exception as err:
-                    print("Error while storing sensor aisle data ", err)
+                except Exception:
+                    logger.exception(
+                        "Queue1 sensor aisle persistence failed for site %s from gateway %s",
+                        location_id,
+                        gw_id,
+                    )
                 # ends here
                 if aisle_group.is_visible:
                     aisle_group_status = True
@@ -626,11 +630,12 @@ def run_mqtt_client1():
                         reading_from__gte=dateHourLowerLimitCheck1,
                         reading_from__lte=dateHourUpperLimitCheck1,
                     )
-                    if previous_hour_entry.exists():
+                    previous_hour_record = previous_hour_entry.first()
+                    if previous_hour_record:
                         print("Checking for any loss in previous hour data.")
-                        pervious_hour_server_unit_consumption = previous_hour_entry[
-                            0
-                        ].unit_consumption
+                        pervious_hour_server_unit_consumption = (
+                            previous_hour_record.unit_consumption
+                        )
                         if (
                             pervious_hour_server_unit_consumption
                             != previous_hour_gw_unit_consumption
@@ -652,6 +657,9 @@ def run_mqtt_client1():
                             previous_hour_entry.update(
                                 unit_consumption=previous_hour_gw_unit_consumption
                             )
+                            previous_hour_record.unit_consumption = (
+                                previous_hour_gw_unit_consumption
+                            )
                             print(
                                 "Server hourly consumption synced with gateway hourly consumption."
                             )
@@ -671,12 +679,12 @@ def run_mqtt_client1():
                             print("Now calculating saving for previous hour.")
                             hourly_saving = (
                                 leg_hourly_baseline
-                                - previous_hour_entry[0].unit_consumption
+                                - previous_hour_record.unit_consumption
                             )
                             previous_hour_entry.update(energy_saved=hourly_saving)
                             print(
                                 "Hourly saving of {} in {} of {} hour updated.".format(
-                                    previous_hour_entry[0].leg_id,
+                                    previous_hour_record.leg_id,
                                     site.site_name,
                                     dateHourLowerLimitCheck1,
                                 )
