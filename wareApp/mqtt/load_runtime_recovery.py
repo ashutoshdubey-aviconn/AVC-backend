@@ -4,7 +4,6 @@ from datetime import datetime
 
 from wareApp.models import SupplyLoadTimeShare
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +34,9 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
                 recovery_hours[index], "%Y-%m-%d %H:%M:%S.%f"
             )
             runtime = (
-                0 if recovery_values[index] == "ERROR404" else int(recovery_values[index])
+                0
+                if recovery_values[index] == "ERROR404"
+                else int(recovery_values[index])
             )
             if source_records.filter(reading_from=observed_at).update(
                 hourly_run_time=runtime
