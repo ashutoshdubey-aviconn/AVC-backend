@@ -2,7 +2,6 @@ from collections.abc import Iterable
 
 from wareApp.mqtt.topics import GatewayTopic, parse_gateway_topic
 
-
 QUEUE_ONE = "queue1"
 QUEUE_TWO = "queue2"
 

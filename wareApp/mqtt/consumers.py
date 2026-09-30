@@ -976,9 +976,15 @@ def run_mqtt_client1():
                         ):
                             print("motor on in auto mode")
                             alarm_type = "Motor-On in Auto-Mode"
-                            check_previous_mail = Email_History.objects.filter(
-                                fire_site=site, deviceName=aisleGrpObject, email_for=5
-                            ).order_by("-created").first()
+                            check_previous_mail = (
+                                Email_History.objects.filter(
+                                    fire_site=site,
+                                    deviceName=aisleGrpObject,
+                                    email_for=5,
+                                )
+                                .order_by("-created")
+                                .first()
+                            )
                             if check_previous_mail:
                                 print("mail exists")
                                 last_mail_time = check_previous_mail.created
@@ -1021,9 +1027,15 @@ def run_mqtt_client1():
                         ):
                             print("motor on in manual mode")
                             alarm_type = "Motor-On in Manual-Mode"
-                            check_previous_mail = Email_History.objects.filter(
-                                fire_site=site, deviceName=aisleGrpObject, email_for=5
-                            ).order_by("-created").first()
+                            check_previous_mail = (
+                                Email_History.objects.filter(
+                                    fire_site=site,
+                                    deviceName=aisleGrpObject,
+                                    email_for=5,
+                                )
+                                .order_by("-created")
+                                .first()
+                            )
                             if check_previous_mail:
                                 print("mail exists")
                                 last_mail_time = check_previous_mail.created
@@ -1543,9 +1555,7 @@ def run_mqtt_client1():
                 print("Checking conditions for run time entry.")
                 if current_hour_record:
                     print("Updating the supply run time for {}.".format(source))
-                    new_run_time = (
-                        current_hour_record.hourly_run_time + source_run_time
-                    )
+                    new_run_time = current_hour_record.hourly_run_time + source_run_time
                     current_hour_runtime.update(hourly_run_time=new_run_time)
                     print("Supply run time for {} updated of {}".format(source, site))
 
@@ -1655,7 +1665,9 @@ def run_mqtt_client1():
                             )
                         )
                     else:
-                        if last_runtime_entry:  # If not the first ever entry for this site.
+                        if (
+                            last_runtime_entry
+                        ):  # If not the first ever entry for this site.
                             print("Previous hour entry not found, data loss suspected.")
                             loss_time = (
                                 today - last_runtime_entry.reading_from
@@ -1769,7 +1781,9 @@ def run_mqtt_client1():
                                 baseline_to__gte=date,
                             ).first()
                             if aisle_group_baseline:
-                                aisle_group_baseline = aisle_group_baseline.baseline_value
+                                aisle_group_baseline = (
+                                    aisle_group_baseline.baseline_value
+                                )
                             else:
                                 aisle_group_baseline = (
                                     SiteBaseline.objects.filter(
@@ -1802,7 +1816,7 @@ def run_mqtt_client1():
                                 print(
                                     "Existing daily unit consumption is greater , so no update:{} -- {} -- {}".format(
                                         aisle_group_id,
-                                            daily_record.unit_consumption,
+                                        daily_record.unit_consumption,
                                         daily_unit_consumption,
                                     )
                                 )

@@ -7,7 +7,6 @@ from django.core.management.base import BaseCommand, CommandError
 from wareApp.mqtt.routing import QUEUE_ONE, QUEUE_TWO, queue_for_gateway_topic
 from wareApp.mqtt.topics import TopicParseError
 
-
 TOPIC_PATTERN = re.compile(r"(/Acclivate/iOmniControl/[^\s]+?/in/[^\s]+)")
 
 
