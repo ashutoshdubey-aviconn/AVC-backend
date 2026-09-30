@@ -902,9 +902,12 @@ def run_mqtt_client1():
                         reading_for=(date.date() - timedelta(days=1)),
                     )[0].unit_consumption
                     consumption_alarms(location_id, aisle_group_id, current_consumption)
-            except Exception as e:
-                print("Exception in consumption calculation block.")
-                print("This is the exception : {}".format(e))
+            except Exception:
+                logger.exception(
+                    "Queue1 consumption processing failed for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
 
         elif "FIREALARM" in msg_type:
             print("%%%%%%%%%")
@@ -1168,8 +1171,12 @@ def run_mqtt_client1():
                             print("No conditions matched")
                     else:
                         pass
-                except Exception as err:
-                    print("Eror in fire alarm : ", err)
+                except Exception:
+                    logger.exception(
+                        "Queue1 FIREALARM processing failed for site %s from gateway %s",
+                        location_id,
+                        gw_id,
+                    )
 
         elif "load" in msg_type:
             print("This message is for load parameters for site {}.".format(site))
@@ -1482,9 +1489,12 @@ def run_mqtt_client1():
                         Updated_on=datetime.now(),
                     )
                     print("New entry for load parameters.")
-            except Exception as e:
-                print("Exception in load calculation block.")
-                print("This is the exception : {}".format(e))
+            except Exception:
+                logger.exception(
+                    "Queue1 load processing failed for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
 
                 # load graph data code starts from here
 
@@ -1687,9 +1697,12 @@ def run_mqtt_client1():
                                     source, site
                                 )
                             )
-            except Exception as e:
-                print("Exception in load run time block.")
-                print("This is the exception : {}".format(e))
+            except Exception:
+                logger.exception(
+                    "Queue1 SupplyTime processing failed for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
 
         if "recovery" in msg_type:
             if "dailyConsumption" in msg_subtype:
@@ -1801,9 +1814,12 @@ def run_mqtt_client1():
                                     aisle_group_id
                                 )
                             )
-                except Exception as e:
-                    print("Exception in daily consumption recovery block.")
-                    print("This is the exception : {}".format(e))
+                except Exception:
+                    logger.exception(
+                        "Queue1 daily consumption recovery failed for site %s from gateway %s",
+                        location_id,
+                        gw_id,
+                    )
 
             elif "hourlyConsumption" in msg_subtype:
                 try:
@@ -1923,9 +1939,12 @@ def run_mqtt_client1():
                             print(
                                 "Hourly consumption and saving calculated and recovered."
                             )
-                except Exception as e:
-                    print("Exception in hourly consumption recovery block.")
-                    print("This is the exception : {}".format(e))
+                except Exception:
+                    logger.exception(
+                        "Queue1 hourly consumption recovery failed for site %s from gateway %s",
+                        location_id,
+                        gw_id,
+                    )
 
             elif "loadRuntime" in msg_subtype:
                 print("############### inside Load RUn time @@@@@@@@@@@@@@@@@@@")
@@ -1974,9 +1993,12 @@ def run_mqtt_client1():
                                     entry_datetime
                                 )
                             )
-                except Exception as e:
-                    print("Exception in load time recovery block.")
-                    print("This is the exception : {}".format(e))
+                except Exception:
+                    logger.exception(
+                        "Queue1 load time recovery failed for site %s from gateway %s",
+                        location_id,
+                        gw_id,
+                    )
             else:
                 print("#####################################################")
                 print("****** Received an unknown recovery message. ********")

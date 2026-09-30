@@ -189,6 +189,26 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         self.assertIn("Ignoring queue1 message for missing site 999999", logs.output[0])
 
+    def test_queue_one_logs_malformed_consumption_payloads(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        message = SimpleNamespace(
+            topic="/Acclivate/iOmniControl/156/gateway-01/in/consumption/state",
+            payload=b"payload",
+        )
+        with (
+            patch(
+                "wareApp.mqtt.consumers.Site.objects.get",
+                return_value=SimpleNamespace(site_name="Test site"),
+            ),
+            self.assertLogs("wareApp.mqtt.consumers", "ERROR") as logs,
+        ):
+            client.on_message(client, None, message)
+
+        self.assertIn("Queue1 consumption processing failed for site 156", logs.output[0])
+
 
 class FakeMqttClient:
     def __init__(self):
