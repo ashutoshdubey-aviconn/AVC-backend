@@ -1980,8 +1980,7 @@ def run_mqtt_client1():
                             load_runtime = 0
                         else:
                             load_runtime = int(recovery_load_runtime[i])
-                        if runtime_entry.exists():
-                            runtime_entry.update(hourly_run_time=load_runtime)
+                        if runtime_entry.update(hourly_run_time=load_runtime):
                             print("Load runtime updated for {}.".format(entry_datetime))
                         else:
                             print(
