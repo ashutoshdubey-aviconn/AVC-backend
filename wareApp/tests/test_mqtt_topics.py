@@ -1,6 +1,8 @@
 from django.test import SimpleTestCase
+from unittest.mock import patch
 
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
+from wareApp import tasks
 
 
 class GatewayTopicParserTests(SimpleTestCase):
@@ -42,3 +44,15 @@ class GatewayTopicParserTests(SimpleTestCase):
     def test_rejects_unknown_topic_root(self):
         with self.assertRaises(TopicParseError):
             parse_gateway_topic("/other/root/12/gateway-001/in/LoadData/current")
+
+    def test_queue_one_task_delegates_to_extracted_consumer(self):
+        with patch("wareApp.tasks.run_mqtt_client1", return_value="queue-one"):
+            result = tasks.mqtt_client1.run()
+
+        self.assertEqual(result, "queue-one")
+
+    def test_queue_two_task_delegates_to_extracted_consumer(self):
+        with patch("wareApp.tasks.run_mqtt_client2", return_value="queue-two"):
+            result = tasks.mqtt_client2.run()
+
+        self.assertEqual(result, "queue-two")
