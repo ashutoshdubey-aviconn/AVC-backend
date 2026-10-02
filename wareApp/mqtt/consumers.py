@@ -1218,6 +1218,13 @@ def run_mqtt_client1():
                     )
 
         elif "load" in msg_type:
+            from wareApp.tasks import process_load_message
+
+            process_load_message.apply_async(
+                args=(site.id, gw_id, message), queue="queue1_processing"
+            )
+            logger.info("Queued load message for site %s from gateway %s", location_id, gw_id)
+            return
             print("This message is for load parameters for site {}.".format(site))
             try:
                 load = message.split(",")
