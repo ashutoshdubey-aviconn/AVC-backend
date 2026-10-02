@@ -918,6 +918,15 @@ def run_mqtt_client1():
                 )
 
         elif "FIREALARM" in msg_type:
+            from wareApp.tasks import process_fire_alarm_message
+
+            process_fire_alarm_message.apply_async(
+                args=(site.id, gw_id, message), queue="queue1_processing"
+            )
+            logger.info(
+                "Queued FIREALARM for site %s from gateway %s", location_id, gw_id
+            )
+            return
             print("%%%%%%%%%")
             fire_alarm_data = message.split("'")[1].split(",")
             print("fire_alarm_data : ", fire_alarm_data)
