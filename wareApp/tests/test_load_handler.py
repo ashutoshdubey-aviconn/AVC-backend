@@ -98,8 +98,7 @@ class LoadHandlerTests(SimpleTestCase):
         }
         history = Mock()
         history.order_by.return_value = [
-            SimpleNamespace(r_phase=230, y_phase=230, b_phase=230)
-            for _ in range(7)
+            SimpleNamespace(r_phase=230, y_phase=230, b_phase=230) for _ in range(7)
         ]
         existing_alarms = Mock(exists=Mock(return_value=False))
 
@@ -131,6 +130,48 @@ class LoadHandlerTests(SimpleTestCase):
                 "site_id": 156,
             }
         )
+
+    def test_low_voltage_alarm_dedupes_existing_notification(self):
+        site = SimpleNamespace(
+            id=156,
+            r_phase_voltage_threshold_max=220,
+            y_phase_voltage_threshold_max=220,
+            b_phase_voltage_threshold_max=220,
+            r_phase_voltage_threshold_min=180,
+            y_phase_voltage_threshold_min=180,
+            b_phase_voltage_threshold_min=180,
+        )
+        values = {
+            "r_volt": 170.0,
+            "y_volt": 170.0,
+            "b_volt": 170.0,
+            "power_source": "1",
+            "meter_number": 2,
+        }
+        history = Mock()
+        history.order_by.return_value = [
+            SimpleNamespace(r_phase=170, y_phase=170, b_phase=170) for _ in range(7)
+        ]
+        existing_alarms = Mock(exists=Mock(return_value=True))
+
+        with patch(
+            "wareApp.mqtt.load.SiteLoadParameters.objects.create"
+        ) as create_parameter, patch(
+            "wareApp.mqtt.load.SiteLoadParameters.objects.filter",
+            return_value=history,
+        ), patch(
+            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
+            return_value=existing_alarms,
+        ), patch(
+            "wareApp.mqtt.load.NewAlarmsNotifications.objects.create"
+        ) as create_alarm, patch(
+            "wareApp.mqtt.load.send_alarm_for_low_voltage"
+        ) as notify:
+            load._record_voltage_alarm(site, values, parameter_type=1)
+
+        create_parameter.assert_called_once()
+        create_alarm.assert_not_called()
+        notify.assert_not_called()
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
