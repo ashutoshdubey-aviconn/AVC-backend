@@ -1866,6 +1866,17 @@ def run_mqtt_client1():
                     )
 
             elif "hourlyConsumption" in msg_subtype:
+                from wareApp.tasks import process_hourly_consumption_recovery_message
+
+                process_hourly_consumption_recovery_message.apply_async(
+                    args=(site.id, gw_id, message), queue="queue1_processing"
+                )
+                logger.info(
+                    "Queued hourlyConsumption recovery for site %s from gateway %s",
+                    location_id,
+                    gw_id,
+                )
+                return
                 try:
                     print(
                         "Starting recovery for hourly consumption for site {}.".format(

@@ -231,6 +231,31 @@ class GatewayTopicParserTests(SimpleTestCase):
             args=(156, "gateway-01", "b'payload'"), queue="queue1_processing"
         )
 
+    def test_queue_one_queues_hourly_consumption_recovery_for_processing(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        site = SimpleNamespace(id=156, site_name="Test site")
+        message = SimpleNamespace(
+            topic=(
+                "/Acclivate/iOmniControl/156/gateway-01/in/"
+                "recovery/hourlyConsumption"
+            ),
+            payload=b"payload",
+        )
+        with (
+            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
+            patch(
+                "wareApp.tasks.process_hourly_consumption_recovery_message.apply_async"
+            ) as enqueue,
+        ):
+            client.on_message(client, None, message)
+
+        enqueue.assert_called_once_with(
+            args=(156, "gateway-01", "b'payload'"), queue="queue1_processing"
+        )
+
     def test_queue_one_queues_load_runtime_recovery_for_processing(self):
         client = FakeMqttClient()
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
