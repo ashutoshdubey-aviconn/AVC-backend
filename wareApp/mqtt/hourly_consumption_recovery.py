@@ -4,7 +4,6 @@ from datetime import datetime
 
 from wareApp.models import AisleGroup, HourlySiteReading, SiteBaseline
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,8 +37,8 @@ def _hourly_baseline_for_day(location_id, aisle_group_id, observed_at):
 def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, message):
     """Persist recovered hourly consumption readings for one aisle group."""
     try:
-        aisle_group_id, recovery_hours, recovery_values = _parse_hourly_recovery_message(
-            message
+        aisle_group_id, recovery_hours, recovery_values = (
+            _parse_hourly_recovery_message(message)
         )
         aisle_group = AisleGroup.objects.filter(
             site=site, attached_leg_id=aisle_group_id

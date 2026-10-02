@@ -1223,7 +1223,9 @@ def run_mqtt_client1():
             process_load_message.apply_async(
                 args=(site.id, gw_id, message), queue="queue1_processing"
             )
-            logger.info("Queued load message for site %s from gateway %s", location_id, gw_id)
+            logger.info(
+                "Queued load message for site %s from gateway %s", location_id, gw_id
+            )
             return
             print("This message is for load parameters for site {}.".format(site))
             try:
