@@ -508,6 +508,15 @@ def run_mqtt_client1():
         print("Site Name : {}".format(site.site_name))
 
         if "consumption" in msg_type:
+            from wareApp.tasks import process_consumption_message
+
+            process_consumption_message.apply_async(
+                args=(site.id, gw_id, message), queue="queue1_processing"
+            )
+            logger.info(
+                "Queued consumption for site %s from gateway %s", location_id, gw_id
+            )
+            return
             try:
                 print("These are the values")
                 # Balance, Reading, Cost, Cummulative_units, Time, Site_cummulative, Room_id, rc= re.search(r'Bal :(.*), Reading :(.*), Cost :(.*), cumulative_units :(.*), Current_time :(.*)',

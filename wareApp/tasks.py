@@ -8,6 +8,7 @@ from wareApp.mqtt.consumers import run_mqtt_client1, run_mqtt_client2
 from wareApp.mqtt.daily_consumption_recovery import (
     handle_daily_consumption_recovery_message,
 )
+from wareApp.mqtt.consumption import handle_consumption_message
 from wareApp.mqtt.fire_alarm import handle_fire_alarm_message
 from wareApp.mqtt.hourly_consumption_recovery import (
     handle_hourly_consumption_recovery_message,
@@ -29,6 +30,10 @@ def mqtt_client2():
 
 
 def _publish_supply_time_recovery(topic, message):
+    mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
+
+
+def _publish_consumption_recovery(topic, message):
     mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
 
 
@@ -112,3 +117,24 @@ def process_fire_alarm_message(site_id, gateway_id, message):
         return
 
     handle_fire_alarm_message(site, site_id, gateway_id, message)
+
+
+@app.task(queue="queue1_processing")
+def process_consumption_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning(
+            "Ignoring queued consumption for missing site %s from gateway %s",
+            site_id,
+            gateway_id,
+        )
+        return
+
+    handle_consumption_message(
+        site,
+        site_id,
+        gateway_id,
+        message,
+        publish_recovery=_publish_consumption_recovery,
+    )
