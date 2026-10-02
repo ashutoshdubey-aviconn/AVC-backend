@@ -36,7 +36,7 @@ flowchart LR
     B --> Q2[queue2 Celery worker\nLoadData-only subscription]
 
     Q1 --> T1[Validate topic and site]
-    T1 --> C1[Consumption / FireAlarm / Load\nlegacy inline handlers]
+    T1 --> C1[Consumption / Load\nlegacy inline handlers]
     C1 --> DB1[(Operational tables)]
     T1 --> P1[queue1_processing]
     P1 --> S1[SupplyTime and recovery\nprocessing worker]
@@ -75,9 +75,9 @@ flowchart LR
 
 ## Full Optimization: Active Callback Offloads
 
-`SupplyTime`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` are moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places compact payloads on `queue1_processing`. The processing worker performs runtime and recovery database updates, monthly aggregation, and any recovery publish.
+`SupplyTime`, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` are moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places compact payloads on `queue1_processing`. The processing worker performs fire-pump, runtime, and recovery database updates, monthly aggregation, and any recovery publish.
 
-This creates a durable RabbitMQ handoff and keeps the Paho callback independent of runtime and recovery database latency. The active implementations are `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp/mqtt/daily_consumption_recovery.py`, `wareApp/mqtt/hourly_consumption_recovery.py`, `wareApp.tasks.process_supply_time_message`, `wareApp.tasks.process_load_runtime_recovery_message`, `wareApp.tasks.process_daily_consumption_recovery_message`, and `wareApp.tasks.process_hourly_consumption_recovery_message`.
+This creates a durable RabbitMQ handoff and keeps the Paho callback independent of fire-pump, runtime, and recovery database latency. The active implementations are `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/fire_alarm.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp/mqtt/daily_consumption_recovery.py`, `wareApp/mqtt/hourly_consumption_recovery.py`, `wareApp.tasks.process_supply_time_message`, `wareApp.tasks.process_fire_alarm_message`, `wareApp.tasks.process_load_runtime_recovery_message`, `wareApp.tasks.process_daily_consumption_recovery_message`, and `wareApp.tasks.process_hourly_consumption_recovery_message`.
 
 ## Logging Contract
 
@@ -123,7 +123,7 @@ The SupplyTime handoff also requires a separate worker:
 celery -A warehouse worker --queues=queue1_processing --concurrency=1 --loglevel=INFO
 ```
 
-Live validation confirmed that queue-1 enqueued malformed SupplyTime, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` packets, and the processing worker isolated all four parse failures without database writes.
+Live validation confirmed that queue-1 enqueued malformed SupplyTime, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` packets, and the processing worker isolated all five parse failures without database writes.
 
 ## Deliberate Boundary
 
