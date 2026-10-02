@@ -36,10 +36,8 @@ flowchart LR
     B --> Q2[queue2 Celery worker\nLoadData-only subscription]
 
     Q1 --> T1[Validate topic and site]
-    T1 --> C1[Load\nlegacy inline handler]
-    C1 --> DB1[(Operational tables)]
     T1 --> P1[queue1_processing]
-    P1 --> S1[SupplyTime and recovery\nprocessing worker]
+    P1 --> S1[Business message\nprocessing worker]
     S1 --> DB1
 
     Q2 --> T2[Validate topic and site]
@@ -75,9 +73,9 @@ flowchart LR
 
 ## Full Optimization: Active Callback Offloads
 
-`consumption`, `SupplyTime`, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` are moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places compact payloads on `queue1_processing`. The processing worker performs consumption, fire-pump, runtime, and recovery database updates, monthly aggregation, and any recovery publish.
+`consumption`, `load`, `SupplyTime`, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` are moved out of the MQTT callback. The queue-1 subscriber now validates the topic and site, then places compact payloads on `queue1_processing`. The processing worker performs consumption, load, fire-pump, runtime, and recovery database updates, monthly aggregation, and any recovery publish.
 
-This creates a durable RabbitMQ handoff and keeps the Paho callback independent of consumption, fire-pump, runtime, and recovery database latency. The active implementations are `wareApp/mqtt/consumption.py`, `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/fire_alarm.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp/mqtt/daily_consumption_recovery.py`, `wareApp/mqtt/hourly_consumption_recovery.py`, `wareApp.tasks.process_consumption_message`, `wareApp.tasks.process_supply_time_message`, `wareApp.tasks.process_fire_alarm_message`, `wareApp.tasks.process_load_runtime_recovery_message`, `wareApp.tasks.process_daily_consumption_recovery_message`, and `wareApp.tasks.process_hourly_consumption_recovery_message`.
+This creates a durable RabbitMQ handoff and keeps the Paho callback independent of business database, notification, and recovery-publish latency. The active implementations are `wareApp/mqtt/consumption.py`, `wareApp/mqtt/load.py`, `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/fire_alarm.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp/mqtt/daily_consumption_recovery.py`, `wareApp/mqtt/hourly_consumption_recovery.py`, `wareApp.tasks.process_consumption_message`, `wareApp.tasks.process_load_message`, `wareApp.tasks.process_supply_time_message`, `wareApp.tasks.process_fire_alarm_message`, `wareApp.tasks.process_load_runtime_recovery_message`, `wareApp.tasks.process_daily_consumption_recovery_message`, and `wareApp.tasks.process_hourly_consumption_recovery_message`.
 
 ## Logging Contract
 
@@ -123,8 +121,8 @@ The SupplyTime handoff also requires a separate worker:
 celery -A warehouse worker --queues=queue1_processing --concurrency=1 --loglevel=INFO
 ```
 
-Live validation confirmed that queue-1 enqueued malformed `consumption`, SupplyTime, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` packets, and the processing worker isolated all six parse failures without database writes.
+Live validation confirmed that queue-1 enqueued malformed `consumption`, `load`, SupplyTime, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` packets, and the processing worker isolated all seven parse failures without database writes.
 
 ## Deliberate Boundary
 
-The queue-1 business branches remain legacy code because they can create alarms, send email, publish recovery commands, and modify operational records. Further work should begin with branch-specific integration tests and production query timing, rather than broad refactoring.
+The legacy callback bodies remain below the active handoff returns as rollback references. Further work should focus on branch-specific integration tests and production query timing before deleting those inactive bodies.
