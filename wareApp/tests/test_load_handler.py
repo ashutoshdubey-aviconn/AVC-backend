@@ -47,9 +47,9 @@ class LoadHandlerTests(SimpleTestCase):
         entries = Mock(first=Mock(return_value=None))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
-        ), patch(
-            "wareApp.mqtt.load.SiteLoadPower.objects.create"
-        ), patch("wareApp.mqtt.load._record_power_factor_alarm") as record_pf:
+        ), patch("wareApp.mqtt.load.SiteLoadPower.objects.create"), patch(
+            "wareApp.mqtt.load._record_power_factor_alarm"
+        ) as record_pf:
             load.handle_load_message(site, 156, "gateway-01", self.message)
 
         record_pf.assert_not_called()
@@ -69,9 +69,7 @@ class LoadHandlerTests(SimpleTestCase):
         }
         existing_alarms = Mock(exists=Mock(return_value=True))
 
-        with patch(
-            "wareApp.mqtt.load.PowerFactorData.objects.create"
-        ) as create, patch(
+        with patch("wareApp.mqtt.load.PowerFactorData.objects.create") as create, patch(
             "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
             return_value=existing_alarms,
         ):
@@ -80,6 +78,59 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(create.call_args.kwargs["r_phase_pf"], 0.8)
         self.assertEqual(create.call_args.kwargs["y_phase_pf"], 0.0)
         self.assertEqual(create.call_args.kwargs["b_phase_pf"], 0.0)
+
+    def test_high_voltage_alarm_requires_sustained_readings_and_notifies(self):
+        site = SimpleNamespace(
+            id=156,
+            r_phase_voltage_threshold_max=220,
+            y_phase_voltage_threshold_max=220,
+            b_phase_voltage_threshold_max=220,
+            r_phase_voltage_threshold_min=180,
+            y_phase_voltage_threshold_min=180,
+            b_phase_voltage_threshold_min=180,
+        )
+        values = {
+            "r_volt": 230.0,
+            "y_volt": 230.0,
+            "b_volt": 230.0,
+            "power_source": "1",
+            "meter_number": 2,
+        }
+        history = Mock()
+        history.order_by.return_value = [
+            SimpleNamespace(r_phase=230, y_phase=230, b_phase=230)
+            for _ in range(7)
+        ]
+        existing_alarms = Mock(exists=Mock(return_value=False))
+
+        with patch(
+            "wareApp.mqtt.load.SiteLoadParameters.objects.create"
+        ) as create_parameter, patch(
+            "wareApp.mqtt.load.SiteLoadParameters.objects.filter",
+            return_value=history,
+        ), patch(
+            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
+            return_value=existing_alarms,
+        ), patch(
+            "wareApp.mqtt.load.NewAlarmsNotifications.objects.create"
+        ) as create_alarm, patch(
+            "wareApp.mqtt.load.send_alarm_for_high_voltage"
+        ) as notify:
+            load._record_voltage_alarm(site, values, parameter_type=0)
+
+        create_parameter.assert_called_once()
+        create_alarm.assert_called_once()
+        notify.assert_called_once_with(
+            {
+                "r_volts": 230.0,
+                "y_volts": 230.0,
+                "b_volts": 230.0,
+                "r_volt_threshold": 220,
+                "y_volt_threshold": 220,
+                "b_volt_threshold": 220,
+                "site_id": 156,
+            }
+        )
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
