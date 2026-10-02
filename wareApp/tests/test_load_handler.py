@@ -54,6 +54,33 @@ class LoadHandlerTests(SimpleTestCase):
 
         record_pf.assert_not_called()
 
+    def test_power_factor_record_uses_zero_for_non_violating_phases(self):
+        site = SimpleNamespace(
+            is_pf_visible=True,
+            r_phase_pf_threshold=0.9,
+            y_phase_pf_threshold=0.9,
+            b_phase_pf_threshold=0.9,
+        )
+        values = {
+            "power_factors": (0.8, 0.95, 0.95),
+            "status": "ON",
+            "power_source": "1",
+            "meter_number": 2,
+        }
+        existing_alarms = Mock(exists=Mock(return_value=True))
+
+        with patch(
+            "wareApp.mqtt.load.PowerFactorData.objects.create"
+        ) as create, patch(
+            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
+            return_value=existing_alarms,
+        ):
+            load._record_power_factor_alarm(site, values)
+
+        self.assertEqual(create.call_args.kwargs["r_phase_pf"], 0.8)
+        self.assertEqual(create.call_args.kwargs["y_phase_pf"], 0.0)
+        self.assertEqual(create.call_args.kwargs["b_phase_pf"], 0.0)
+
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
         with patch("wareApp.tasks.Site.objects.get", return_value=site), patch(

@@ -151,9 +151,9 @@ def _record_power_factor_alarm(site, values):
         site=site,
         supply_source=values["power_source"],
         meter_number=values["meter_number"],
-        r_phase_pf=factors[0] if factors[0] < thresholds[0] else None,
-        y_phase_pf=factors[1] if factors[1] < thresholds[1] else None,
-        b_phase_pf=factors[2] if factors[2] < thresholds[2] else None,
+        r_phase_pf=factors[0] if factors[0] < thresholds[0] else 0.0,
+        y_phase_pf=factors[1] if factors[1] < thresholds[1] else 0.0,
+        b_phase_pf=factors[2] if factors[2] < thresholds[2] else 0.0,
         created=datetime.now(),
     )
     if NewAlarmsNotifications.objects.filter(
