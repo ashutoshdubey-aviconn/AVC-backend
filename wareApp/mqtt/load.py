@@ -44,15 +44,21 @@ def _voltage_alarm_data(site, values, maximum):
         "r_volts": round(values["r_volt"], 2),
         "y_volts": round(values["y_volt"], 2),
         "b_volts": round(values["b_volt"], 2),
-        "r_volt_threshold": site.r_phase_voltage_threshold_max
-        if maximum
-        else site.r_phase_voltage_threshold_min,
-        "y_volt_threshold": site.y_phase_voltage_threshold_max
-        if maximum
-        else site.y_phase_voltage_threshold_min,
-        "b_volt_threshold": site.b_phase_voltage_threshold_max
-        if maximum
-        else site.b_phase_voltage_threshold_min,
+        "r_volt_threshold": (
+            site.r_phase_voltage_threshold_max
+            if maximum
+            else site.r_phase_voltage_threshold_min
+        ),
+        "y_volt_threshold": (
+            site.y_phase_voltage_threshold_max
+            if maximum
+            else site.y_phase_voltage_threshold_min
+        ),
+        "b_volt_threshold": (
+            site.b_phase_voltage_threshold_max
+            if maximum
+            else site.b_phase_voltage_threshold_min
+        ),
         "site_id": site.id,
     }
 
@@ -73,15 +79,22 @@ def _record_voltage_alarm(site, values, parameter_type):
             site_id=site,
             power_source=values["power_source"],
             parameter_type=parameter_type,
-        )
-        .order_by("-created")[:7]
+        ).order_by("-created")[:7]
     )
     if len(recent) <= 6:
         return
     thresholds = (
-        (site.r_phase_voltage_threshold_max, site.y_phase_voltage_threshold_max, site.b_phase_voltage_threshold_max)
+        (
+            site.r_phase_voltage_threshold_max,
+            site.y_phase_voltage_threshold_max,
+            site.b_phase_voltage_threshold_max,
+        )
         if parameter_type == 0
-        else (site.r_phase_voltage_threshold_min, site.y_phase_voltage_threshold_min, site.b_phase_voltage_threshold_min)
+        else (
+            site.r_phase_voltage_threshold_min,
+            site.y_phase_voltage_threshold_min,
+            site.b_phase_voltage_threshold_min,
+        )
     )
     if parameter_type == 0:
         violated = all(
@@ -189,7 +202,6 @@ def handle_load_message(site, location_id, gateway_id, message):
         ):
             _record_voltage_alarm(site, values, parameter_type=0)
             _record_voltage_alarm(site, values, parameter_type=1)
-        _record_power_factor_alarm(site, values)
 
         update_values = {
             "Associated_Site": site,
@@ -204,6 +216,7 @@ def handle_load_message(site, location_id, gateway_id, message):
             "Updated_on": datetime.now(),
         }
         if record:
+            _record_power_factor_alarm(site, values)
             factors = values.get("power_factors", (0.0, 0.0, 0.0))
             entries.update(
                 **update_values,

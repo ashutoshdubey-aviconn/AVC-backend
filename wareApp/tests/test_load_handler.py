@@ -42,6 +42,18 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(entries.update.call_args.kwargs["Site_Total_Load"], 14.0)
         self.assertEqual(entries.update.call_args.kwargs["Status"], "ON")
 
+    def test_does_not_evaluate_power_factor_for_first_load_record(self):
+        site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=True)
+        entries = Mock(first=Mock(return_value=None))
+        with patch(
+            "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
+        ), patch(
+            "wareApp.mqtt.load.SiteLoadPower.objects.create"
+        ), patch("wareApp.mqtt.load._record_power_factor_alarm") as record_pf:
+            load.handle_load_message(site, 156, "gateway-01", self.message)
+
+        record_pf.assert_not_called()
+
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
         with patch("wareApp.tasks.Site.objects.get", return_value=site), patch(
