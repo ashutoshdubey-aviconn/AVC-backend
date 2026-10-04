@@ -16,7 +16,6 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from wareApp.tasks import mqtt_client1, mqtt_client2
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -29,6 +28,3 @@ urlpatterns = [
 admin.site.site_header = "Aviconn Admin"
 admin.site.site_title = "Aviconn Admin Portal"
 admin.site.index_title = "Welcome to Aviconn Portal"
-
-# qtt_client1.apply_async(queue="queue1")
-# qtt_client2.apply_async(queue="queue2")

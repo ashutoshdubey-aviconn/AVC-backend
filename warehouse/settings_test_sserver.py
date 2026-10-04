@@ -28,22 +28,21 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 if env == "PROD":
     DEBUG = False
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
 else:
     DEBUG = True
-    SECURE_SSL_REDIRECT = False
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
-
 
 # ALLOWED_HOSTS = config('ALLOWED_HOSTS',["*"])
 ALLOWED_HOSTS = [
+    "asem.aviconncorp.com",
+    "www.asem.aviconncorp.com",
+    "13.235.168.74",
+    "43.204.53.81",
     "*",
 ]
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
 
+PREPEND_WWW = False
+APPEND_SLASH = False  # or match the exact path your backend url defines
 
 # Application definition
 
@@ -61,11 +60,13 @@ INSTALLED_APPS = [
     "django_extensions",
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True  # Or add 'http://43.204.53.81' to CORS_ALLOWED_ORIGINS
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # CORS middleware early
+    "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",  # Add this line
@@ -95,17 +96,17 @@ SETTINGS_PATH = os.path.normpath(os.path.dirname(__file__))
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
-DATABASE_ROUTERS = ["wareApp.routers.SecondaryDBRouter"]
-if env in {"Local", "PROD"}:
+
+if env == "PROD":
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": config("DB_HOSTNAME"),
-            "USER": config("DB_USERNAME"),
-            "PASSWORD": config("DB_PASSWORD"),
-            "HOST": config("DB_HOST"),
-            "PORT": config("DB_PORT"),
-            "CONN_MAX_AGE": 60,
+            "ENGINE": "django.db.backends.postgresql_psycopg2",
+            "NAME": "warehouse",
+            "USER": "aviconn",
+            "PASSWORD": "1V3asem2025",
+            "HOST": "localhost",
+            "PORT": "5432",
+            "CONN_MAX_AGE": 80,
         },
         "main": {
             "ENGINE": "django.db.backends.postgresql",
@@ -115,14 +116,6 @@ if env in {"Local", "PROD"}:
             "HOST": "172.31.9.28",
             "PORT": "5432",
         },
-        # "secondary": {
-        #     "ENGINE": "django.db.backends.postgresql_psycopg2",
-        #     "NAME": "warehouse",
-        #     "USER": "aviconn",
-        #     "PASSWORD": "1V3asem2025",
-        #     "HOST": "43.204.53.81",
-        #     "PORT": "5432",
-        # },
     }
 else:
     DATABASES = {
@@ -191,8 +184,6 @@ EMAIL_BACKEND = config("EMAIL_BACKEND", "")
 # CELERY_ACCEPT_CONTENT = ['application/json']
 # CELERY_TASK_SERIALIZER = 'json'
 # CELERY_RESULT_SERIALIZER = 'json'
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://guest@localhost//")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "rpc://")
 CELERY_TIMEZONE = TIME_ZONE
 # CELERYBEAT_SCHEDULER='djcelery'
 
@@ -246,22 +237,6 @@ LOGGING = {
             "filename": f"{LOG_FILE}/debug.log",
             "formatter": "verbose",
         },
-        "recovery_file": {
-            "level": "INFO",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{LOG_FILE}/recovery.log",
-            "formatter": "verbose",
-            "maxBytes": 5 * 1024 * 1024,
-            "backupCount": 5,
-        },
-        "dg_fuel_file": {
-            "level": "INFO",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{LOG_FILE}/dg_fuel.log",
-            "formatter": "verbose",
-            "maxBytes": 5 * 1024 * 1024,
-            "backupCount": 10,
-        },
     },
     "loggers": {
         "django": {
@@ -273,45 +248,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
-        "wareApp.recovery": {
-            "handlers": ["recovery_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "wareApp.dg_fuel": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "wareApp.fuel_providers": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "wareApp.dg_fuel.ingestion": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "wareApp.dg_fuel.sessions": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "fetch_fuel_data": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
     },
 }
 
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": "redis://127.0.0.1:6379/1",
-#         "OPTIONS": {
-#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#         },
-#     }
-# }
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}

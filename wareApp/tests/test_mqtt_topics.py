@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
@@ -20,6 +20,9 @@ from wareApp import tasks
 
 
 class GatewayTopicParserTests(SimpleTestCase):
+    def setUp(self):
+        tasks._queue_two_mqtt_start_dispatched = False
+
     def test_parses_gateway_inbound_topic(self):
         parsed = parse_gateway_topic(
             "/Acclivate/iOmniControl/12/gateway-001/in/LoadData/current"
@@ -70,6 +73,59 @@ class GatewayTopicParserTests(SimpleTestCase):
             result = tasks.mqtt_client2.run()
 
         self.assertEqual(result, "queue-two")
+
+    def test_queue_two_worker_starts_load_data_mqtt_task(self):
+        sender = SimpleNamespace(hostname="worker.queue2@test-server")
+        inspector = Mock()
+        inspector.active.return_value = {}
+        inspector.reserved.return_value = {}
+
+        with (
+            patch("wareApp.tasks.app.control.inspect", return_value=inspector),
+            patch("wareApp.tasks.app.send_task") as send_task,
+        ):
+            tasks.start_queue_two_mqtt_client(sender)
+
+        send_task.assert_called_once_with("wareApp.tasks.mqtt_client2", queue="queue2")
+
+    def test_queue_two_worker_does_not_restart_active_load_data_task(self):
+        sender = SimpleNamespace(hostname="worker.queue2@test-server")
+        inspector = Mock()
+        inspector.active.return_value = {
+            "worker.queue2@test-server": [{"name": "wareApp.tasks.mqtt_client2"}]
+        }
+        inspector.reserved.return_value = {}
+
+        with (
+            patch("wareApp.tasks.app.control.inspect", return_value=inspector),
+            patch("wareApp.tasks.app.send_task") as send_task,
+        ):
+            tasks.start_queue_two_mqtt_client(sender)
+
+        send_task.assert_not_called()
+
+    def test_queue_two_worker_starts_load_data_mqtt_task_once(self):
+        sender = SimpleNamespace(hostname="worker.queue2@test-server")
+        inspector = Mock()
+        inspector.active.return_value = {}
+        inspector.reserved.return_value = {}
+
+        with (
+            patch("wareApp.tasks.app.control.inspect", return_value=inspector),
+            patch("wareApp.tasks.app.send_task") as send_task,
+        ):
+            tasks.start_queue_two_mqtt_client(sender)
+            tasks.start_queue_two_mqtt_client(sender)
+
+        send_task.assert_called_once_with("wareApp.tasks.mqtt_client2", queue="queue2")
+
+    def test_non_queue_two_worker_does_not_start_load_data_mqtt_task(self):
+        sender = SimpleNamespace(hostname="worker.queue1@test-server")
+
+        with patch("wareApp.tasks.app.send_task") as send_task:
+            tasks.start_queue_two_mqtt_client(sender)
+
+        send_task.assert_not_called()
 
     def test_real_queue_one_topic_routes_only_to_queue_one(self):
         topic = (

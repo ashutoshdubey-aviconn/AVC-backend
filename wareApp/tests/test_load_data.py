@@ -124,6 +124,36 @@ class LoadDataTests(SimpleTestCase):
         filter_monthly.return_value.update.assert_not_called()
         filter_load.assert_not_called()
 
+    def test_monthly_update_uses_calendar_month_bounds(self):
+        site = SimpleNamespace(id=156)
+        aisle_group = SimpleNamespace(aisleGroupName="Mains-Supply")
+        reading = LoadReading(
+            load_value=50.0,
+            leg_id="967",
+            meter_number="1",
+            created=datetime(2026, 10, 1, 2, 15),
+            epoch_time="1790801110167",
+        )
+
+        with (
+            patch("wareApp.load_data.monthly.datetime") as current_datetime,
+            patch(
+                "wareApp.load_data.monthly.MonthlyMinMaxLoadData.objects.filter"
+            ) as filter_monthly,
+        ):
+            current_datetime.now.return_value = datetime(2026, 10, 4, 6, 35)
+            filter_monthly.return_value.first.return_value = SimpleNamespace(
+                min_load=10.0, max_load=100.0
+            )
+            monthly.update_monthly_min_max_load(site, aisle_group, reading)
+
+        filter_monthly.assert_called_once_with(
+            site=site,
+            supply_source="Mains-Supply",
+            created__gte=datetime(2026, 10, 1),
+            created__lt=datetime(2026, 11, 1),
+        )
+
     def test_rollup_batches_minimum_and_maximum_records(self):
         class FakeModel:
             objects = SimpleNamespace(bulk_create=Mock())
@@ -288,17 +318,25 @@ class LoadDataTests(SimpleTestCase):
             ]
         )
         existing_hourly = QuerySet(
-            [SimpleNamespace(aisle_group_id=7, created=bucket_start + timedelta(seconds=5))]
+            [
+                SimpleNamespace(
+                    aisle_group_id=7, created=bucket_start + timedelta(seconds=5)
+                )
+            ]
         )
 
         with (
-            patch.object(rollups.RawLoadData.objects, "filter", return_value=raw_readings),
+            patch.object(
+                rollups.RawLoadData.objects, "filter", return_value=raw_readings
+            ),
             patch.object(
                 rollups.HourlyLoadData.objects,
                 "filter",
                 side_effect=[existing_hourly, QuerySet()],
             ),
-            patch.object(rollups.DailyLoadData.objects, "filter", return_value=QuerySet()),
+            patch.object(
+                rollups.DailyLoadData.objects, "filter", return_value=QuerySet()
+            ),
             patch("wareApp.load_data.rollups._save_extrema") as save_extrema,
         ):
             rollups.roll_up_completed_load_data(site, datetime(2026, 9, 30, 12, 5))

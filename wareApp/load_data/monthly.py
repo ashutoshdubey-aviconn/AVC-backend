@@ -12,11 +12,18 @@ def update_monthly_min_max_load(site, aisle_group, reading: LoadReading):
     power_source = aisle_group.aisleGroupName
     try:
         today_date = datetime.now()
+        month_start = today_date.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        if month_start.month == 12:
+            next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+        else:
+            next_month_start = month_start.replace(month=month_start.month + 1)
         monthly_min_max_load = MonthlyMinMaxLoadData.objects.filter(
             site=site,
             supply_source=power_source,
-            created__year=today_date.year,
-            created__month=today_date.month,
+            created__gte=month_start,
+            created__lt=next_month_start,
         )
         monthly_load = monthly_min_max_load.first()
         if monthly_load:

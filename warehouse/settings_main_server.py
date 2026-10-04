@@ -62,8 +62,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # CORS middleware early
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # CORS middleware early
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -96,7 +96,7 @@ SETTINGS_PATH = os.path.normpath(os.path.dirname(__file__))
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 DATABASE_ROUTERS = ["wareApp.routers.SecondaryDBRouter"]
-if env in {"Local", "PROD"}:
+if env == "Local":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -106,15 +106,7 @@ if env in {"Local", "PROD"}:
             "HOST": config("DB_HOST"),
             "PORT": config("DB_PORT"),
             "CONN_MAX_AGE": 60,
-        },
-        "main": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": "warehouse",
-            "USER": "aviconn",
-            "PASSWORD": "1V3asem2025",
-            "HOST": "172.31.9.28",
-            "PORT": "5432",
-        },
+        }
         # "secondary": {
         #     "ENGINE": "django.db.backends.postgresql_psycopg2",
         #     "NAME": "warehouse",
@@ -197,10 +189,10 @@ CELERY_TIMEZONE = TIME_ZONE
 # CELERYBEAT_SCHEDULER='djcelery'
 
 # SECURE_PROXY_SSL_HEADER         = None
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-SECURE_BROWSER_XSS_FILTER = True
-CSRF_COOKIE_SECURE = False
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# SECURE_BROWSER_XSS_FILTER = True
+# CSRF_COOKIE_SECURE = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 # SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -315,3 +307,8 @@ LOGGING = {
 #         },
 #     }
 # }
+
+
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
