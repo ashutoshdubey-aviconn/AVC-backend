@@ -1,5 +1,6 @@
 import paho.mqtt.client as mqtt
 import re
+import requests
 import math
 from celery import Celery
 from wareApp.models import *
@@ -10,12 +11,142 @@ from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
 from wareApp.sendmail import *
 
-import collections
-
-_SEEN_EPOCHS_DEQUE = collections.deque(maxlen=10000)
-_SEEN_EPOCHS_SET = set()
-
 app = Celery("warehouse", broker="amqp://guest@localhost//")
+
+
+def roadcasteAPI(start_time, end_time):
+    start_dt_object, end_dt_object = datetime.fromtimestamp(
+        start_time
+    ), datetime.fromtimestamp(end_time)
+    start_time, end_time = (
+        start_dt_object.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        end_dt_object.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+    )
+
+    url = f"https://api-track-py.roadcast.co.in/api/v1/auth/reports/fuel?start={start_time}&end={end_time}&timezone_offset=-330&variation=0&driver_ids=281311&selected_date={end_time}&device_ids=281311&selectedUserId=78446"
+
+    payload = {}
+    headers = {
+        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MjczMzE2MjIsIm5iZiI6MTcyNzMzMTYyMiwianRpIjoiZGMwODI2YzUtYjA3NS00MDg2LWIyNjUtZGM5ZDI3NWEzYjE4IiwiZXhwIjoxNzI3NTkwODIyLCJpZGVudGl0eSI6eyJpZCI6Nzg0NDYsImRiIjowLCJjbyI6MSwibmFtZSI6IkF2aWNvbm4iLCJ0eXBlIjoiYWRtaW4iLCJyZWFkX29ubHkiOjAsInR6IjotMzMwLCJ0el9zIjoiQXNpYS9Lb2xrYXRhIiwic3NvIjowLCJkZXZpY2UiOiJ3ZWIiLCJhbGlhcyI6IiJ9LCJmcmVzaCI6ZmFsc2UsInR5cGUiOiJhY2Nlc3MifQ.Fwn08jciwxlm659ZYEfq1LpQBAf2fddUZ9zrjmrzcmU"
+    }
+    try:
+        response = requests.request("GET", url, headers=headers, data=payload)
+        if response["data"]:
+            return response["data"][0]["consumed_fuel"]
+    except:
+        return None
+
+
+def roadcasteAPIUpdated(vehical, start_date, end_date):
+    url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
+    header = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    from_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+    end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
+    parms = {"device_imei": vehical, "from_time": from_date, "to_time": end_date}
+    print(parms)
+    d = requests.get(url, params=parms, headers=header)
+    res = d.json()
+    try:
+        return res["fuel_consumed"]
+    except:
+        print(res)
+        return 0
+
+
+def get_loconav_fuel_data(vehicle_number, dg_start_date, dg_end_date):
+    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+    fetch_fuel = requests.get(
+        f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}",
+        headers=headers,
+    ).json()
+    fuel = 0
+    if "data" in fetch_fuel:
+        fetch_fuel = fetch_fuel["data"]
+        if "fuel_consumption" in fetch_fuel:
+            fuel = fetch_fuel["fuel_consumption"]["value"]
+    return fuel
+
+
+def DG_fuel_for_Roadcaste(site_id, aisle_group, new_unit_consumption, entry_time):
+    print("for site 124")
+    site = Site.objects.get(id=site_id)
+    dg_unit = DgUnitConsumption.objects.filter(
+        site=int(site_id), aisle_group=aisle_group[0]
+    )
+    if dg_unit.exists():
+        print("DgUnitConsumption entries are present for aisle : ", aisle_group[0])
+        last_entry = dg_unit.last()
+        check_dg_status = last_entry.is_dg_on
+        if check_dg_status and aisle_group[0].power_source not in [0, 2]:
+            print("DG of site 124 is already running")
+            epoch_time = int(entry_time.timestamp() * 1000)
+            last_entry.unit_consumption = (
+                last_entry.unit_consumption + new_unit_consumption
+            )
+            last_entry.epoch_time = epoch_time
+            last_entry.dg_end_date = entry_time
+            last_entry.save()
+        elif aisle_group[0].power_source not in [0, 2] and new_unit_consumption > 0:
+            print("DG is Still Running on Site 124")
+            if last_entry.fetch_fuel_data:
+                last_record = (
+                    DgUnitConsumption.objects.filter(
+                        site=int(site_id), aisle_group=aisle_group[0], is_dg_on=False
+                    )
+                    .order_by("-created")
+                    .first()
+                )
+                dg_start_date = int(last_record.dg_start_date.timestamp())
+                dg_end_date = int(last_record.dg_end_date.timestamp())
+                epoch_time = int(entry_time.timestamp() * 1000)
+                fetch_fuel = roadcasteAPIUpdated(
+                    site.partner_dg_fuel_id, last_record.dg_start_date.date
+                )
+                if fetch_fuel:
+                    last_record.dg_fuel_consumption = fetch_fuel
+                    last_record.save()
+            DgUnitConsumption.objects.create(
+                site=site,
+                aisle_group=aisle_group[0],
+                unit_consumption=new_unit_consumption,
+                created=entry_time,
+                epoch_time=epoch_time,
+                dg_start_date=entry_time,
+                dg_end_date=entry_time,
+                is_dg_on=True,
+            )
+        elif aisle_group[0].power_source in [0, 2] and new_unit_consumption > 0:
+            print("turning Off the DG for Site 124")
+            print(
+                "power source: ",
+                aisle_group[0].power_source,
+                " consumption : ",
+                new_unit_consumption,
+            )
+            print(
+                "power source is currently running is mains supply , making dg last entry off"
+            )
+            last_entry.is_dg_on = False
+            last_entry.save()
+            last_record = (
+                DgUnitConsumption.objects.filter(
+                    site=int(site_id), aisle_group=aisle_group[0], is_dg_on=False
+                )
+                .order_by("-created")
+                .first()
+            )
+            dg_start_date = int(last_record.dg_start_date.timestamp())
+            dg_end_date = int(last_record.dg_end_date.timestamp())
+            fetch_fuel = roadcasteAPIUpdated(
+                site.partner_dg_fuel_id, last_record.dg_start_date.date
+            )
+            print("fetched fuel data : ", fetch_fuel)
+            if fetch_fuel:
+                last_record.dg_fuel_consumption = fetch_fuel
+                last_record.save()
+            else:
+                last_record.fetch_fuel_data = True
+                last_record.save()
 
 
 @app.task(queue="queue1")
@@ -496,8 +627,6 @@ def mqtt_client1():
                 gw_total_cumulative = str(data[7])
                 pervious_hour_total_consumption = str(data[8])
                 gw_total_cumulative_units = float(gw_total_cumulative.split(":")[1])
-                leg_name = str(leg_Meter_Reading.split("_")[0])
-                # meter_reading= float()***************************
                 current_hour_gw_unit_consumption = float(
                     current_hour_total_consumption.split(":")[1]
                 )
@@ -507,6 +636,19 @@ def mqtt_client1():
                 consuption_time_in_sec = float((consumption_time.split(":"))[1])
                 new_unit_consumption = float((consumption.split(":"))[1])
                 aisle_group_id = int((aisle_group.split(":"))[1])
+
+                if site.site_type == 2:
+                    if new_unit_consumption > 10000:
+                        print(
+                            "Unit consumption for WH_Energy_Saving site exceeded 10000 ({}), setting to 0.".format(
+                                new_unit_consumption
+                            )
+                        )
+                        new_unit_consumption = 0.0
+                    if current_hour_gw_unit_consumption > 10000:
+                        current_hour_gw_unit_consumption = 0.0
+                    if previous_hour_gw_unit_consumption > 10000:
+                        previous_hour_gw_unit_consumption = 0.0
                 message_time = (time.split(":"))[1].split(" ")
                 print("Message hour :", message_time[1])
                 print(
@@ -542,6 +684,293 @@ def mqtt_client1():
                 aisle_group = AisleGroup.objects.filter(
                     site=site, attached_leg_id=str(aisle_group_id)
                 )
+                # DgUnitConsumption logic starts here only for wh metering
+
+                if site.site_type == 1 and site.dg_fuel_system_installed:
+                    try:
+                        print("message time : ", message_time)
+                        msg_time = time.split(":")[1:]
+                        msg_time = ":".join(msg_time)
+                        print("msg time: ", msg_time)
+                        try:
+                            entry_time = datetime.strptime(
+                                msg_time, "%Y-%m-%d %H:%M:%S.%f"
+                            )
+                        except:
+                            entry_time = datetime.strptime(
+                                msg_time, "%Y-%m-%d %H:%M:%S"
+                            )
+                        print("entry time: ", entry_time)
+                        # Changing hard date code , we are not creating date here
+                        # hard_code_date = datetime.now().replace(year=2026,month=3, day=17)
+                        dg_unit = DgUnitConsumption.objects.filter(
+                            site=int(location_id), aisle_group=aisle_group[0]
+                        ).order_by("-created")
+                        if dg_unit.exists():
+                            print(
+                                "DgUnitConsumption entries are present for aisle : ",
+                                aisle_group_id,
+                            )
+                            last_entry = dg_unit.last()
+                            check_dg_status = last_entry.is_dg_on
+                            # if(location_id in [124, 118, 140, 153, 156]):
+                            #     try:
+                            #         print("inside site 124")
+                            #         DG_fuel_for_Roadcaste(location_id , aisle_group, new_unit_consumption, entry_time)
+                            #     except:
+                            #         print("there's a problem in the API")
+
+                            if check_dg_status and aisle_group[0].power_source != 0:
+                                # entry_time = datetime.strptime(msg_time, "%Y-%m-%d %H:%M:%S.%f")
+                                epoch_time = int(entry_time.timestamp() * 1000)
+                                print(
+                                    "dg is running continously from last entry, updating last entry"
+                                )
+                                last_entry.unit_consumption = (
+                                    last_entry.unit_consumption + new_unit_consumption
+                                )
+                                last_entry.epoch_time = epoch_time
+                                last_entry.dg_end_date = entry_time
+                                last_entry.save()
+                                try:
+                                    print("check for dg overtime run")
+                                    if (
+                                        (
+                                            last_entry.dg_end_date
+                                            - last_entry.dg_start_date
+                                        ).seconds
+                                    ) / 60 > site.dg_overtime:
+                                        check_alarm_dg_overtime = (
+                                            NewAlarmsNotifications.objects.filter(
+                                                site_id=site,
+                                                alarm_type=3,
+                                                created__gte=datetime.now()
+                                                - timedelta(hours=2),
+                                            )
+                                        )
+                                        if not check_alarm_dg_overtime.exists():
+                                            NewAlarmsNotifications.objects.filter(
+                                                site_id=site,
+                                                alarm_type=3,
+                                                created=datetime.now(),
+                                            )
+                                            data = {
+                                                "start_time": last_entry.dg_start_date,
+                                                "end_time": last_entry.dg_end_date,
+                                                "site_id": site.id,
+                                            }
+                                            send_alarm_for_dg_overtime(data)
+                                        print("generating alarm")
+                                except Exception as err:
+                                    print("Error in checking alarm for dg overtime run")
+                                print("data updated")
+                            else:
+                                if (
+                                    aisle_group[0].power_source != 0
+                                    and new_unit_consumption > 0
+                                ):
+                                    print(
+                                        "dg status gets off in previous time when data came, creating new entry"
+                                    )
+                                    # getting fuel consumption of last entry
+                                    print(
+                                        "fetching fuel consumption of last entry from loconav api"
+                                    )
+                                    last_record = (
+                                        DgUnitConsumption.objects.filter(
+                                            site=int(location_id),
+                                            aisle_group=aisle_group[0],
+                                            is_dg_on=False,
+                                        )
+                                        .order_by("-created")
+                                        .first()
+                                    )
+                                    dg_start_date = int(
+                                        last_record.dg_start_date.timestamp()
+                                    )
+                                    dg_end_date = int(
+                                        last_record.dg_end_date.timestamp()
+                                    )
+                                    if location_id in [
+                                        124,
+                                        118,
+                                        140,
+                                        153,
+                                        156,
+                                        169,
+                                        187,
+                                    ]:
+                                        fuel = roadcasteAPIUpdated(
+                                            site.partner_dg_fuel_id,
+                                            last_record.dg_start_date,
+                                            last_record.dg_end_date,
+                                        )
+                                    else:
+                                        fuel = get_loconav_fuel_data(
+                                            site.partner_dg_fuel_id,
+                                            dg_start_date,
+                                            dg_end_date,
+                                        )
+                                    print("fuel calculated value is: ", fuel)
+                                    if fuel:
+                                        last_record.dg_fuel_consumption = fuel
+                                        last_record.save()
+                                        print(
+                                            "fuel data updated of litre {} at {}".format(
+                                                fuel, datetime.now()
+                                            )
+                                        )
+                                    else:
+                                        print("fuel data not updated")
+                                        last_record.fetch_fuel_data = True
+                                        last_record.save()
+                                    # code commented by yash
+                                    """headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+                                    vehicle_number = site.partner_dg_fuel_id
+                                    fetch_fuel = requests.get(f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}", headers=headers).json()
+                                    print("fetched fuel data : ", fetch_fuel)
+                                    if 'data' in fetch_fuel:
+                                        fetch_fuel = fetch_fuel["data"]
+                                        if 'fuel_consumption' in fetch_fuel:
+                                            fuel = fetch_fuel['fuel_consumption']['value']
+                                            last_record.dg_fuel_consumption = fuel
+                                            last_record.save()
+                                            print("fuel data updated of litre {} at {}".format(fuel, datetime.now()))
+                                    else:
+                                        print("fuel data not updated")
+                                        last_record.fetch_fuel_data = True
+                                        last_record.save()"""
+
+                                    # entry_time = datetime.strptime(message_time[0], "%Y-%m-%d %H:%M:%S")
+                                    epoch_time = int(entry_time.timestamp() * 1000)
+                                    DgUnitConsumption.objects.create(
+                                        site=site,
+                                        aisle_group=aisle_group[0],
+                                        unit_consumption=new_unit_consumption,
+                                        created=entry_time,
+                                        epoch_time=epoch_time,
+                                        dg_start_date=entry_time,
+                                        dg_end_date=entry_time,
+                                        is_dg_on=True,
+                                    )
+                                    print("new dg entry created")
+                                else:
+                                    if (
+                                        aisle_group[0].power_source == 0
+                                        and new_unit_consumption > 0
+                                    ):
+                                        print(
+                                            "power source: ",
+                                            aisle_group[0].power_source,
+                                            " consumption : ",
+                                            new_unit_consumption,
+                                        )
+                                        print(
+                                            "power source is currently running is mains supply , making dg last entry off"
+                                        )
+                                        if last_entry.is_dg_on:
+                                            print(
+                                                "making dg last entry off at : ",
+                                                datetime.now(),
+                                            )
+                                            last_entry.is_dg_on = False
+                                            last_entry.save()
+                                            print(
+                                                "dg status gets off in previous time when data came, creating new entry"
+                                            )
+                                            # getting fuel consumption of last entry
+                                            print(
+                                                "fetching fuel consumption of last entry from loconav api"
+                                            )
+                                            last_record = (
+                                                DgUnitConsumption.objects.filter(
+                                                    site=int(location_id),
+                                                    aisle_group=aisle_group[0],
+                                                    is_dg_on=False,
+                                                )
+                                                .order_by("-created")
+                                                .first()
+                                            )
+                                            dg_start_date = int(
+                                                last_record.dg_start_date.timestamp()
+                                            )
+                                            dg_end_date = int(
+                                                last_record.dg_end_date.timestamp()
+                                            )
+                                            if location_id in [
+                                                124,
+                                                118,
+                                                140,
+                                                153,
+                                                156,
+                                                169,
+                                            ]:
+                                                fuel = roadcasteAPIUpdated(
+                                                    site.partner_dg_fuel_id,
+                                                    last_record.dg_start_date,
+                                                    last_record.dg_end_date,
+                                                )
+                                            else:
+                                                fuel = get_loconav_fuel_data(
+                                                    site.partner_dg_fuel_id,
+                                                    dg_start_date,
+                                                    dg_end_date,
+                                                )
+                                            if fuel:
+                                                last_record.dg_fuel_consumption = fuel
+                                                last_record.save()
+                                                print(
+                                                    "fuel data updated of litre {} at {}".format(
+                                                        fuel, datetime.now()
+                                                    )
+                                                )
+                                            else:
+                                                print("fuel data not updated")
+                                                last_record.fetch_fuel_data = True
+                                                last_record.save()
+
+                                            # headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+                                            # vehicle_number = site.partner_dg_fuel_id
+                                            # fetch_fuel = requests.get(f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}", headers=headers).json()
+                                            # print("fetched fuel data : ", fetch_fuel)
+                                            # if 'data' in fetch_fuel:
+                                            #     fetch_fuel = fetch_fuel["data"]
+                                            #     if 'fuel_consumption' in fetch_fuel:
+                                            #         fuel = fetch_fuel['fuel_consumption']['value']
+                                            #         last_record.dg_fuel_consumption = fuel
+                                            #         last_record.save()
+                                            #         print("fuel data updated of litre {} at {}".format(fuel, datetime.now()))
+                                            # else:
+                                            #     last_record.fetch_fuel_data = True
+                                            #     last_record.save()
+                        else:
+                            if (
+                                aisle_group[0].power_source != 0
+                                and new_unit_consumption > 0
+                            ):
+                                print(
+                                    "creating first ever entry for dg with aisle group: ",
+                                    aisle_group_id,
+                                )
+                                # entry_time = datetime.strptime(message_time[0], "%Y-%m-%d %H:%M:%S")
+                                epoch_time = int(entry_time.timestamp() * 1000)
+                                DgUnitConsumption.objects.create(
+                                    site=site,
+                                    aisle_group=aisle_group[0],
+                                    unit_consumption=new_unit_consumption,
+                                    created=entry_time,
+                                    dg_start_date=entry_time,
+                                    dg_end_date=entry_time,
+                                    epoch_time=epoch_time,
+                                    is_dg_on=True,
+                                )
+                    except Exception as err:
+                        print(
+                            "Exception while storing/updating dg unit consumption data : ",
+                            str(err),
+                        )
+
+                # DgUnitConsumption logic ends here
                 aisle_group_status, aisle_group_active = False, False
                 site_baseline, leg_hourly_baseline = 0.0, 0.0
                 # for sensor aisle unit consumption
@@ -791,19 +1220,29 @@ def mqtt_client1():
                                     aisle_group_id, site.site_name
                                 )
                             )
+                            leg_hourly_baseline, site_baseline = 0.0, 0.0
                             if aisle_group_active:
                                 aisle_group_baseline = SiteBaseline.objects.filter(
                                     associated_site_id=int(location_id),
                                     leg_id=str(aisle_group_id),
                                 ).last()
-                                leg_hourly_baseline = (
-                                    aisle_group_baseline.baseline_value
-                                    / aisle_group_baseline.working_hours
-                                )
-                                site_baseline = aisle_group_baseline.baseline_value
+                                if aisle_group_baseline:
+                                    site_baseline = (
+                                        aisle_group_baseline.baseline_value or 0.0
+                                    )
+                                    working_hrs = (
+                                        aisle_group_baseline.working_hours or 0
+                                    )
+                                    leg_hourly_baseline = (
+                                        (site_baseline / working_hrs)
+                                        if working_hrs > 0
+                                        else 0.0
+                                    )
+
+                            ag_obj = aisle_group[0] if aisle_group.exists() else None
                             HourlySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=ag_obj,
                                 leg_id=aisle_group_id,
                                 unit_consumption=new_unit_consumption,
                                 hourly_baseline_value=leg_hourly_baseline,
@@ -814,7 +1253,7 @@ def mqtt_client1():
 
                             DailySiteReading.objects.create(
                                 associated_Site=site,
-                                aisle_group=aisle_group[0],
+                                aisle_group=ag_obj,
                                 leg_id=aisle_group_id,
                                 unit_consumption=new_unit_consumption,
                                 daily_baseline_value=site_baseline,
@@ -835,9 +1274,10 @@ def mqtt_client1():
                     aisle_group_baseline = SiteBaseline.objects.filter(
                         associated_site_id=int(location_id), leg_id=str(aisle_group_id)
                     ).last()
-                    site_baseline = aisle_group_baseline.baseline_value
+                    if aisle_group_baseline:
+                        site_baseline = aisle_group_baseline.baseline_value or 0.0
                     for i in aisle_entry.filter(reading_from__gte=today):
-                        daily_saving += i.energy_saved
+                        daily_saving += i.energy_saved or 0.0
                 if daily_entry.exists():
                     print("Updating daily consumption data.")
                     new_consumption = (
@@ -852,11 +1292,11 @@ def mqtt_client1():
 
                 else:
                     print("Creating new daily consumption entry.")
-                    # komal to add code for previous day all hours(24) to daily entry
                     s = Site.objects.get(id=int(location_id))
+                    ag_obj = aisle_group[0] if aisle_group.exists() else None
                     DailySiteReading.objects.create(
                         associated_Site=s,
-                        aisle_group=aisle_group[0],
+                        aisle_group=ag_obj,
                         leg_id=aisle_group_id,
                         unit_consumption=new_unit_consumption,
                         daily_baseline_value=site_baseline,
@@ -869,12 +1309,16 @@ def mqtt_client1():
                         )
                     )
                     print("Checking for high or low consumption in this aisle group.")
-                    current_consumption = DailySiteReading.objects.filter(
+                    current_consumption_qs = DailySiteReading.objects.filter(
                         associated_Site=s,
                         leg_id=aisle_group_id,
                         reading_for=(date.date() - timedelta(days=1)),
-                    )[0].unit_consumption
-                    consumption_alarms(location_id, aisle_group_id, current_consumption)
+                    )
+                    if current_consumption_qs.exists():
+                        current_consumption = current_consumption_qs[0].unit_consumption
+                        consumption_alarms(
+                            location_id, aisle_group_id, current_consumption
+                        )
             except Exception as e:
                 print("Exception in consumption calculation block.")
                 print("This is the exception : {}".format(e))
@@ -1704,6 +2148,8 @@ def mqtt_client1():
                             daily_unit_consumption = 0.0
                         else:
                             daily_unit_consumption = float(daily_consumptions[i])
+                            if site.site_type == 2 and daily_unit_consumption > 10000:
+                                daily_unit_consumption = 0.0
                         daily_entry = DailySiteReading.objects.filter(
                             associated_Site=site,
                             leg_id=aisle_group_id,
@@ -1981,25 +2427,12 @@ def mqtt_client2():
 
     # The callback for when the client receives a CONNACK response from the server.
     def on_connect(client, userdata, flags, rc):
-        print("Connected with result code queue 2 " + str(rc), flush=True)
-        client.subscribe(
-            [
-                ("/Acclivate/iOmniControl/#", 0),
-                ("Acclivate/iOmniControl/#", 0),
-                ("/asem/#", 0),
-                ("asem/#", 0),
-            ]
-        )
-        print(
-            "[MQTT SUBSCRIBE] Subscribed to /Acclivate/iOmniControl/#, Acclivate/iOmniControl/#, and /asem/# on queue 2",
-            flush=True,
-        )
+        # logMessage(Constants.TRACE_FLAG_INFO, "Connected with result code " + str(rc))
+        print("Connected with result code queue 2 " + str(rc))
 
-    def on_disconnect(client, userdata, rc):
-        print(
-            f"[MQTT DISCONNECT] Queue 2 disconnected with rc={rc}. Reconnecting...",
-            flush=True,
-        )
+        # Subscribing in on_connect() means that if we lose the connection and
+        # reconnect then subscriptions will be renewed.
+        client.subscribe("/Acclivate/iOmniControl/#")
 
     def send_mail_for_alarms(site_id, aisle_id, alarm_type):
         from_mail = settings.EMAIL_HOST_USER
@@ -2614,295 +3047,72 @@ def mqtt_client2():
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(client, userdata, msg):
-        try:
-            from django.db import close_old_connections
+        print("######################")
+        print("Topic: ", msg.topic + "  Message: " + str(msg.payload))
+        print("######################")
+        message = str(msg.payload)
+        print("message_value :", message)
+        head = (msg.topic).split("/")
+        locationId = head[3]
+        gw_id = head[4]
+        print(gw_id)
+        msg_type = (head[6]).split("_")
+        print("msg_type : ", msg_type)
+        msg_subtype = head[7]
+        print("This is the message type: ", msg_type)
+        location_id = int(locationId)
+        site = Site.objects.get(id=int(locationId))
+        print("Location Id is : ", int(locationId))
+        print("Site Name : {}".format(site.site_name))
 
-            close_old_connections()
-            _process_mqtt_message(msg)
-        except Exception as e:
-            import traceback, io
-
-            buf = io.StringIO()
-            traceback.print_exc(file=buf)
-            print(
-                f"[on_message ERROR] Exception processing {msg.topic}: {e}\n{buf.getvalue()}",
-                flush=True,
+        if "LoadData" in msg_type:
+            print("inside load data")
+            load_data = message.split("'")[1].split(",")
+            print("load data: ", load_data)
+            load_value = float(load_data[0].split(":")[1])
+            print("load_value : ", load_value)
+            load_leg_id = load_data[1].split(":")[1]
+            print("load_leg_id", load_leg_id)
+            meter_number = load_data[2].split(":")[1]
+            print("meter_number : ", meter_number)
+            print("@@@@@@@@@@@@@@@@@@@")
+            load_date = load_data[3].split(":")[1:]
+            print("load_date", load_date)
+            date = ":".join(load_date)
+            print("date : ", date)
+            load_date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f")
+            print("load_date : ", load_date)
+            load_hour = load_date.hour
+            load_minute = load_date.minute
+            load_epoch_time = load_data[4].split(":")[1]
+            print("epoch", load_epoch_time)
+            load_aisle_group = AisleGroup.objects.filter(
+                site=site, attached_leg_id=str(load_leg_id)
             )
-        finally:
-            from django.db import close_old_connections
-
-            close_old_connections()
-
-    def _process_mqtt_message(msg):
-        try:
-
-            print("######################", flush=True)
-            print("Topic: ", msg.topic + "  Message: " + str(msg.payload), flush=True)
-            print("######################", flush=True)
-            message = str(msg.payload)
-            print("message_value :", message, flush=True)
-
-            clean_topic = msg.topic.strip("/")
-            topic_parts = clean_topic.split("/")
-            if len(topic_parts) >= 7 and topic_parts[0] in ["Acclivate", "asem"]:
-                locationId = topic_parts[2]
-                gw_id = topic_parts[3]
-                msg_type = topic_parts[5].split("_")
-                msg_subtype = topic_parts[6]
-            elif len(topic_parts) >= 6 and topic_parts[0] in ["Acclivate", "asem"]:
-                locationId = topic_parts[2]
-                gw_id = topic_parts[3]
-                msg_type = topic_parts[4].split("_")
-                msg_subtype = topic_parts[5]
-            else:
-                head = (msg.topic).split("/")
-                if len(head) < 8:
-                    print(
-                        f"[SKIP] Topic has unrecognized format: {msg.topic}", flush=True
-                    )
-                    return
-                locationId = head[3]
-                gw_id = head[4]
-                msg_type = (head[6]).split("_")
-                msg_subtype = head[7]
-
-            print("gw_id : ", gw_id, flush=True)
-            print("msg_type : ", msg_type, flush=True)
-            try:
-                location_id = int(locationId)
-                site = Site.objects.get(id=location_id)
-            except (ValueError, TypeError, Site.DoesNotExist):
-                print(f"[SKIP] Invalid or unknown site id: {locationId}", flush=True)
-                return
-            print("Location Id is : ", location_id, flush=True)
-            print("Site Name : {}".format(site.site_name), flush=True)
-
-            if "LoadData" in msg_type:
-                print("inside load data", flush=True)
-                # 1. Safe payload extraction (handles bytes, b'...', str, JSON, or comma-separated)
-                payload_str = str(message).strip()
-                if payload_str.startswith("b'") and payload_str.endswith("'"):
-                    payload_str = payload_str[2:-1]
-                elif payload_str.startswith('b"') and payload_str.endswith('"'):
-                    payload_str = payload_str[2:-1]
-
-                data_dict = {}
-                parts = [p.strip() for p in payload_str.split(",")]
-                for part in parts:
-                    if ":" in part:
-                        k, v = part.split(":", 1)
-                        data_dict[k.strip().lower()] = v.strip()
-
-                # Extract load_value
+            print("load_aisle_group :", load_aisle_group)
+            # raw load data logic starts here
+            RawLoadData.objects.create(
+                site=site,
+                aisle_group=load_aisle_group[0],
+                load_data=load_value,
+                created=load_date,
+                epoch_time=load_epoch_time,
+            )
+            print(
+                "raw entry created for {} site with leg id {} of load value {} at {}".format(
+                    locationId, load_leg_id, load_value, datetime.now()
+                )
+            )
+            # raw load data logic ends here
+            if site.is_loadGraph_visible:
+                power_source = load_aisle_group[0].aisleGroupName
+                print("power source", power_source)
+                load_entry = SiteLoadPower.objects.filter(
+                    Associated_Site=int(location_id), Meter_Number=meter_number
+                )
+                print("load entry ", load_entry)
+                print("checking for monthly min max load")
                 try:
-                    load_value = float(
-                        data_dict.get(
-                            "loadvalue",
-                            (
-                                parts[0].split(":")[1]
-                                if len(parts) > 0 and ":" in parts[0]
-                                else (parts[0] if len(parts) > 0 else 0)
-                            ),
-                        )
-                    )
-                except Exception:
-                    load_value = 0.0
-                print("load_value : ", load_value, flush=True)
-
-                # Extract load_leg_id
-                load_leg_id = data_dict.get(
-                    "leg_id",
-                    (
-                        parts[1].split(":")[1].strip()
-                        if len(parts) > 1 and ":" in parts[1]
-                        else (parts[1] if len(parts) > 1 else "")
-                    ),
-                )
-                load_leg_str = str(load_leg_id).strip()
-                print("load_leg_id", load_leg_id, flush=True)
-
-                # Extract meter_number
-                meter_number = data_dict.get(
-                    "meter_number",
-                    (
-                        parts[2].split(":")[1].strip()
-                        if len(parts) > 2 and ":" in parts[2]
-                        else "1"
-                    ),
-                )
-                print("meter_number : ", meter_number, flush=True)
-
-                # Extract datetime robustly
-                date_raw = (
-                    data_dict.get("datetime")
-                    or data_dict.get("date")
-                    or data_dict.get("time")
-                    or data_dict.get("timestamp")
-                    or ""
-                )
-                if not date_raw and len(parts) > 3:
-                    p3 = parts[3]
-                    if ":" in p3:
-                        p3_split = p3.split(":", 1)
-                        if p3_split[0].strip().lower() in [
-                            "datetime",
-                            "date",
-                            "time",
-                            "timestamp",
-                        ]:
-                            date_raw = p3_split[1].strip()
-                        else:
-                            date_raw = p3.strip()
-                    else:
-                        date_raw = p3.strip()
-                print("date : ", date_raw, flush=True)
-
-                load_date = None
-                if date_raw:
-                    for fmt in (
-                        "%Y-%m-%d %H:%M:%S.%f",
-                        "%Y-%m-%d %H:%M:%S",
-                        "%Y/%m/%d %H:%M:%S",
-                        "%Y-%m-%d %H:%M",
-                        "%Y-%m-%dT%H:%M:%S.%f",
-                        "%Y-%m-%dT%H:%M:%S",
-                        "%d-%m-%Y %H:%M:%S",
-                        "%d/%m/%Y %H:%M:%S",
-                    ):
-                        try:
-                            load_date = datetime.strptime(date_raw, fmt)
-                            break
-                        except Exception:
-                            pass
-                if not load_date:
-                    load_date = datetime.now()
-                print("load_date : ", load_date, flush=True)
-                load_hour = load_date.hour
-                load_minute = load_date.minute
-
-                # Extract & normalize epoch_time
-                load_epoch_time = data_dict.get(
-                    "epochtime",
-                    (
-                        parts[4].split(":")[1].strip()
-                        if len(parts) > 4 and ":" in parts[4]
-                        else ""
-                    ),
-                )
-                if not load_epoch_time or load_epoch_time in ("0", "-1"):
-                    load_epoch_time = str(int(load_date.timestamp() * 1000))
-                print("epoch", load_epoch_time, flush=True)
-
-                # Fast AisleGroup lookup using in-memory cache to prevent multiple DB queries per packet
-                if not hasattr(mqtt_client2, "_aisle_cache"):
-                    mqtt_client2._aisle_cache = {}
-                cache_key = (site.id, load_leg_str)
-                current_leg = mqtt_client2._aisle_cache.get(cache_key)
-
-                if not current_leg:
-                    load_aisle_group = AisleGroup.objects.filter(
-                        Q(site=site) | Q(virtual_siteID=site),
-                        Q(attached_leg_id=load_leg_str)
-                        | Q(attached_leg_id__iexact=load_leg_str),
-                    )
-                    if not load_aisle_group.exists() and load_leg_str.isdigit():
-                        load_aisle_group = AisleGroup.objects.filter(
-                            Q(site=site) | Q(virtual_siteID=site), id=int(load_leg_str)
-                        )
-                    if not load_aisle_group.exists():
-                        load_aisle_group = AisleGroup.objects.filter(
-                            Q(attached_leg_id=load_leg_str)
-                            | Q(attached_leg_id__iexact=load_leg_str)
-                        )
-                    if not load_aisle_group.exists():
-                        site_aisles = AisleGroup.objects.filter(
-                            Q(site=site) | Q(virtual_siteID=site)
-                        )
-                        if site_aisles.filter(
-                            attached_leg_id__icontains=load_leg_str
-                        ).exists():
-                            load_aisle_group = site_aisles.filter(
-                                attached_leg_id__icontains=load_leg_str
-                            )
-                        elif site_aisles.count() == 1:
-                            load_aisle_group = site_aisles
-                    if not load_aisle_group.exists():
-                        try:
-                            new_leg = AisleGroup.objects.create(
-                                site=site,
-                                virtual_siteID=site,
-                                attached_leg_id=load_leg_str,
-                                aisleGroupName=f"Leg {load_leg_str}",
-                                is_active=True,
-                                is_visible=True,
-                                power_source=0,
-                                load_graph_color="#28a745",
-                            )
-                            load_aisle_group = [new_leg]
-                            print(
-                                f"Auto-created AisleGroup for site {locationId} with leg {load_leg_str}",
-                                flush=True,
-                            )
-                        except Exception as e:
-                            print(f"Error creating AisleGroup: {e}", flush=True)
-
-                    current_leg = load_aisle_group[0] if load_aisle_group else None
-                    if current_leg:
-                        mqtt_client2._aisle_cache[cache_key] = current_leg
-
-                print("load_aisle_group :", current_leg, flush=True)
-
-                # Single-leg graph color fix (avoids looping over all site legs on every packet)
-                if current_leg and not current_leg.load_graph_color:
-                    current_leg.load_graph_color = (
-                        "#28a745" if current_leg.power_source == 0 else "#ff7a01"
-                    )
-                    try:
-                        current_leg.save(update_fields=["load_graph_color"])
-                    except Exception:
-                        pass
-
-                # Raw load data logic
-                try:
-                    RawLoadData.objects.create(
-                        site=site,
-                        aisle_group=current_leg,
-                        load_data=load_value,
-                        created=load_date,
-                        epoch_time=load_epoch_time,
-                    )
-                    print(
-                        "raw entry created for {} site with leg id {} of load value {} at {}".format(
-                            locationId, load_leg_id, load_value, datetime.now()
-                        ),
-                        flush=True,
-                    )
-                except Exception as e:
-                    print(f"Error creating RawLoadData: {e}", flush=True)
-
-                # Maintain monthly min/max load data & real-time SiteLoadPower
-                try:
-                    power_source = (
-                        current_leg.aisleGroupName if current_leg else "MAINS SUPPLY"
-                    )
-                    print("power source", power_source, flush=True)
-                    try:
-                        meter_num_int = int(meter_number)
-                    except (ValueError, TypeError):
-                        meter_num_int = 1
-                    load_entry = SiteLoadPower.objects.filter(
-                        Associated_Site=site, Meter_Number=meter_num_int
-                    )
-                    if not load_entry.exists():
-                        load_entry = SiteLoadPower.objects.filter(
-                            Associated_Site_id=location_id, Meter_Number=meter_num_int
-                        )
-                    if load_entry.exists():
-                        load_entry.update(
-                            Site_Total_Load=load_value,
-                            Status="ON",
-                            Updated_on=datetime.now(),
-                        )
                     today_date = datetime.now()
                     monthly_min_max_load = MonthlyMinMaxLoadData.objects.filter(
                         site=site,
@@ -2911,33 +3121,39 @@ def mqtt_client2():
                         created__month=today_date.month,
                     )
                     if monthly_min_max_load.exists():
+                        print("checking update for min max of monthly load data")
                         monthly_min_load = monthly_min_max_load[0].min_load
                         monthly_max_load = monthly_min_max_load[0].max_load
-                        if (
-                            monthly_min_load is not None
-                            and monthly_min_load > load_value
-                        ):
+                        print(
+                            "monthly_min_load: ",
+                            monthly_min_load,
+                            "monthly_max_load: ",
+                            monthly_max_load,
+                            "current load: ",
+                            load_value,
+                        )
+                        if monthly_min_load > load_value:
+                            print("updating min load")
                             monthly_min_max_load.update(
                                 min_load=load_value, min_load_created=today_date
                             )
                             if load_entry.exists():
                                 load_entry.update(min_load=load_value)
-                        elif monthly_min_load == 0.0 or monthly_min_load is None:
+                        elif monthly_min_load == 0.0:
                             monthly_min_max_load.update(
                                 min_load=load_value, min_load_created=today_date
                             )
                             if load_entry.exists():
                                 load_entry.update(min_load=load_value)
-                        if (
-                            monthly_max_load is not None
-                            and monthly_max_load < load_value
-                        ):
+                        if monthly_max_load < load_value:
+                            print("updating max load")
                             monthly_min_max_load.update(
                                 max_load=load_value, max_load_created=today_date
                             )
                             if load_entry.exists():
                                 load_entry.update(max_load=load_value)
                     else:
+                        print("creating first entry for this month")
                         MonthlyMinMaxLoadData.objects.create(
                             site=site,
                             min_load=load_value,
@@ -2948,562 +3164,794 @@ def mqtt_client2():
                             supply_source=power_source,
                         )
                 except Exception as err:
-                    print("Error in monthly min max load section : ", err, flush=True)
-
-                # Load hourly logic (with sanitized & bounded deduplication)
-                dedup_key = f"{locationId}_{load_leg_str}_{load_epoch_time}"
-                if dedup_key in _SEEN_EPOCHS_SET:
-                    print(
-                        f"[DEDUP] Skipping duplicate packet for site {locationId} leg {load_leg_str} epoch {load_epoch_time}",
-                        flush=True,
-                    )
-                else:
-                    while len(_SEEN_EPOCHS_DEQUE) >= 2000:
-                        old_k = _SEEN_EPOCHS_DEQUE.popleft()
-                        _SEEN_EPOCHS_SET.discard(old_k)
-                    _SEEN_EPOCHS_DEQUE.append(dedup_key)
-                    _SEEN_EPOCHS_SET.add(dedup_key)
-
-                    try:
-                        HourlyLoadData.objects.create(
-                            site=site,
-                            aisle_group=current_leg,
-                            load_data=load_value,
-                            created=load_date,
-                            epoch_time=load_epoch_time,
-                        )
-                        print(
-                            "Hourly entry created successfull for load {} of {} site with leg id {}  at {}".format(
-                                load_value,
-                                locationId,
-                                (
-                                    current_leg.aisleGroupName
-                                    if current_leg
-                                    else load_leg_id
-                                ),
-                                load_date,
-                            ),
-                            flush=True,
-                        )
-                        MainsDgLoadData.objects.create(
-                            site=site,
-                            aisle_group=current_leg,
-                            load_data=load_value,
-                            created=load_date,
-                            epoch_time=load_epoch_time,
-                        )
-                        print(
-                            "Mains Dg Load data entry created successfull for load {} of {} site with leg id {}  at {}".format(
-                                load_value,
-                                locationId,
-                                (
-                                    current_leg.aisleGroupName
-                                    if current_leg
-                                    else load_leg_id
-                                ),
-                                load_date,
-                            ),
-                            flush=True,
-                        )
-
-                        # Bulk zero-load creation for other legs in a single DB query
-                        all_site_legs = list(
-                            AisleGroup.objects.filter(
-                                Q(site=site) | Q(virtual_siteID=site)
-                            )
-                        )
-                        other_legs = [
-                            l
-                            for l in all_site_legs
-                            if current_leg and l.id != current_leg.id
-                        ]
-                        if other_legs:
-                            zero_records = [
-                                MainsDgLoadData(
-                                    site=site,
-                                    aisle_group=other_leg,
-                                    load_data=0.0,
-                                    created=load_date,
-                                    epoch_time=load_epoch_time,
-                                )
-                                for other_leg in other_legs
-                            ]
-                            MainsDgLoadData.objects.bulk_create(
-                                zero_records, ignore_conflicts=True
-                            )
-                            print(
-                                f"Bulk created zero load MainsDgLoadData for {len(zero_records)} other legs of site {locationId} at {load_date}",
-                                flush=True,
-                            )
-                    except Exception as err:
-                        print("Error in hourly load data: ", err, flush=True)
-
-                # Daily load data logic (per-leg check so legs don't block each other)
+                    print("Error in monthly min max load section : ", err)
+            # load hourly logic starts here
+            previous_minute = load_date - timedelta(minutes=1)
+            print("previous minute: ", previous_minute)
+            if (
+                load_date.date() == previous_minute.date()
+                and load_date.hour == previous_minute.hour
+            ):
+                print("checking hourly entry for current data")
                 try:
-                    previous_hour_dt = load_date - timedelta(hours=1)
-                    hours_to_check = []
-
-                    # Midnight rollover: check previous day hour 23
-                    if (
-                        load_date.hour == 0
-                        and load_date.date() != previous_hour_dt.date()
-                    ):
-                        hours_to_check.append((previous_hour_dt.date(), 23))
-
-                    # Normal hourly rollover: check previous hour of today
-                    if load_hour > 0:
-                        hours_to_check.append((load_date.date(), load_hour - 1))
-
-                    for check_date, check_hour in hours_to_check:
-                        start_dt = datetime(
-                            check_date.year,
-                            check_date.month,
-                            check_date.day,
-                            check_hour,
-                            0,
-                            0,
-                        )
-                        end_dt = start_dt + timedelta(hours=1)
-
-                        all_legs = list(
-                            AisleGroup.objects.filter(
-                                Q(site=site) | Q(virtual_siteID=site)
+                    load_hourly = HourlyLoadData.objects.filter(
+                        site=site,
+                        created__date=load_date.date(),
+                        created__hour=load_hour,
+                        created__minute=load_minute - 1,
+                    )
+                    if not load_hourly.exists():
+                        print(
+                            "Trying to create min, max load hourly  entry of {} minute, {} hour of site {} , aisle group {} at {}".format(
+                                load_minute,
+                                load_hour,
+                                locationId,
+                                load_leg_id,
+                                datetime.now(),
                             )
                         )
-                        for leg in all_legs:
-                            # Check PER LEG instead of site-wide so legs don't suppress each other
-                            if not DailyLoadData.objects.filter(
+                        all_leg_id = AisleGroup.objects.filter(site=site)
+                        min_epoch_time = load_epoch_time
+                        max_epoch_time = load_epoch_time
+                        min_created = load_date
+                        max_created = load_date
+                        for leg in all_leg_id:
+                            raw_load = RawLoadData.objects.filter(
                                 site=site,
-                                aisle_group=leg,
-                                created__gte=start_dt,
-                                created__lt=end_dt,
-                            ).exists():
-                                hourly_records = list(
-                                    HourlyLoadData.objects.filter(
+                                aisle_group=leg.id,
+                                created__date=load_date.date(),
+                                created__hour=load_hour,
+                                created__minute=load_minute - 1,
+                            )
+
+                            if raw_load.exists():
+                                min_load = math.inf
+                                max_load = 0.0
+                                if raw_load.exists():
+                                    for i in raw_load:
+                                        load = i.load_data
+                                        if min_load > load:
+                                            min_load = load
+                                            min_epoch_time = i.epoch_time
+                                            min_created = i.created
+                                        elif min_load == 0.0:
+                                            min_load = load
+                                            min_epoch_time = i.epoch_time
+                                            min_created = i.created
+                                        if max_load < load:
+                                            max_load = load
+                                            max_epoch_time = i.epoch_time
+                                            max_created = i.created
+                                    try:
+                                        if int(min_epoch_time) < int(max_epoch_time):
+                                            HourlyLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=min_load,
+                                                created=min_created,
+                                                epoch_time=min_epoch_time,
+                                            )
+                                            print(
+                                                "Hourly entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+                                            HourlyLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=max_load,
+                                                created=max_created,
+                                                epoch_time=max_epoch_time,
+                                            )
+                                            print(
+                                                "Hourly entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                    max_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+
+                                            MainsDgLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=min_load,
+                                                created=min_created,
+                                                epoch_time=min_epoch_time,
+                                            )
+                                            print(
+                                                "Mains Dg Load data entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+                                            MainsDgLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=max_load,
+                                                created=max_created,
+                                                epoch_time=max_epoch_time,
+                                            )
+                                            print(
+                                                "Mains Dg Load data entry created successfull for maximum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+                                        else:
+                                            HourlyLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=max_load,
+                                                created=max_created,
+                                                epoch_time=max_epoch_time,
+                                            )
+                                            print(
+                                                "Hourly entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                    max_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+
+                                            HourlyLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=min_load,
+                                                created=min_created,
+                                                epoch_time=min_epoch_time,
+                                            )
+                                            print(
+                                                "Hourly entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+
+                                            MainsDgLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=max_load,
+                                                created=max_created,
+                                                epoch_time=max_epoch_time,
+                                            )
+                                            print(
+                                                "Mains Dg Load data entry created successfull for maximum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+                                            MainsDgLoadData.objects.create(
+                                                site=site,
+                                                aisle_group=leg,
+                                                load_data=min_load,
+                                                created=min_created,
+                                                epoch_time=min_epoch_time,
+                                            )
+                                            print(
+                                                "Mains Dg Load data entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                    min_load,
+                                                    locationId,
+                                                    leg.aisleGroupName,
+                                                    datetime.now(),
+                                                )
+                                            )
+
+                                    except Exception as err:
+                                        print(
+                                            "Error while storing load data in mains dg table",
+                                            err,
+                                        )
+                            else:
+                                print(
+                                    "storing zero load data in mains dg table for leg {} of site {} at {}".format(
+                                        locationId, leg.aisleGroupName, datetime.now()
+                                    )
+                                )
+                                if int(min_epoch_time) < int(max_epoch_time):
+                                    MainsDgLoadData.objects.create(
                                         site=site,
                                         aisle_group=leg,
-                                        created__gte=start_dt,
-                                        created__lt=end_dt,
-                                    ).order_by("created")
+                                        load_data=0,
+                                        created=min_created,
+                                        epoch_time=min_epoch_time,
+                                    )
+                                    print(
+                                        "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                    MainsDgLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        load_data=0,
+                                        created=max_created,
+                                        epoch_time=max_epoch_time,
+                                    )
+                                    print(
+                                        "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                else:
+                                    MainsDgLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        load_data=0,
+                                        created=max_created,
+                                        epoch_time=max_epoch_time,
+                                    )
+                                    print(
+                                        "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                    MainsDgLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        load_data=0,
+                                        created=min_created,
+                                        epoch_time=min_epoch_time,
+                                    )
+                                    print(
+                                        "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+
+                except Exception as err:
+                    print("Error in hourly load data: ", err)
+            else:
+                print("else code is running for hourly load entry")
+                if load_date.minute == 0:
+                    print("creating entry for  last minute of previous hour")
+                    try:
+                        if previous_minute.hour == 23 and previous_minute.minute == 59:
+                            print("creating last minute entry of previous day")
+                            load_hourly = HourlyLoadData.objects.filter(
+                                site=site,
+                                created__date=previous_minute.date(),
+                                created__hour=previous_minute.hour,
+                                created__minute=59,
+                            )
+                        else:
+                            print("creating last minute entry of current day")
+                            load_hourly = HourlyLoadData.objects.filter(
+                                site=site,
+                                created__date=load_date.date(),
+                                created__hour=load_date.hour - 1,
+                                created__minute=59,
+                            )
+                        if not load_hourly.exists():
+                            print(
+                                "Trying to create min, max load hourly  entry of {} minute, {} hour of site {} , aisle group {} at {}".format(
+                                    load_minute,
+                                    load_hour,
+                                    locationId,
+                                    load_leg_id,
+                                    datetime.now(),
                                 )
+                            )
+                            min_epoch_time = load_epoch_time
+                            max_epoch_time = load_epoch_time
+                            min_created = load_date
+                            max_created = load_date
+                            all_leg_id = AisleGroup.objects.filter(site=site)
+                            for leg in all_leg_id:
+                                if (
+                                    previous_minute.hour == 23
+                                    and previous_minute.minute == 59
+                                ):
+                                    raw_load = RawLoadData.objects.filter(
+                                        site=site,
+                                        aisle_group=leg.id,
+                                        created__date=previous_minute.date(),
+                                        created__hour=previous_minute.hour,
+                                        created__minute=59,
+                                    )
+                                else:
+                                    raw_load = RawLoadData.objects.filter(
+                                        site=site,
+                                        aisle_group=leg.id,
+                                        created__date=load_date.date(),
+                                        created__hour=load_date.hour - 1,
+                                        created__minute=59,
+                                    )
 
-                                if hourly_records:
-                                    min_rec = min(
-                                        hourly_records, key=lambda x: x.load_data
+                                if raw_load.exists():
+                                    min_load = math.inf
+                                    max_load = 0.0
+                                    if raw_load.exists():
+                                        for i in raw_load:
+                                            load = i.load_data
+                                            if min_load > load:
+                                                min_load = load
+                                                min_epoch_time = i.epoch_time
+                                                min_created = i.created
+                                            elif min_load == 0.0:
+                                                min_load = load
+                                                min_epoch_time = i.epoch_time
+                                                min_created = i.created
+                                            if max_load < load:
+                                                max_load = load
+                                                max_epoch_time = i.epoch_time
+                                                max_created = i.created
+                                        try:
+                                            if int(min_epoch_time) < int(
+                                                max_epoch_time
+                                            ):
+                                                HourlyLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=min_load,
+                                                    created=min_created,
+                                                    epoch_time=min_epoch_time,
+                                                )
+                                                print(
+                                                    "Hourly entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+                                                HourlyLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=max_load,
+                                                    created=max_created,
+                                                    epoch_time=max_epoch_time,
+                                                )
+                                                print(
+                                                    "Hourly entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                        max_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+
+                                                MainsDgLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=min_load,
+                                                    created=min_created,
+                                                    epoch_time=min_epoch_time,
+                                                )
+                                                print(
+                                                    "Mains Dg Load data entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+                                                MainsDgLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=max_load,
+                                                    created=max_created,
+                                                    epoch_time=max_epoch_time,
+                                                )
+                                                print(
+                                                    "Mains Dg Load data entry created successfull for maximum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+                                            else:
+                                                HourlyLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=max_load,
+                                                    created=max_created,
+                                                    epoch_time=max_epoch_time,
+                                                )
+                                                print(
+                                                    "Hourly entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                        max_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+                                                HourlyLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=min_load,
+                                                    created=min_created,
+                                                    epoch_time=min_epoch_time,
+                                                )
+                                                print(
+                                                    "Hourly entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+
+                                                MainsDgLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=max_load,
+                                                    created=max_created,
+                                                    epoch_time=max_epoch_time,
+                                                )
+                                                print(
+                                                    "Mains Dg Load data entry created successfull for maximum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+                                                MainsDgLoadData.objects.create(
+                                                    site=site,
+                                                    aisle_group=leg,
+                                                    load_data=min_load,
+                                                    created=min_created,
+                                                    epoch_time=min_epoch_time,
+                                                )
+                                                print(
+                                                    "Mains Dg Load data entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                        min_load,
+                                                        locationId,
+                                                        leg.aisleGroupName,
+                                                        datetime.now(),
+                                                    )
+                                                )
+
+                                        except Exception as err:
+                                            print(
+                                                "Error while storing load data in mains dg table",
+                                                err,
+                                            )
+                                else:
+                                    print(
+                                        "storing zero load data in mains dg table for leg {} of site {} at {}".format(
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
                                     )
-                                    max_rec = max(
-                                        hourly_records, key=lambda x: x.load_data
+                                    if int(min_epoch_time) < int(max_epoch_time):
+                                        MainsDgLoadData.objects.create(
+                                            site=site,
+                                            aisle_group=leg,
+                                            load_data=0,
+                                            created=min_created,
+                                            epoch_time=min_epoch_time,
+                                        )
+                                        print(
+                                            "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
+                                        )
+                                        MainsDgLoadData.objects.create(
+                                            site=site,
+                                            aisle_group=leg,
+                                            load_data=0,
+                                            created=max_created,
+                                            epoch_time=max_epoch_time,
+                                        )
+                                        print(
+                                            "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
+                                        )
+                                    else:
+                                        MainsDgLoadData.objects.create(
+                                            site=site,
+                                            aisle_group=leg,
+                                            load_data=0,
+                                            created=max_created,
+                                            epoch_time=max_epoch_time,
+                                        )
+                                        print(
+                                            "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
+                                        )
+                                        MainsDgLoadData.objects.create(
+                                            site=site,
+                                            aisle_group=leg,
+                                            load_data=0,
+                                            created=min_created,
+                                            epoch_time=min_epoch_time,
+                                        )
+                                        print(
+                                            "Mains Dg Load data entry created successfull for zero  load  of {} site with leg id {}  at {}".format(
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
+                                        )
+                    except Exception as err:
+                        print("Error in hourly load data: ", err)
+
+                print("remaining code comes here for base case")
+                pass
+
+            # load hourly logic ends here
+            # daily load data logic starts here
+            previous_hour = load_date - timedelta(hours=1)
+            print("previous_hour: ", previous_hour)
+            if load_date.date() == previous_hour.date():
+                print("checking daily entry for current data")
+                try:
+                    load_daily_entry = DailyLoadData.objects.filter(
+                        site=site,
+                        created__date=load_date.date(),
+                        created__hour=load_hour - 1,
+                    )
+                    if not load_daily_entry.exists():
+                        print(
+                            "Trying to create min, max load daily  entry of {} minute, {} hour of site {} , aisle group {} at {}".format(
+                                load_minute,
+                                load_hour,
+                                locationId,
+                                load_leg_id,
+                                datetime.now(),
+                            )
+                        )
+                        all_leg_id = AisleGroup.objects.filter(site=site)
+                        for leg in all_leg_id:
+                            load_hourly_entry = HourlyLoadData.objects.filter(
+                                site=site,
+                                aisle_group=leg.id,
+                                created__date=load_date.date(),
+                                created__hour=load_hour - 1,
+                            )
+                            if load_hourly_entry.exists():
+                                min_load = math.inf
+                                max_load = 0.0
+                                min_epoch_time = load_epoch_time
+                                max_epoch_time = load_epoch_time
+                                min_created = load_date
+                                max_created = load_date
+                                for i in load_hourly_entry:
+                                    load = i.load_data
+                                    if min_load > load:
+                                        min_load = load
+                                        min_epoch_time = i.epoch_time
+                                        min_created = i.created
+                                    elif min_load == 0.0:
+                                        min_load = load
+                                        min_epoch_time = i.epoch_time
+                                        min_created = i.created
+                                    if max_load < load:
+                                        max_load = load
+                                        max_epoch_time = i.epoch_time
+                                        max_created = i.created
+                                if int(min_epoch_time) < int(max_epoch_time):
+                                    DailyLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        created=min_created,
+                                        load_data=min_load,
+                                        epoch_time=min_epoch_time,
+                                    )
+                                    print(
+                                        "Daily entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                            min_load,
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                    DailyLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        created=max_created,
+                                        load_data=max_load,
+                                        epoch_time=max_epoch_time,
+                                    )
+                                    print(
+                                        "Daily entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                            max_load,
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                else:
+                                    DailyLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        created=max_created,
+                                        load_data=max_load,
+                                        epoch_time=max_epoch_time,
+                                    )
+                                    print(
+                                        "Daily entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                            max_load,
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
+                                    )
+                                    DailyLoadData.objects.create(
+                                        site=site,
+                                        aisle_group=leg,
+                                        created=min_created,
+                                        load_data=min_load,
+                                        epoch_time=min_epoch_time,
+                                    )
+                                    print(
+                                        "Daily entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                            min_load,
+                                            locationId,
+                                            leg.aisleGroupName,
+                                            datetime.now(),
+                                        )
                                     )
 
-                                    min_epoch = (
-                                        int(min_rec.epoch_time)
-                                        if str(min_rec.epoch_time).isdigit()
-                                        else 0
-                                    )
-                                    max_epoch = (
-                                        int(max_rec.epoch_time)
-                                        if str(max_rec.epoch_time).isdigit()
-                                        else 0
-                                    )
+                except Exception as err:
+                    print("Error in daily load data: ", err)
+            else:
+                if load_date.hour == 0:
+                    print("creating previous day last hour entry")
+                    try:
+                        load_daily_entry = DailyLoadData.objects.filter(
+                            site=site,
+                            created__date=previous_hour.date(),
+                            created__hour=23,
+                        )
+                        if not load_daily_entry.exists():
+                            print(
+                                "Trying to create min, max load daily  entry of {} minute, {} hour of site {} , aisle group {} at {}".format(
+                                    load_minute,
+                                    load_hour,
+                                    locationId,
+                                    load_leg_id,
+                                    datetime.now(),
+                                )
+                            )
+                            all_leg_id = AisleGroup.objects.filter(site=site)
+                            for leg in all_leg_id:
+                                load_hourly_entry = HourlyLoadData.objects.filter(
+                                    site=site,
+                                    aisle_group=leg.id,
+                                    created__date=previous_hour.date(),
+                                    created__hour=23,
+                                )
+                                if load_hourly_entry.exists():
+                                    min_load = math.inf
+                                    max_load = 0.0
+                                    min_epoch_time = load_epoch_time
+                                    max_epoch_time = load_epoch_time
+                                    min_created = load_date
+                                    max_created = load_date
+                                    for i in load_hourly_entry:
+                                        load = i.load_data
+                                        if min_load > load:
+                                            min_load = load
+                                            min_epoch_time = i.epoch_time
+                                            min_created = i.created
+                                        elif min_load == 0.0:
+                                            min_load = load
+                                            min_epoch_time = i.epoch_time
+                                            min_created = i.created
+                                        if max_load < load:
+                                            max_load = load
+                                            max_epoch_time = i.epoch_time
+                                            max_created = i.created
 
-                                    if min_epoch < max_epoch:
+                                    if int(min_epoch_time) < int(max_epoch_time):
                                         DailyLoadData.objects.create(
                                             site=site,
                                             aisle_group=leg,
-                                            created=min_rec.created,
-                                            load_data=min_rec.load_data,
-                                            epoch_time=min_rec.epoch_time,
+                                            created=min_created,
+                                            load_data=min_load,
+                                            epoch_time=min_epoch_time,
+                                        )
+                                        print(
+                                            "Daily entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                min_load,
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
                                         )
                                         DailyLoadData.objects.create(
                                             site=site,
                                             aisle_group=leg,
-                                            created=max_rec.created,
-                                            load_data=max_rec.load_data,
-                                            epoch_time=max_rec.epoch_time,
+                                            created=max_created,
+                                            load_data=max_load,
+                                            epoch_time=max_epoch_time,
+                                        )
+                                        print(
+                                            "Daily entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                max_load,
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
                                         )
                                     else:
                                         DailyLoadData.objects.create(
                                             site=site,
                                             aisle_group=leg,
-                                            created=max_rec.created,
-                                            load_data=max_rec.load_data,
-                                            epoch_time=max_rec.epoch_time,
+                                            created=max_created,
+                                            load_data=max_load,
+                                            epoch_time=max_epoch_time,
+                                        )
+                                        print(
+                                            "Daily entry created successfull for max load {} of {} site with leg id {}  at {}".format(
+                                                max_load,
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
                                         )
                                         DailyLoadData.objects.create(
                                             site=site,
                                             aisle_group=leg,
-                                            created=min_rec.created,
-                                            load_data=min_rec.load_data,
-                                            epoch_time=min_rec.epoch_time,
+                                            created=min_created,
+                                            load_data=min_load,
+                                            epoch_time=min_epoch_time,
                                         )
-                                    print(
-                                        f"[DAILY OK] Created DailyLoadData min={min_rec.load_data} max={max_rec.load_data} for site {locationId} leg {leg.aisleGroupName} on {check_date} hour {check_hour}",
-                                        flush=True,
-                                    )
-                except Exception as daily_err:
-                    print(f"Error in daily load data: {daily_err}", flush=True)
-                # Daily load data logic ends here
-            # Load graph data code ends from here
+                                        print(
+                                            "Daily entry created successfull for minimum load {} of {} site with leg id {}  at {}".format(
+                                                min_load,
+                                                locationId,
+                                                leg.aisleGroupName,
+                                                datetime.now(),
+                                            )
+                                        )
 
-            else:
-                print("##########################################################")
-                print("*********Got an unknown message. Need to check!!**********")
-                print("##########################################################")
+                    except Exception as err:
+                        print("Error in daily load data: ", err)
+                print("remaining code comes here")
 
-        except Exception as e:
-            import traceback, io
+            # daily load data logic ends here
 
-            buf = io.StringIO()
-            traceback.print_exc(file=buf)
-            print(
-                f"[on_message ERROR] Exception processing {msg.topic}: {e}\n{buf.getvalue()}",
-                flush=True,
-            )
+        # load graph data code ends from here
 
-    import uuid
+        else:
+            print("##########################################################")
+            print("*********Got an unknown message. Need to check!!**********")
+            print("##########################################################")
 
-    client_id = f"server_paho_client_2_{uuid.uuid4().hex[:8]}"
-    client = mqtt.Client(client_id)
+    client = mqtt.Client("server_paho_client_2")
     client.on_connect = on_connect
     client.on_message = on_message
-    client.on_disconnect = on_disconnect
-    client.reconnect_delay_set(min_delay=1, max_delay=30)
 
-    print(f"Connecting MQTT Client 2 ({client_id}) to 127.0.0.1:1883...", flush=True)
     client.connect("127.0.0.1", 1883, 60)
-    print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", flush=True)
+    print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     # client.username_pw_set("djgpjqqt","AfTkXiiaov8c")
 
     # Blocking call that processes network traffic, dispatches callbacks and
     # handles reconnecting.
+    # Other loop*() functions are available that give a threaded interface and a
+    # manual interface.
     client.loop_forever()
-
-
-@app.task(queue="queue2")
-def aggregate_daily_load_all_sites():
-    """
-    Periodic task: aggregate HourlyLoadData → DailyLoadData for ALL sites and ALL legs.
-
-    Design goals:
-    - COMPLETELY decoupled from MQTT ingestion. Runs every 5 minutes via Celery Beat.
-    - Site-agnostic: works for any site/leg combination without code changes.
-    - Idempotent: safe to run multiple times for the same hour (delete + recreate current hour).
-    - Processes today + yesterday to handle midnight boundary packets.
-    - No per-packet DB penalty: the on_message thread is now < 500ms per packet.
-
-    To schedule via Celery Beat, add to your beat schedule (settings.py or celery.py):
-        app.conf.beat_schedule = {
-            ...
-            "aggregate-daily-load-every-5min": {
-                "task": "wareApp.tasks.aggregate_daily_load_all_sites",
-                "schedule": 300.0,  # every 5 minutes
-                "options": {"queue": "queue2"},
-            },
-        }
-    Or run manually: app.send_task("wareApp.tasks.aggregate_daily_load_all_sites", queue="queue2")
-    """
-    from django.db import close_old_connections
-    from django.db.models import Q
-
-    close_old_connections()
-
-    now = datetime.now()
-    today = now.date()
-    prev_date = today - timedelta(days=1)
-
-    print(f"[DAILY AGG] Starting aggregate_daily_load_all_sites at {now}", flush=True)
-
-    try:
-        all_sites = list(Site.objects.all())
-    except Exception as e:
-        print(f"[DAILY AGG] ERROR fetching sites: {e}", flush=True)
-        return
-
-    for site in all_sites:
-        try:
-            all_site_legs = list(
-                AisleGroup.objects.filter(Q(site=site) | Q(virtual_siteID=site))
-            )
-            if not all_site_legs:
-                continue
-
-            # ── TODAY ──────────────────────────────────────────────────────────
-            current_hour = now.hour
-
-            # 1. Current hour: always delete + recreate (live rolling update)
-            for leg in all_site_legs:
-                try:
-                    load_hourly_entry = list(
-                        HourlyLoadData.objects.filter(
-                            site=site,
-                            aisle_group=leg,
-                            created__date=today,
-                            created__hour=current_hour,
-                        )
-                        .exclude(load_data__isnull=True)
-                        .order_by("created")
-                    )
-                    if not load_hourly_entry:
-                        continue
-
-                    min_load = math.inf
-                    max_load = -math.inf
-                    min_epoch_time = load_hourly_entry[0].epoch_time
-                    max_epoch_time = load_hourly_entry[0].epoch_time
-                    min_created = load_hourly_entry[0].created
-                    max_created = load_hourly_entry[0].created
-
-                    for entry in load_hourly_entry:
-                        load = entry.load_data
-                        if load is None:
-                            continue
-                        if load < min_load:
-                            min_load = load
-                            min_epoch_time = entry.epoch_time
-                            min_created = entry.created
-                        if load > max_load:
-                            max_load = load
-                            max_epoch_time = entry.epoch_time
-                            max_created = entry.created
-
-                    if min_load == math.inf or max_load == -math.inf:
-                        continue
-
-                    DailyLoadData.objects.filter(
-                        site=site,
-                        aisle_group=leg,
-                        created__date=today,
-                        created__hour=current_hour,
-                    ).delete()
-                    DailyLoadData.objects.create(
-                        site=site,
-                        aisle_group=leg,
-                        created=min_created,
-                        load_data=min_load,
-                        epoch_time=min_epoch_time,
-                    )
-                    DailyLoadData.objects.create(
-                        site=site,
-                        aisle_group=leg,
-                        created=max_created,
-                        load_data=max_load,
-                        epoch_time=max_epoch_time,
-                    )
-                except Exception as leg_err:
-                    print(
-                        f"[DAILY AGG] ERROR site={site.id} leg={leg.id} current_hour: {leg_err}",
-                        flush=True,
-                    )
-
-            # 2. Past hours today: only create if DailyLoadData row is missing for that hour
-            try:
-                existing_daily_hours = set(
-                    DailyLoadData.objects.filter(
-                        site=site, created__date=today
-                    ).values_list("created__hour", flat=True)
-                )
-            except Exception:
-                existing_daily_hours = set()
-
-            for h in range(0, current_hour):
-                if h in existing_daily_hours:
-                    continue
-                for leg in all_site_legs:
-                    try:
-                        entries = list(
-                            HourlyLoadData.objects.filter(
-                                site=site,
-                                aisle_group=leg,
-                                created__date=today,
-                                created__hour=h,
-                            )
-                            .exclude(load_data__isnull=True)
-                            .order_by("created")
-                        )
-                        if not entries:
-                            continue
-
-                        min_load = math.inf
-                        max_load = -math.inf
-                        min_epoch_time = entries[0].epoch_time
-                        max_epoch_time = entries[0].epoch_time
-                        min_created = entries[0].created
-                        max_created = entries[0].created
-
-                        for entry in entries:
-                            load = entry.load_data
-                            if load is None:
-                                continue
-                            if load < min_load:
-                                min_load = load
-                                min_epoch_time = entry.epoch_time
-                                min_created = entry.created
-                            if load > max_load:
-                                max_load = load
-                                max_epoch_time = entry.epoch_time
-                                max_created = entry.created
-
-                        if min_load == math.inf or max_load == -math.inf:
-                            continue
-
-                        DailyLoadData.objects.create(
-                            site=site,
-                            aisle_group=leg,
-                            created=min_created,
-                            load_data=min_load,
-                            epoch_time=min_epoch_time,
-                        )
-                        DailyLoadData.objects.create(
-                            site=site,
-                            aisle_group=leg,
-                            created=max_created,
-                            load_data=max_load,
-                            epoch_time=max_epoch_time,
-                        )
-                        print(
-                            f"[DAILY AGG] site={site.id} leg={leg.aisleGroupName} h={h} today → created min/max",
-                            flush=True,
-                        )
-                    except Exception as leg_err:
-                        print(
-                            f"[DAILY AGG] ERROR site={site.id} leg={leg.id} h={h}: {leg_err}",
-                            flush=True,
-                        )
-
-            # ── YESTERDAY ──────────────────────────────────────────────────────
-            try:
-                daily_prev_hours = set(
-                    DailyLoadData.objects.filter(
-                        site=site, created__date=prev_date
-                    ).values_list("created__hour", flat=True)
-                )
-            except Exception:
-                daily_prev_hours = set()
-
-            for h in range(0, 24):
-                if h in daily_prev_hours:
-                    continue
-                for leg in all_site_legs:
-                    try:
-                        entries = list(
-                            HourlyLoadData.objects.filter(
-                                site=site,
-                                aisle_group=leg,
-                                created__date=prev_date,
-                                created__hour=h,
-                            )
-                            .exclude(load_data__isnull=True)
-                            .order_by("created")
-                        )
-                        if not entries:
-                            continue
-
-                        min_load = math.inf
-                        max_load = -math.inf
-                        min_epoch_time = entries[0].epoch_time
-                        max_epoch_time = entries[0].epoch_time
-                        min_created = entries[0].created
-                        max_created = entries[0].created
-
-                        for entry in entries:
-                            load = entry.load_data
-                            if load is None:
-                                continue
-                            if load < min_load:
-                                min_load = load
-                                min_epoch_time = entry.epoch_time
-                                min_created = entry.created
-                            if load > max_load:
-                                max_load = load
-                                max_epoch_time = entry.epoch_time
-                                max_created = entry.created
-
-                        if min_load == math.inf or max_load == -math.inf:
-                            continue
-
-                        DailyLoadData.objects.create(
-                            site=site,
-                            aisle_group=leg,
-                            created=min_created,
-                            load_data=min_load,
-                            epoch_time=min_epoch_time,
-                        )
-                        DailyLoadData.objects.create(
-                            site=site,
-                            aisle_group=leg,
-                            created=max_created,
-                            load_data=max_load,
-                            epoch_time=max_epoch_time,
-                        )
-                        print(
-                            f"[DAILY AGG] site={site.id} leg={leg.aisleGroupName} h={h} yesterday → created min/max",
-                            flush=True,
-                        )
-                    except Exception as leg_err:
-                        print(
-                            f"[DAILY AGG] ERROR site={site.id} leg={leg.id} prev h={h}: {leg_err}",
-                            flush=True,
-                        )
-
-        except Exception as site_err:
-            print(
-                f"[DAILY AGG] ERROR processing site={site.id}: {site_err}", flush=True
-            )
-
-    print(
-        f"[DAILY AGG] Finished aggregate_daily_load_all_sites at {datetime.now()}",
-        flush=True,
-    )
-
-
-from celery.signals import worker_ready
-
-
-@worker_ready.connect
-def auto_start_mqtt_worker(sender, **kwargs):
-    """
-    Automatically dispatch mqtt_client2 when worker.queue2 starts.
-    Eliminates reliance on Django URLs import or manual re-queuing after worker restart.
-    Guards against duplicate dispatch when the task is already active or reserved.
-    """
-    hostname = str(getattr(sender, "hostname", ""))
-    print(f"[CELERY WORKER READY] Worker {hostname} ready", flush=True)
-
-    def is_task_already_running(task_name):
-        """Return True if the task is already active or reserved on any worker."""
-        try:
-            inspect = app.control.inspect()
-            active = inspect.active() or {}
-            reserved = inspect.reserved() or {}
-            for tasks in list(active.values()) + list(reserved.values()):
-                for t in tasks:
-                    if t.get("name") == task_name:
-                        return True
-        except Exception:
-            pass
-        return False
-
-    if "queue2" in hostname:
-        if not is_task_already_running("wareApp.tasks.mqtt_client2"):
-            app.send_task("wareApp.tasks.mqtt_client2", queue="queue2")
-            print(
-                "[CELERY AUTORUN] Dispatched wareApp.tasks.mqtt_client2 to queue2",
-                flush=True,
-            )
-        else:
-            print(
-                "[CELERY AUTORUN] mqtt_client2 already running, skipping dispatch.",
-                flush=True,
-            )
-    elif "queue1" in hostname:
-        if not is_task_already_running("wareApp.tasks.mqtt_client1"):
-            app.send_task("wareApp.tasks.mqtt_client1", queue="queue1")
-            print(
-                "[CELERY AUTORUN] Dispatched wareApp.tasks.mqtt_client1 to queue1",
-                flush=True,
-            )
-        else:
-            print(
-                "[CELERY AUTORUN] mqtt_client1 already running, skipping dispatch.",
-                flush=True,
-            )

@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 
 import os
 
+from kombu import Queue
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from decouple import config
@@ -194,6 +196,14 @@ EMAIL_BACKEND = config("EMAIL_BACKEND", "")
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://guest@localhost//")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "rpc://")
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_QUEUES = (
+    Queue("celery"),
+    Queue("queue1"),
+    Queue("queue2"),
+    Queue("queue1_processing"),
+    Queue("queue2_processing"),
+)
 # CELERYBEAT_SCHEDULER='djcelery'
 
 # SECURE_PROXY_SSL_HEADER         = None

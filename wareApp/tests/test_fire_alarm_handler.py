@@ -10,7 +10,20 @@ from wareApp.mqtt import fire_alarm
 class FireAlarmHandlerTests(SimpleTestCase):
     message = b"Meter_Number:1,R_Volt:230,Y_Volt:80,B_Volt:230,Power_Status:1"
 
+    def test_parser_accepts_gateway_fields_in_any_order(self):
+        values = fire_alarm._parse_fire_alarm_message(
+            b"Power_Status:1,B_Volt:230,Y_Volt:80,R_Volt:230,Meter_Number:1"
+        )
+
+        self.assertEqual(values, (1, 230.0, 80.0, 230.0, 1))
+
     def test_parser_reads_gateway_payload(self):
+        self.assertEqual(
+            fire_alarm._parse_fire_alarm_message(self.message.decode()),
+            (1, 230.0, 80.0, 230.0, 1),
+        )
+
+    def test_parser_accepts_legacy_bytes_wrapper(self):
         self.assertEqual(
             fire_alarm._parse_fire_alarm_message(str(self.message)),
             (1, 230.0, 80.0, 230.0, 1),
@@ -31,10 +44,14 @@ class FireAlarmHandlerTests(SimpleTestCase):
         ), patch(
             "wareApp.mqtt.fire_alarm.Email_History.objects.filter",
             return_value=previous_emails,
-        ), patch("wareApp.mqtt.fire_alarm.Email_History.objects.create") as create, patch(
+        ), patch(
+            "wareApp.mqtt.fire_alarm.Email_History.objects.create"
+        ) as create, patch(
             "wareApp.mqtt.fire_alarm.send_mail_fire_alarm_user"
         ) as send:
-            fire_alarm.handle_fire_alarm_message(site, 156, "gateway-01", str(self.message))
+            fire_alarm.handle_fire_alarm_message(
+                site, 156, "gateway-01", self.message.decode()
+            )
 
         fire_pump_entries.update.assert_called_once()
         send.assert_called_once_with(

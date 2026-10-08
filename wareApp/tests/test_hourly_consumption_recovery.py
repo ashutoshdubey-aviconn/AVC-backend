@@ -20,8 +20,18 @@ class HourlyConsumptionRecoveryTests(SimpleTestCase):
         )
 
         self.assertEqual(aisle_group_id, "967")
-        self.assertEqual(hours, ["2026-10-02 10:15:00.000000", ""])
-        self.assertEqual(consumptions, ["12.5", ""])
+        self.assertEqual(hours, ["2026-10-02 10:15:00.000000"])
+        self.assertEqual(consumptions, ["12.5"])
+
+    def test_parser_keeps_final_value_without_a_trailing_comma(self):
+        message = self.message.replace("12.5,;", "12.5;")
+
+        _, hours, consumptions = (
+            hourly_consumption_recovery._parse_hourly_recovery_message(message)
+        )
+
+        self.assertEqual(hours, ["2026-10-02 10:15:00.000000"])
+        self.assertEqual(consumptions, ["12.5"])
 
     def test_updates_existing_hourly_recovery_record(self):
         aisle_group = SimpleNamespace(is_active=False)

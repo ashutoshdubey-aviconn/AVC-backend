@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from django.db import transaction
 
-from wareApp.models import DGFuelAlertsData, DgFuelConsumptionData, Site
+from wareApp.models import AisleGroup, DGFuelAlertsData, DgFuelConsumptionData, Site
 
 from .dedupe import dedupe_dg_consumption
 from .normalization import as_float, epoch_milliseconds
@@ -26,6 +26,7 @@ def record_fuel_level(
     epoch_value: object,
     source: str,
     created: Optional[datetime] = None,
+    aisle_group: Optional[AisleGroup] = None,
 ) -> Tuple[DgFuelConsumptionData, bool]:
     """Create one provider tank-level sample for a site and normalized epoch."""
     normalized_fuel = as_float(fuel_liters)
@@ -54,6 +55,7 @@ def record_fuel_level(
                 "fuel_consumption": normalized_fuel,
                 "fuel_data_source": source,
                 "created": created,
+                "aisle_group": aisle_group,
             },
         )
     logger.debug(
@@ -77,6 +79,7 @@ def record_fuel_alert(
     fuel_liters: object,
     epoch_value: object,
     created: Optional[datetime] = None,
+    aisle_group: Optional[AisleGroup] = None,
 ) -> Tuple[DGFuelAlertsData, bool]:
     """Create one provider refuel or theft event for a normalized timestamp."""
     normalized_fuel = as_float(fuel_liters)
@@ -111,7 +114,11 @@ def record_fuel_alert(
             vehicle_number=str(vehicle_number),
             alert_name=alert_name,
             epoch_time=str(normalized_epoch),
-            defaults={"fuel_consumption": normalized_fuel, "created": created},
+            defaults={
+                "fuel_consumption": normalized_fuel,
+                "created": created,
+                "aisle_group": aisle_group,
+            },
         )
     logger.debug(
         "DG fuel alert %s site_id=%s vehicle_number=%s alert_name=%s fuel_liters=%s epoch_ms=%s created_at=%s",

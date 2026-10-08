@@ -20,8 +20,18 @@ class DailyConsumptionRecoveryTests(SimpleTestCase):
         )
 
         self.assertEqual(aisle_group_id, "967")
-        self.assertEqual(dates, ["2026-10-01", ""])
-        self.assertEqual(consumptions, ["12.5", ""])
+        self.assertEqual(dates, ["2026-10-01"])
+        self.assertEqual(consumptions, ["12.5"])
+
+    def test_parser_keeps_final_value_without_a_trailing_comma(self):
+        message = self.message.replace("12.5,;", "12.5;")
+
+        _, dates, consumptions = (
+            daily_consumption_recovery._parse_daily_recovery_message(message)
+        )
+
+        self.assertEqual(dates, ["2026-10-01"])
+        self.assertEqual(consumptions, ["12.5"])
 
     def test_updates_only_when_recovered_consumption_is_greater(self):
         aisle_group = SimpleNamespace(is_active=False)

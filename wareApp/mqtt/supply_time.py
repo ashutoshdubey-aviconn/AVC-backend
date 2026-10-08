@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timedelta
 
+from django.db.models import F, Sum
+
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 
 
@@ -33,26 +35,35 @@ def _update_monthly_share_if_due(site, location_id, last_runtime_entry, now):
     if not last_runtime_entry or now.month == last_runtime_entry.reading_from.month:
         return
 
-    previous_month_last_date = now - timedelta(days=1)
-    previous_month_first_date = previous_month_last_date.replace(day=1)
-    monthly_run_time = SupplyLoadTimeShare.objects.filter(site=location_id)
-    monthly_total_run_time = monthly_run_time.filter(
-        reading_from__date__gte=previous_month_first_date,
-        reading_from__date__lte=previous_month_last_date,
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+    monthly_totals = (
+        SupplyLoadTimeShare.objects.filter(
+            site=location_id,
+            reading_from__gte=previous_month_start,
+            reading_from__lt=current_month_start,
+        )
+        .values("power_source")
+        .annotate(total_runtime=Sum("hourly_run_time"))
     )
-    total_time = sum(entry.hourly_run_time for entry in monthly_total_run_time)
+    total_time = sum(entry["total_runtime"] for entry in monthly_totals)
     if not total_time:
         return
 
-    for entry in monthly_run_time.distinct("power_source"):
-        source_run_time = monthly_total_run_time.filter(power_source=entry.power_source)
-        source_total_time = sum(item.hourly_run_time for item in source_run_time)
-        MonthlyLoadSharePercentage.objects.create(
+    for entry in monthly_totals:
+        share = (entry["total_runtime"] / total_time) * 100
+        monthly_share = MonthlyLoadSharePercentage.objects.filter(
             site=site,
-            power_source=entry.power_source,
-            monthly_time_based_percentage=(source_total_time / total_time) * 100,
-            for_month=previous_month_first_date.strftime("%m %Y"),
+            power_source=entry["power_source"],
+            for_month=previous_month_start.strftime("%m %Y"),
         )
+        if not monthly_share.update(monthly_time_based_percentage=share):
+            MonthlyLoadSharePercentage.objects.create(
+                site=site,
+                power_source=entry["power_source"],
+                monthly_time_based_percentage=share,
+                for_month=previous_month_start.strftime("%m %Y"),
+            )
 
 
 def handle_supply_time_message(
@@ -70,12 +81,7 @@ def handle_supply_time_message(
             reading_from__gte=hour_start,
             reading_from__lte=hour_end,
         )
-        current_hour_record = current_hour.first()
-
-        if current_hour_record:
-            current_hour.update(
-                hourly_run_time=current_hour_record.hourly_run_time + source_run_time
-            )
+        if current_hour.update(hourly_run_time=F("hourly_run_time") + source_run_time):
             logger.info(
                 "Updated SupplyTime for site %s, source %s, hour %s",
                 location_id,
@@ -84,7 +90,7 @@ def handle_supply_time_message(
             )
             return
 
-        last_runtime_entry = run_time.last()
+        last_runtime_entry = run_time.order_by("-reading_from", "-id").first()
         _update_monthly_share_if_due(
             site, location_id, last_runtime_entry, datetime.now()
         )

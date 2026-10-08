@@ -17,7 +17,11 @@ def _parse_hourly_recovery_message(message):
         raise ValueError("Invalid hourlyConsumption recovery payload")
 
     aisle_group_id, recovery_hours, unit_consumptions, _ = match.groups()
-    return aisle_group_id, recovery_hours.split(","), unit_consumptions.split(",")
+    return (
+        aisle_group_id,
+        [value for value in recovery_hours.split(",") if value],
+        [value for value in unit_consumptions.split(",") if value],
+    )
 
 
 def _hourly_baseline_for_day(location_id, aisle_group_id, observed_at):
@@ -30,7 +34,7 @@ def _hourly_baseline_for_day(location_id, aisle_group_id, observed_at):
     if not baseline:
         baseline = SiteBaseline.objects.filter(
             associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-        ).last()
+        ).order_by("-baseline_to", "-id").first()
     return baseline.baseline_value / baseline.working_hours
 
 
@@ -46,16 +50,16 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
         if not aisle_group:
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
-        for index in range(min(len(recovery_hours), len(recovery_values)) - 1):
+        for recovery_hour, recovery_value in zip(recovery_hours, recovery_values):
             observed_at = datetime.strptime(
-                recovery_hours[index], "%Y-%m-%d %H:%M:%S.%f"
+                recovery_hour, "%Y-%m-%d %H:%M:%S.%f"
             )
             hour_start = observed_at.replace(minute=0, second=0, microsecond=0)
             hour_end = observed_at.replace(minute=59, second=59, microsecond=0)
             consumption = (
                 0.0
-                if recovery_values[index] == "ERROR404"
-                else float(recovery_values[index])
+                if recovery_value == "ERROR404"
+                else float(recovery_value)
             )
             hourly_baseline = 0.0
             saving = 0.0

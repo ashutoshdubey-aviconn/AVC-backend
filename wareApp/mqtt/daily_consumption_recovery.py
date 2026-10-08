@@ -17,7 +17,11 @@ def _parse_daily_recovery_message(message):
         raise ValueError("Invalid dailyConsumption recovery payload")
 
     aisle_group_id, recovery_dates, unit_consumptions, _ = match.groups()
-    return aisle_group_id, recovery_dates.split(","), unit_consumptions.split(",")
+    return (
+        aisle_group_id,
+        [value for value in recovery_dates.split(",") if value],
+        [value for value in unit_consumptions.split(",") if value],
+    )
 
 
 def _baseline_for_day(location_id, aisle_group_id, observed_at):
@@ -33,8 +37,7 @@ def _baseline_for_day(location_id, aisle_group_id, observed_at):
     return (
         SiteBaseline.objects.filter(
             associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-        )
-        .last()
+        ).order_by("-baseline_to", "-id").first()
         .baseline_value
     )
 
@@ -51,12 +54,12 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
         if not aisle_group:
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
-        for index in range(min(len(recovery_dates), len(recovery_values)) - 1):
-            observed_at = datetime.strptime(recovery_dates[index], "%Y-%m-%d")
+        for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
+            observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = (
                 0.0
-                if recovery_values[index] == "ERROR404"
-                else float(recovery_values[index])
+                if recovery_value == "ERROR404"
+                else float(recovery_value)
             )
             baseline_value = 0.0
             saving = 0.0

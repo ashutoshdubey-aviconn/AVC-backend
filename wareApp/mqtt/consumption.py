@@ -1,6 +1,9 @@
 import logging
 from datetime import datetime, timedelta
 
+from django.db import transaction
+from django.db.models import F, Sum
+
 from wareApp.models import (
     AisleGroup,
     AlarmNotifications,
@@ -14,23 +17,42 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_consumption_message(message):
-    data = message.split(",")
-    message_time = data[3].split(":")[1].split(" ")
+    fields = {}
+    for field in str(message).split(","):
+        key, separator, value = field.partition(":")
+        if not separator:
+            raise ValueError(f"Invalid consumption field: {field!r}")
+        fields[key.strip().lower().replace("_", "")] = value.strip()
+
+    def value_for(key):
+        try:
+            return fields[key]
+        except KeyError as error:
+            raise ValueError(f"Missing consumption field: {key}") from error
+
+    message_time = value_for("time").split(" ")
+    if len(message_time) != 2:
+        raise ValueError("Invalid consumption timestamp")
+
     return {
-        "consumption_time": float(data[0].split(":")[1]),
-        "new_unit_consumption": float(data[1].split(":")[1]),
+        "consumption_time": float(value_for("consumptiontime")),
+        "new_unit_consumption": float(value_for("consumption")),
         "observed_date": datetime.strptime(message_time[0], "%Y-%m-%d"),
         "observed_hour": int(message_time[1]),
-        "current_hour_consumption": float(data[5].split(":")[1]),
-        "aisle_group_id": int(data[6].split(":")[1]),
-        "previous_hour_consumption": float(data[8].split(":")[1]),
+        "current_hour_consumption": float(value_for("currenthourtotalconsumption")),
+        "aisle_group_id": int(value_for("aislegroup")),
+        "previous_hour_consumption": float(value_for("previoushourtotalconsumption")),
     }
 
 
 def _hourly_baseline(location_id, aisle_group_id):
-    baseline = SiteBaseline.objects.filter(
-        associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-    ).last()
+    baseline = (
+        SiteBaseline.objects.filter(
+            associated_site_id=int(location_id), leg_id=str(aisle_group_id)
+        )
+        .order_by("-baseline_to", "-id")
+        .first()
+    )
     return baseline.baseline_value / baseline.working_hours, baseline.baseline_value
 
 
@@ -41,17 +63,15 @@ def _consumption_alarms(site, leg_id, current_consumption):
         leg_id=leg_id,
         reading_for__gte=(current_date - timedelta(days=7)).date(),
     )
-    average_consumption = sum(
-        reading.unit_consumption for reading in daily_readings
+    average_consumption = (
+        daily_readings.aggregate(total=Sum("unit_consumption"))["total"] or 0
     ) / 7
     maximum = round(
-        average_consumption
-        + (average_consumption * site.max_threshold_value) / 100,
+        average_consumption + (average_consumption * site.max_threshold_value) / 100,
         2,
     )
     minimum = round(
-        average_consumption
-        - (average_consumption * site.min_threshold_value) / 100,
+        average_consumption - (average_consumption * site.min_threshold_value) / 100,
         2,
     )
     if current_consumption > maximum:
@@ -92,7 +112,10 @@ def _publish_consumption_recovery(
     publish_recovery(topic, message)
 
 
-def handle_consumption_message(site, location_id, gateway_id, message, publish_recovery):
+@transaction.atomic
+def handle_consumption_message(
+    site, location_id, gateway_id, message, publish_recovery
+):
     """Persist a gateway consumption packet outside the Paho callback."""
     try:
         values = _parse_consumption_message(message)
@@ -101,9 +124,11 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
         )
         hour_end = observed_at.replace(minute=59, second=59)
         aisle_group_id = values["aisle_group_id"]
-        aisle_group = AisleGroup.objects.filter(
-            site=site, attached_leg_id=str(aisle_group_id)
-        ).first()
+        aisle_group = (
+            AisleGroup.objects.select_for_update()
+            .filter(site=site, attached_leg_id=str(aisle_group_id))
+            .first()
+        )
         if not aisle_group:
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
@@ -125,7 +150,7 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
         daily_entries = DailySiteReading.objects.filter(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
-        daily_record = daily_entries.first()
+        daily_record = None
 
         if not current_hour_entries.update(
             unit_consumption=values["current_hour_consumption"]
@@ -137,6 +162,7 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
             )
             previous_record = previous_entries.first()
             if previous_record:
+                daily_record = daily_entries.first()
                 if (
                     previous_record.unit_consumption
                     != values["previous_hour_consumption"]
@@ -144,7 +170,9 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
                     previous_entries.update(
                         unit_consumption=values["previous_hour_consumption"]
                     )
-                    previous_record.unit_consumption = values["previous_hour_consumption"]
+                    previous_record.unit_consumption = values[
+                        "previous_hour_consumption"
+                    ]
 
                 hourly_baseline = 0.0
                 if aisle_group.is_active:
@@ -156,13 +184,21 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
                     )
 
                 if daily_record:
+                    day_start = observed_at.replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
                     hourly_readings = HourlySiteReading.objects.filter(
                         associated_Site=site,
                         aisle_group=aisle_group,
-                        reading_from__date=observed_at.date(),
-                        reading_to__date=observed_at.date(),
+                        reading_from__gte=day_start,
+                        reading_from__lt=day_start + timedelta(days=1),
                     )
-                    total = sum(reading.unit_consumption for reading in hourly_readings)
+                    total = (
+                        hourly_readings.aggregate(total=Sum("unit_consumption"))[
+                            "total"
+                        ]
+                        or 0
+                    )
                     if total != daily_record.unit_consumption:
                         daily_record.unit_consumption = total
                         daily_record.save()
@@ -183,7 +219,7 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
                     location_id,
                     gateway_id,
                     aisle_group_id,
-                    hourly_entries.last(),
+                    hourly_entries.order_by("-reading_to", "-id").first(),
                 )
                 return
             else:
@@ -217,31 +253,37 @@ def handle_consumption_message(site, location_id, gateway_id, message, publish_r
         if aisle_group.is_active:
             _, daily_baseline = _hourly_baseline(location_id, aisle_group_id)
         if daily_record:
-            new_consumption = (
-                daily_record.unit_consumption + values["new_unit_consumption"]
-            )
             daily_entries.update(
-                unit_consumption=new_consumption,
-                energy_saved=daily_baseline - new_consumption,
+                unit_consumption=F("unit_consumption") + values["new_unit_consumption"],
+                energy_saved=daily_baseline
+                - (F("unit_consumption") + values["new_unit_consumption"]),
                 daily_baseline_value=daily_baseline,
             )
         else:
-            DailySiteReading.objects.create(
-                associated_Site=site,
-                aisle_group=aisle_group,
-                leg_id=aisle_group_id,
-                unit_consumption=values["new_unit_consumption"],
+            if not daily_entries.update(
+                unit_consumption=F("unit_consumption") + values["new_unit_consumption"],
+                energy_saved=daily_baseline
+                - (F("unit_consumption") + values["new_unit_consumption"]),
                 daily_baseline_value=daily_baseline,
-                reading_for=observed_at.date(),
-                is_visible=True,
-            )
-            yesterday = DailySiteReading.objects.filter(
-                associated_Site=site,
-                leg_id=aisle_group_id,
-                reading_for=observed_at.date() - timedelta(days=1),
-            ).first()
-            if yesterday:
-                _consumption_alarms(site, aisle_group_id, yesterday.unit_consumption)
+            ):
+                DailySiteReading.objects.create(
+                    associated_Site=site,
+                    aisle_group=aisle_group,
+                    leg_id=aisle_group_id,
+                    unit_consumption=values["new_unit_consumption"],
+                    daily_baseline_value=daily_baseline,
+                    reading_for=observed_at.date(),
+                    is_visible=True,
+                )
+                yesterday = DailySiteReading.objects.filter(
+                    associated_Site=site,
+                    leg_id=aisle_group_id,
+                    reading_for=observed_at.date() - timedelta(days=1),
+                ).first()
+                if yesterday:
+                    _consumption_alarms(
+                        site, aisle_group_id, yesterday.unit_consumption
+                    )
     except Exception:
         logger.exception(
             "Queue1 consumption processing failed for site %s from gateway %s",

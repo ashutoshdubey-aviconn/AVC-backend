@@ -32,6 +32,32 @@ class DgFuelCollectionTests(unittest.TestCase):
         self.assertEqual(result["failed_site_ids"], [])
         self.assertEqual(result["expired_site_ids"], [92])
 
+    def test_collects_loconav_sample_for_configured_dg_aisle(self):
+        site = SimpleNamespace(id=76)
+        dg_aisle = SimpleNamespace(
+            pk=718,
+            site=site,
+            dg_fuel_enabled=True,
+            dg_fuel_provider="loconav",
+            dg_fuel_vehicle_number="DCGenerator-02",
+        )
+        result = collect_loconav_levels(
+            [dg_aisle],
+            lambda vehicle: {
+                "data": [
+                    {
+                        "vehicle_number": vehicle,
+                        "fuel_in_liters": 356.16,
+                        "timestamp": 1788115579000,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(len(result["samples"]), 1)
+        self.assertEqual(result["samples"][0]["site"], site)
+        self.assertEqual(result["samples"][0]["aisle_group"], dg_aisle)
+
     def test_maps_roadcast_levels_and_reports_missing_devices(self):
         present = SimpleNamespace(id=118, partner_dg_fuel_id="353691840557010")
         absent = SimpleNamespace(id=124, partner_dg_fuel_id="353201353997221")
@@ -51,6 +77,32 @@ class DgFuelCollectionTests(unittest.TestCase):
         self.assertEqual(result["samples"][0]["site"], present)
         self.assertEqual(result["missing_vehicle_ids"], ["353201353997221"])
         self.assertEqual(result["expired_vehicle_ids"], ["353201353997221"])
+
+    def test_maps_roadcast_level_to_configured_dg_aisle(self):
+        site = SimpleNamespace(id=118)
+        dg_aisle = SimpleNamespace(
+            pk=719,
+            site=site,
+            dg_fuel_enabled=True,
+            dg_fuel_provider="roadcast",
+            dg_fuel_vehicle_number="353691840557010",
+        )
+        result = collect_roadcast_levels(
+            [dg_aisle],
+            lambda: {
+                "data": [
+                    {
+                        "deviceImei": "353691840557010",
+                        "fuel": 275.46,
+                        "lastUpdate": "2026-08-30T18:44:40.000000+0000",
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(len(result["samples"]), 1)
+        self.assertEqual(result["samples"][0]["site"], site)
+        self.assertEqual(result["samples"][0]["aisle_group"], dg_aisle)
 
     def test_only_current_roadcast_samples_are_persistable(self):
         current_site = SimpleNamespace(id=118, partner_dg_fuel_id="353691840557010")

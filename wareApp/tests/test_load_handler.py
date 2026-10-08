@@ -20,6 +20,20 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(values["power_source"], "1")
         self.assertEqual(values["meter_number"], 2)
 
+    def test_parser_accepts_gateway_fields_in_any_order(self):
+        values = load._parse_load_message(",".join(reversed(self.message.split(","))))
+
+        self.assertEqual(values["load_power"], 14.0)
+        self.assertEqual(values["status"], "ON")
+
+    def test_parser_reads_plain_power_factor_payload(self):
+        values = load._parse_load_message(
+            f"{self.message},R_Power_Factor:0.8,"
+            "Y_Power_Factor:0.9,B_Power_Factor:1.0"
+        )
+
+        self.assertEqual(values["power_factors"], (0.8, 0.9, 1.0))
+
     def test_creates_first_load_power_record(self):
         site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=False)
         entries = Mock(first=Mock(return_value=None))

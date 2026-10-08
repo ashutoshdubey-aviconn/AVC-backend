@@ -16,7 +16,11 @@ def _parse_load_runtime_recovery_message(message):
         raise ValueError("Invalid loadRuntime recovery payload")
 
     source, recovery_hours, recovery_values = match.groups()
-    return int(source), recovery_hours.split(","), recovery_values.split(",")
+    return (
+        int(source),
+        [value for value in recovery_hours.split(",") if value],
+        [value for value in recovery_values.split(",") if value],
+    )
 
 
 def handle_load_runtime_recovery_message(site, location_id, gateway_id, message):
@@ -29,14 +33,14 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
             site=site, power_source=source
         )
 
-        for index in range(min(len(recovery_hours), len(recovery_values)) - 1):
+        for recovery_hour, recovery_value in zip(recovery_hours, recovery_values):
             observed_at = datetime.strptime(
-                recovery_hours[index], "%Y-%m-%d %H:%M:%S.%f"
+                recovery_hour, "%Y-%m-%d %H:%M:%S.%f"
             )
             runtime = (
                 0
-                if recovery_values[index] == "ERROR404"
-                else int(recovery_values[index])
+                if recovery_value == "ERROR404"
+                else int(recovery_value)
             )
             if source_records.filter(reading_from=observed_at).update(
                 hourly_run_time=runtime

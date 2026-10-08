@@ -18,10 +18,14 @@ QUEUE_ONE_MESSAGE_TYPES = frozenset(
 )
 QUEUE_TWO_MESSAGE_TYPES = frozenset({"LoadData"})
 
+# These types remain recognized for compatibility, but queue1 has no inbound
+# handler for them. `sync` is currently used only for gateway recovery requests.
+QUEUE_ONE_NOOP_MESSAGE_TYPES = frozenset({"sync", "remoteAccess"})
+
 MQTT_TOPIC_PREFIX = "/Acclivate/iOmniControl/+/+/in"
 QUEUE_ONE_SUBSCRIPTIONS = tuple(
     f"{MQTT_TOPIC_PREFIX}/{message_type}/#"
-    for message_type in sorted(QUEUE_ONE_MESSAGE_TYPES)
+    for message_type in sorted(QUEUE_ONE_MESSAGE_TYPES - QUEUE_ONE_NOOP_MESSAGE_TYPES)
 )
 QUEUE_TWO_SUBSCRIPTIONS = tuple(
     f"{MQTT_TOPIC_PREFIX}/{message_type}/#"

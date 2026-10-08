@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
+from wareApp import tasks
 from wareApp.load_data import handler, monthly, rollups
 from wareApp.load_data.parser import LoadReading, parse_load_data_message
 from warehouse.celery import app
@@ -96,6 +97,20 @@ class LoadDataTests(SimpleTestCase):
 
         handler.handle_load_data_message(
             None, site, 1, "gw-1", "b'bad-payload'", ["LoadData"]
+        )
+
+    def test_processing_task_resolves_site_before_handling_load_data(self):
+        site = SimpleNamespace(id=156)
+
+        with (
+            patch("wareApp.tasks.Site.objects.get", return_value=site) as get_site,
+            patch("wareApp.tasks.handle_load_data_message") as handle_message,
+        ):
+            tasks.process_load_data_message.run(156, "gateway-01", "payload")
+
+        get_site.assert_called_once_with(id=156)
+        handle_message.assert_called_once_with(
+            None, site, 156, "gateway-01", "payload", ["LoadData"]
         )
 
     def test_monthly_update_skips_site_load_query_when_bounds_do_not_change(self):

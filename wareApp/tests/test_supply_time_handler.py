@@ -2,6 +2,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from django.db.models import F
 from django.test import SimpleTestCase
 
 from wareApp import tasks
@@ -22,7 +23,7 @@ class SupplyTimeHandlerTests(SimpleTestCase):
 
     def test_updates_existing_hourly_runtime(self):
         current_hour = Mock()
-        current_hour.first.return_value = SimpleNamespace(hourly_run_time=5)
+        current_hour.update.return_value = 1
         run_time = Mock()
         run_time.filter.return_value = current_hour
 
@@ -34,15 +35,17 @@ class SupplyTimeHandlerTests(SimpleTestCase):
                 Mock(), SimpleNamespace(), 156, "gateway-01", self.message
             )
 
-        current_hour.update.assert_called_once_with(hourly_run_time=17.0)
+        current_hour.update.assert_called_once_with(
+            hourly_run_time=F("hourly_run_time") + 12.0
+        )
 
     def test_creates_first_runtime_record(self):
         current_hour = Mock()
-        current_hour.first.return_value = None
+        current_hour.update.return_value = 0
         previous_hour = Mock()
         run_time = Mock()
         run_time.filter.side_effect = [current_hour, previous_hour]
-        run_time.last.return_value = None
+        run_time.order_by.return_value.first.return_value = None
         site = SimpleNamespace()
 
         with patch(
@@ -65,12 +68,12 @@ class SupplyTimeHandlerTests(SimpleTestCase):
 
     def test_requests_recovery_when_previous_hour_is_missing(self):
         current_hour = Mock()
-        current_hour.first.return_value = None
+        current_hour.update.return_value = 0
         previous_hour = Mock()
         previous_hour.exists.return_value = False
         run_time = Mock()
         run_time.filter.side_effect = [current_hour, previous_hour]
-        run_time.last.return_value = SimpleNamespace(
+        run_time.order_by.return_value.first.return_value = SimpleNamespace(
             reading_from=datetime(2026, 10, 1, 8)
         )
         client = Mock()
@@ -88,6 +91,75 @@ class SupplyTimeHandlerTests(SimpleTestCase):
             client.publish.call_args.args[0],
             "/Acclivate/iOmniControl/156/gateway-01/in/sync/loadTime/state",
         )
+
+    def test_monthly_share_uses_previous_month_grouped_totals(self):
+        site = SimpleNamespace()
+        last_runtime_entry = SimpleNamespace(reading_from=datetime(2026, 10, 31, 23))
+        grouped_totals = [
+            {"power_source": 1, "total_runtime": 30},
+            {"power_source": 2, "total_runtime": 70},
+        ]
+        values = Mock()
+        values.annotate.return_value = grouped_totals
+        entries = Mock()
+        entries.values.return_value = values
+        monthly_share = Mock()
+        monthly_share.update.return_value = 0
+
+        with patch(
+            "wareApp.mqtt.supply_time.SupplyLoadTimeShare.objects.filter",
+            return_value=entries,
+        ) as filter_entries, patch(
+            "wareApp.mqtt.supply_time.MonthlyLoadSharePercentage.objects.filter",
+            return_value=monthly_share,
+        ) as filter_monthly_share, patch(
+            "wareApp.mqtt.supply_time.MonthlyLoadSharePercentage.objects.create"
+        ) as create:
+            supply_time._update_monthly_share_if_due(
+                site, 156, last_runtime_entry, datetime(2026, 11, 1, 3)
+            )
+
+        filter_entries.assert_called_once_with(
+            site=156,
+            reading_from__gte=datetime(2026, 10, 1),
+            reading_from__lt=datetime(2026, 11, 1),
+        )
+        self.assertEqual(create.call_count, 2)
+        self.assertEqual(create.call_args_list[0].kwargs["power_source"], 1)
+        self.assertEqual(
+            create.call_args_list[0].kwargs["monthly_time_based_percentage"], 30
+        )
+        self.assertEqual(create.call_args_list[1].kwargs["power_source"], 2)
+        self.assertEqual(
+            create.call_args_list[1].kwargs["monthly_time_based_percentage"], 70
+        )
+        self.assertEqual(filter_monthly_share.call_count, 2)
+
+    def test_monthly_share_updates_existing_record(self):
+        site = SimpleNamespace()
+        last_runtime_entry = SimpleNamespace(reading_from=datetime(2026, 10, 31, 23))
+        values = Mock()
+        values.annotate.return_value = [{"power_source": 1, "total_runtime": 10}]
+        entries = Mock()
+        entries.values.return_value = values
+        monthly_share = Mock()
+        monthly_share.update.return_value = 1
+
+        with patch(
+            "wareApp.mqtt.supply_time.SupplyLoadTimeShare.objects.filter",
+            return_value=entries,
+        ), patch(
+            "wareApp.mqtt.supply_time.MonthlyLoadSharePercentage.objects.filter",
+            return_value=monthly_share,
+        ), patch(
+            "wareApp.mqtt.supply_time.MonthlyLoadSharePercentage.objects.create"
+        ) as create:
+            supply_time._update_monthly_share_if_due(
+                site, 156, last_runtime_entry, datetime(2026, 11, 1, 3)
+            )
+
+        monthly_share.update.assert_called_once_with(monthly_time_based_percentage=100)
+        create.assert_not_called()
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)

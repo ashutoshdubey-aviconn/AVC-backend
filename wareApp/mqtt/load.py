@@ -17,24 +17,40 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_load_message(message):
-    fields = message.split(",")
+    payload = message.decode("utf-8") if isinstance(message, bytes) else str(message)
+    payload = payload.strip()
+    if payload.startswith("b'") and payload.endswith("'"):
+        payload = payload[2:-1]
+    fields = {}
+    for field in payload.split(","):
+        key, separator, value = field.partition(":")
+        if not separator:
+            raise ValueError(f"Invalid load field: {field!r}")
+        fields[key.strip().lower().replace("_", "")] = value.strip().strip("'")
+
+    def value_for(key):
+        try:
+            return fields[key]
+        except KeyError as error:
+            raise ValueError(f"Missing load field: {key}") from error
+
     values = {
-        "load_power": float(fields[0].split(":")[1]),
-        "r_volt": float(fields[1].split(":")[1]),
-        "y_volt": float(fields[2].split(":")[1]),
-        "b_volt": float(fields[3].split(":")[1]),
-        "r_current": float(fields[4].split(":")[1]),
-        "y_current": float(fields[5].split(":")[1]),
-        "b_current": float(fields[6].split(":")[1]),
-        "power_source": fields[7].split(":")[1],
-        "status": fields[8].split(":")[1],
-        "meter_number": int(fields[9].split(":")[1]),
+        "load_power": float(value_for("loadpower")),
+        "r_volt": float(value_for("rvolt")),
+        "y_volt": float(value_for("yvolt")),
+        "b_volt": float(value_for("bvolt")),
+        "r_current": float(value_for("rcurrent")),
+        "y_current": float(value_for("ycurrent")),
+        "b_current": float(value_for("bcurrent")),
+        "power_source": value_for("powersource"),
+        "status": value_for("status"),
+        "meter_number": int(value_for("meternumber")),
     }
-    if len(fields) == 14:
+    if {"rpowerfactor", "ypowerfactor", "bpowerfactor"}.issubset(fields):
         values["power_factors"] = (
-            float(fields[11].split(":")[1]),
-            float(fields[12].split(":")[1]),
-            float(fields[13].split(":")[1][:-1]),
+            float(value_for("rpowerfactor")),
+            float(value_for("ypowerfactor")),
+            float(value_for("bpowerfactor")),
         )
     return values
 

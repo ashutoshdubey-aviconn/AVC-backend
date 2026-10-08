@@ -235,6 +235,14 @@ class SupplyLoadTimeShare(models.Model):
     def __str__(self):
         return self.get_power_source_display()
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["site", "power_source", "reading_from"],
+                name="idx_supply_site_src_time",
+            )
+        ]
+
 
 class Image(models.Model):
     which_site = models.ForeignKey(
@@ -293,6 +301,10 @@ class Floor(models.Model):
 
 
 class AisleGroup(models.Model):
+    class DgFuelProvider(models.TextChoices):
+        LOCONAV = "loconav", "LocoNav"
+        ROADCAST = "roadcast", "Roadcast"
+
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     attached_leg_id = models.CharField(max_length=30, null=True, blank=True)
     block_id = models.ManyToManyField(BlockInfo)
@@ -321,6 +333,14 @@ class AisleGroup(models.Model):
     y_phase_pf_threshold = models.FloatField(default=0, blank=True, null=True)
     b_phase_pf_threshold = models.FloatField(default=0, blank=True, null=True)
     load_graph_color = models.CharField(max_length=30, null=True, blank=True)
+    dg_fuel_enabled = models.BooleanField(default=False)
+    dg_fuel_provider = models.CharField(
+        max_length=32,
+        choices=DgFuelProvider.choices,
+        null=True,
+        blank=True,
+    )
+    dg_fuel_vehicle_number = models.CharField(max_length=50, null=True, blank=True)
     virtual_siteID = models.ForeignKey(
         to=Site,
         on_delete=models.CASCADE,
@@ -524,6 +544,14 @@ class SiteBaseline(models.Model):
     def __str__(self):
         return str(self.baseline_value)
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["associated_site_id", "leg_id", "baseline_from", "baseline_to"],
+                name="idx_baseline_site_leg_dates",
+            )
+        ]
+
 
 # class AlarmNotifications(models.Model):
 #     created_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
@@ -664,6 +692,10 @@ class SiteLoadPower(models.Model):
                 fields=["Associated_Site", "Updated_on"],
                 name="idx_sitepower_site_updated",
             ),
+            models.Index(
+                fields=["Associated_Site", "Supply_Source", "Meter_Number"],
+                name="idx_sitepower_site_src_meter",
+            ),
         ]
 
     def __str__(self):
@@ -785,6 +817,13 @@ class FirePumpAlarm(models.Model):
     def __str__(self):
         return self.aisleGroup.aisleGroupName
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["Site", "Meter_Number"], name="idx_fpalarm_site_meter"
+            )
+        ]
+
 
 class Email_History(models.Model):
     fire_site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
@@ -804,6 +843,14 @@ class Email_History(models.Model):
 
     def __str__(self):
         return self.fire_site.site_name
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["fire_site", "deviceName", "email_for", "created"],
+                name="idx_email_site_dev_kind_time",
+            )
+        ]
 
 
 class Email(models.Model):
@@ -989,6 +1036,9 @@ class DGAlertsData(models.Model):
 
 class DgFuelConsumptionData(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    aisle_group = models.ForeignKey(
+        AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
+    )
     vehicle_number = models.CharField(max_length=50, null=True, blank=True, default=1)
     # vehicle_number = models.ForeignKey(DgFuelSystem, on_delete=models.CASCADE, null=True, blank=True)
     fuel_consumption = models.FloatField(default=0, null=True, blank=True)
@@ -1032,6 +1082,8 @@ class DgUnitConsumption(models.Model):
     epoch_time = models.CharField(max_length=50, null=True, blank=True)
     is_dg_on = models.BooleanField(default=False)
     fetch_fuel_data = models.BooleanField(default=False)
+    fuel_provider = models.CharField(max_length=32, null=True, blank=True)
+    fuel_vehicle_number = models.CharField(max_length=50, null=True, blank=True)
     daily_data_status = models.CharField(
         max_length=16,
         choices=DailyDataStatus.choices,
@@ -1047,6 +1099,9 @@ class DgUnitConsumption(models.Model):
 
 class DGFuelAlertsData(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    aisle_group = models.ForeignKey(
+        AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
+    )
     alert_name = models.CharField(max_length=50, null=True, blank=True)
     vehicle_number = models.CharField(max_length=50, null=True, blank=True)
     fuel_consumption = models.FloatField(default=0, null=True, blank=True)
@@ -1111,6 +1166,14 @@ class NewAlarmsNotifications(models.Model):
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["site_id", "power_source", "alarm_type", "created"],
+                name="idx_alarm_site_src_type_time",
+            )
+        ]
+
 
 class SiteLoadParameters(models.Model):
     site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
@@ -1136,6 +1199,14 @@ class SiteLoadParameters(models.Model):
 
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["site_id", "power_source", "parameter_type", "created"],
+                name="idx_lp_site_src_type_time",
+            )
+        ]
 
 
 class SiteConsumptionPing(models.Model):

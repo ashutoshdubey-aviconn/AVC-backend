@@ -23,6 +23,48 @@ from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
 logger = logging.getLogger(__name__)
 
 
+def _queue_one_processing_task(message_type, message_subtype):
+    from wareApp import tasks
+
+    task_by_message = {
+        "consumption": tasks.process_consumption_message,
+        "FIREALARM": tasks.process_fire_alarm_message,
+        "load": tasks.process_load_message,
+        "SupplyTime": tasks.process_supply_time_message,
+    }
+    if message_type == "recovery":
+        return {
+            "dailyConsumption": tasks.process_daily_consumption_recovery_message,
+            "hourlyConsumption": tasks.process_hourly_consumption_recovery_message,
+            "loadRuntime": tasks.process_load_runtime_recovery_message,
+        }.get(message_subtype)
+    return task_by_message.get(message_type)
+
+
+def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
+    task = _queue_one_processing_task(topic.message_type, topic.message_subtype)
+    if task is None:
+        logger.info(
+            "Ignoring queue1 message without a processing handler: type=%s subtype=%s "
+            "site=%s gateway=%s",
+            topic.message_type,
+            topic.message_subtype,
+            site_id,
+            gateway_id,
+        )
+        return False
+
+    task.apply_async(args=(site_id, gateway_id, message), queue="queue1_processing")
+    logger.debug(
+        "Queued %s%s for site %s from gateway %s",
+        topic.message_type,
+        f"/{topic.message_subtype}" if topic.message_type == "recovery" else "",
+        site_id,
+        gateway_id,
+    )
+    return True
+
+
 def _log_legacy_message(*values, **_kwargs):
     logger.debug(" ".join(str(value) for value in values))
 
@@ -473,11 +515,11 @@ def run_mqtt_client1():
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(client, userdata, msg):
-        print("Queue 1 only ######################")
-        print("Topic: ", msg.topic + "  Message: " + str(msg.payload))
-        print("######################")
-        message = str(msg.payload)
-        print("message_value :", message)
+        message = (
+            msg.payload.decode("utf-8", errors="replace")
+            if isinstance(msg.payload, bytes)
+            else str(msg.payload)
+        )
         try:
             topic = parse_gateway_topic(msg.topic)
         except TopicParseError as error:
@@ -490,24 +532,12 @@ def run_mqtt_client1():
 
         location_id = topic.site_id
         gw_id = topic.gateway_id
-        msg_type = [topic.message_type]
-        msg_subtype = topic.message_subtype
-        print(gw_id)
-        print("msg_type : ", msg_type)
-        print("This is the message type: ", msg_type)
-        try:
-            site = Site.objects.get(id=location_id)
-        except Site.DoesNotExist:
-            logger.warning(
-                "Ignoring queue1 message for missing site %s from gateway %s",
-                location_id,
-                gw_id,
-            )
+        if _queue_one_message_for_processing(location_id, gw_id, message, topic):
             return
-        print("Location Id is : ", location_id)
-        print("Site Name : {}".format(site.site_name))
 
-        if "consumption" in msg_type:
+        return
+
+        if topic.message_type == "consumption":
             from wareApp.tasks import process_consumption_message
 
             process_consumption_message.apply_async(
@@ -2103,8 +2133,8 @@ def run_mqtt_client1():
     client = mqtt.Client("server_paho_client_1")
     client.on_connect = on_connect
     client.on_message = on_message
-
-    client.connect("127.0.0.1", 1883, 60)
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
+    client.connect_async("127.0.0.1", 1883, 60)
     logger.info("Queue1 MQTT client started")
     # client.username_pw_set("djgpjqqt","AfTkXiiaov8c")
 
@@ -2112,7 +2142,7 @@ def run_mqtt_client1():
     # handles reconnecting.
     # Other loop*() functions are available that give a threaded interface and a
     # manual interface.
-    client.loop_forever()
+    return client.loop_forever(retry_first_connection=True)
 
 
 def _run_mqtt_client2_legacy():
@@ -2808,27 +2838,25 @@ def run_mqtt_client2():
             return
 
         try:
-            site = Site.objects.get(id=topic.site_id)
-        except Site.DoesNotExist:
-            logger.warning(
-                "Ignoring LoadData for missing site %s from gateway %s",
-                topic.site_id,
-                topic.gateway_id,
-            )
-            return
+            from wareApp import tasks
 
-        try:
-            handle_load_data_message(
-                client,
-                site,
+            message = (
+                msg.payload.decode("utf-8", errors="replace")
+                if isinstance(msg.payload, bytes)
+                else str(msg.payload)
+            )
+            tasks.process_load_data_message.apply_async(
+                args=(topic.site_id, topic.gateway_id, message),
+                queue="queue2_processing",
+            )
+            logger.debug(
+                "Queued LoadData for site %s from gateway %s",
                 topic.site_id,
                 topic.gateway_id,
-                str(msg.payload),
-                [topic.message_type],
             )
         except Exception:
             logger.exception(
-                "Failed to process LoadData for site %s from gateway %s",
+                "Failed to queue LoadData for site %s from gateway %s",
                 topic.site_id,
                 topic.gateway_id,
             )
@@ -2836,6 +2864,7 @@ def run_mqtt_client2():
     client = mqtt.Client("server_paho_client_2")
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("127.0.0.1", 1883, 60)
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
+    client.connect_async("127.0.0.1", 1883, 60)
     logger.info("Queue2 LoadData MQTT client started")
-    client.loop_forever()
+    return client.loop_forever(retry_first_connection=True)

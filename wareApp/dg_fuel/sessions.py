@@ -33,6 +33,31 @@ from wareApp.models import (
 logger = logging.getLogger(__name__)
 
 
+def fuel_configuration_for_aisle(site: Site, aisle_group: Any) -> dict[str, str | None]:
+    """Return the configured provider device for one DG aisle or the legacy site fallback."""
+    provider = (getattr(aisle_group, "dg_fuel_provider", None) or "").strip().lower()
+    vehicle_number = (
+        getattr(aisle_group, "dg_fuel_vehicle_number", None) or ""
+    ).strip()
+    if (
+        getattr(aisle_group, "dg_fuel_enabled", False)
+        and provider
+        in {
+            "loconav",
+            "roadcast",
+        }
+        and vehicle_number
+    ):
+        return {"provider": provider, "vehicle_number": vehicle_number}
+
+    return {
+        "provider": (getattr(site, "partner_dg_provider", None) or "").strip().lower()
+        or None,
+        "vehicle_number": (getattr(site, "partner_dg_fuel_id", None) or "").strip()
+        or None,
+    }
+
+
 def _main_database_alias() -> str:
     if "main" in connections.databases:
         return "main"
@@ -53,7 +78,8 @@ def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
         return None
 
     daily_reading = (
-        DailySiteReading.objects.using(_main_database_alias()).filter(
+        DailySiteReading.objects.using(_main_database_alias())
+        .filter(
             associated_Site=unit.site,
             aisle_group=unit.aisle_group,
             reading_for=reading_date,
@@ -131,6 +157,7 @@ def reconcile_daily_unit_consumption(
             aisle_group__power_source__gte=1,
         )
         .exclude(aisle_group_id__isnull=True)
+        .select_related("aisle_group")
         .order_by("aisle_group_id", "-id")
     )
 
@@ -143,6 +170,9 @@ def reconcile_daily_unit_consumption(
         seen_aisles.add(aisle_id)
 
         unit_value = as_float(daily_reading.unit_consumption)
+        fuel_configuration = fuel_configuration_for_aisle(
+            site, daily_reading.aisle_group
+        )
 
         if unit_value is None:
             skipped += 1
@@ -206,6 +236,14 @@ def reconcile_daily_unit_consumption(
                 unit.epoch_time = epoch_time
                 update_fields.append("epoch_time")
 
+            if unit.fuel_provider != fuel_configuration["provider"]:
+                unit.fuel_provider = fuel_configuration["provider"]
+                update_fields.append("fuel_provider")
+
+            if unit.fuel_vehicle_number != fuel_configuration["vehicle_number"]:
+                unit.fuel_vehicle_number = fuel_configuration["vehicle_number"]
+                update_fields.append("fuel_vehicle_number")
+
             if unit.dg_fuel_consumption is None and not unit.fetch_fuel_data:
                 unit.fetch_fuel_data = True
                 update_fields.append("fetch_fuel_data")
@@ -240,6 +278,8 @@ def reconcile_daily_unit_consumption(
                 epoch_time=epoch_time,
                 is_dg_on=False,
                 fetch_fuel_data=True,
+                fuel_provider=fuel_configuration["provider"],
+                fuel_vehicle_number=fuel_configuration["vehicle_number"],
             )
 
             if return_details:
@@ -311,38 +351,40 @@ def _fetch_loconav_report(
 
 
 def _persist_provider_alerts(
-    site: Site, unit: DgUnitConsumption, provider: str
+    site: Site, unit: DgUnitConsumption, provider: str, vehicle_number: str
 ) -> None:
     if provider == "roadcast":
         try:
             report = fetch_roadcast_report(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+                vehicle_number, unit.dg_start_date, unit.dg_end_date
             )
             if isinstance(report, dict):
                 for event in report.get("refuels", []) or []:
                     record_fuel_alert(
                         site=site,
-                        vehicle_number=site.partner_dg_fuel_id,
+                        vehicle_number=vehicle_number,
                         alert_name="refuel",
                         fuel_liters=event.get("fuel_liters"),
                         epoch_value=event.get("epoch_ms"),
                         created=dj_timezone.now(),
+                        aisle_group=unit.aisle_group,
                     )
                 for event in report.get("thefts", []) or []:
                     record_fuel_alert(
                         site=site,
-                        vehicle_number=site.partner_dg_fuel_id,
+                        vehicle_number=vehicle_number,
                         alert_name="theft",
                         fuel_liters=event.get("fuel_liters"),
                         epoch_value=event.get("epoch_ms"),
                         created=dj_timezone.now(),
+                        aisle_group=unit.aisle_group,
                     )
         except Exception:
             pass
     elif provider == "loconav":
         try:
             report = _fetch_loconav_report(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+                vehicle_number, unit.dg_start_date, unit.dg_end_date
             )
             if isinstance(report, dict):
                 refuels = detect_refuel_from_alerts(report)
@@ -350,20 +392,22 @@ def _persist_provider_alerts(
                 for event in refuels:
                     record_fuel_alert(
                         site=site,
-                        vehicle_number=site.partner_dg_fuel_id,
+                        vehicle_number=vehicle_number,
                         alert_name="refuel",
                         fuel_liters=event.get("value"),
                         epoch_value=event.get("timestamp"),
                         created=dj_timezone.now(),
+                        aisle_group=unit.aisle_group,
                     )
                 for event in thefts:
                     record_fuel_alert(
                         site=site,
-                        vehicle_number=site.partner_dg_fuel_id,
+                        vehicle_number=vehicle_number,
                         alert_name="theft",
                         fuel_liters=event.get("value"),
                         epoch_value=event.get("timestamp"),
                         created=dj_timezone.now(),
+                        aisle_group=unit.aisle_group,
                     )
         except Exception:
             pass
@@ -376,8 +420,8 @@ def attempt_fetch_for_unit(
     result: dict[str, Any] = {
         "site_id": getattr(getattr(unit, "site", None), "id", None),
         "unit_id": getattr(unit, "id", None),
-        "vehicle_number": getattr(getattr(unit, "site", None), "partner_dg_fuel_id", None),
-        "provider": determine_provider(getattr(unit, "site", None)) if unit else None,
+        "vehicle_number": getattr(unit, "fuel_vehicle_number", None),
+        "provider": getattr(unit, "fuel_provider", None),
         "success": False,
         "status": "NOT AVAILABLE",
         "reason": None,
@@ -408,12 +452,15 @@ def attempt_fetch_for_unit(
         return result if return_details else False
 
     site = unit.site
-    provider = determine_provider(site)
+    fuel_configuration = fuel_configuration_for_aisle(site, unit.aisle_group)
+    provider = unit.fuel_provider or fuel_configuration["provider"]
+    vehicle_number = unit.fuel_vehicle_number or fuel_configuration["vehicle_number"]
     result["provider"] = provider
-    if provider is None:
+    result["vehicle_number"] = vehicle_number
+    if provider not in {"loconav", "roadcast"} or not vehicle_number:
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
-        result["reason"] = "missing_or_invalid_provider"
+        result["reason"] = "missing_or_invalid_fuel_configuration"
         return result if return_details else False
 
     fuel_fetch_success = False
@@ -421,11 +468,11 @@ def attempt_fetch_for_unit(
     try:
         if provider == "roadcast":
             value = _fetch_roadcast_fuel(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+                vehicle_number, unit.dg_start_date, unit.dg_end_date
             )
         else:
             value = _fetch_loconav_fuel(
-                site.partner_dg_fuel_id, unit.dg_start_date, unit.dg_end_date
+                vehicle_number, unit.dg_start_date, unit.dg_end_date
             )
     except Exception:
         value = None
@@ -433,13 +480,17 @@ def attempt_fetch_for_unit(
     if value is None:
         unit.fetch_fuel_data = True
         unit.save(update_fields=["fetch_fuel_data"])
-        result.update({"reason": "provider_returned_no_usable_value", "status": "UNAVAILABLE"})
+        result.update(
+            {"reason": "provider_returned_no_usable_value", "status": "UNAVAILABLE"}
+        )
     else:
         normalized_value = as_float(value)
         if normalized_value is None:
             unit.fetch_fuel_data = True
             unit.save(update_fields=["fetch_fuel_data"])
-            result.update({"reason": "provider_returned_invalid_value", "status": "INVALID"})
+            result.update(
+                {"reason": "provider_returned_invalid_value", "status": "INVALID"}
+            )
         else:
             try:
                 unit.dg_fuel_consumption = normalized_value
@@ -448,12 +499,14 @@ def attempt_fetch_for_unit(
                     "Failed to persist DG fuel value site_id=%s unit_id=%s vehicle_number=%s provider=%s",
                     getattr(site, "id", None),
                     getattr(unit, "id", None),
-                    getattr(site, "partner_dg_fuel_id", None),
+                    vehicle_number,
                     provider,
                 )
                 unit.fetch_fuel_data = True
                 unit.save(update_fields=["fetch_fuel_data"])
-                result.update({"reason": "failed_to_persist_dg_fuel_value", "status": "ERROR"})
+                result.update(
+                    {"reason": "failed_to_persist_dg_fuel_value", "status": "ERROR"}
+                )
             else:
                 unit.fetch_fuel_data = False
                 unit.save(update_fields=["dg_fuel_consumption", "fetch_fuel_data"])
@@ -491,7 +544,7 @@ def attempt_fetch_for_unit(
             if detect_suspicious_fuel(tank_capacity, unit.dg_fuel_consumption):
                 DGFuelAlertsData.objects.create(
                     site=site,
-                    vehicle_number=site.partner_dg_fuel_id,
+                    vehicle_number=vehicle_number,
                     alert_name="suspicious_fuel",
                     fuel_consumption=unit.dg_fuel_consumption,
                     epoch_time=str(int(time.time())),
@@ -507,7 +560,7 @@ def attempt_fetch_for_unit(
         except Exception:
             pass
 
-    _persist_provider_alerts(site, unit, provider)
+    _persist_provider_alerts(site, unit, provider, vehicle_number)
 
     if return_details:
         return result

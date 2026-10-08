@@ -8,13 +8,29 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_fire_alarm_message(message):
-    values = message.split("'")[1].split(",")
+    payload = message.decode("utf-8") if isinstance(message, bytes) else str(message)
+    payload = payload.strip()
+    if payload.startswith("b'") and payload.endswith("'"):
+        payload = payload[2:-1]
+    fields = {}
+    for field in payload.split(","):
+        key, separator, value = field.partition(":")
+        if not separator:
+            raise ValueError(f"Invalid fire alarm field: {field!r}")
+        fields[key.strip().lower().replace("_", "")] = value.strip()
+
+    def value_for(key):
+        try:
+            return fields[key]
+        except KeyError as error:
+            raise ValueError(f"Missing fire alarm field: {key}") from error
+
     return (
-        int(values[0].split(":")[1]),
-        float(values[1].split(":")[1]),
-        float(values[2].split(":")[1]),
-        float(values[3].split(":")[1]),
-        int(values[4].split(":")[1]),
+        int(value_for("meternumber")),
+        float(value_for("rvolt")),
+        float(value_for("yvolt")),
+        float(value_for("bvolt")),
+        int(value_for("powerstatus")),
     )
 
 

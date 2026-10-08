@@ -44,7 +44,7 @@ from wareApp.fuel_providers import (
     fetch_loconav_report,
     fetch_roadcast_report,
 )
-from wareApp.models import DgUnitConsumption, Site
+from wareApp.models import AisleGroup, DgUnitConsumption, Site
 
 LOG_DIR = os.path.join(PROJECT_ROOT, "logges")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -155,12 +155,30 @@ def vehicle_variants(value):
 
 
 def run_current_level_cycle():
-    sites = (
+    configured_dg_aisles = list(
+        AisleGroup.objects.filter(
+            power_source__gte=1,
+            dg_fuel_enabled=True,
+        )
+        .exclude(dg_fuel_provider__isnull=True)
+        .exclude(dg_fuel_provider="")
+        .exclude(dg_fuel_vehicle_number__isnull=True)
+        .exclude(dg_fuel_vehicle_number="")
+        .select_related("site")
+    )
+    configured_site_ids = {aisle.site_id for aisle in configured_dg_aisles}
+    legacy_sites = (
         Site.objects.filter(dg_fuel_system_installed=True)
+        .exclude(id__in=configured_site_ids)
         .only("id", "partner_dg_provider", "partner_dg_fuel_id")
         .order_by("id")
     )
-    return collect_level_cycle(sites, fetch_loconav, fetch_roadcast, dry_run=False)
+    return collect_level_cycle(
+        [*configured_dg_aisles, *legacy_sites],
+        fetch_loconav,
+        fetch_roadcast,
+        dry_run=False,
+    )
 
 
 # def _today_provider_window():

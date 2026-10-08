@@ -38,8 +38,8 @@ flowchart LR
 
 | File | Function or component | Responsibility |
 | --- | --- | --- |
-| `wareApp/tasks.py` | `mqtt_client2()` | Celery task entry point for the dedicated queue2 MQTT client. |
-| `wareApp/tasks.py` | `start_queue_two_mqtt_client()` | Starts one `mqtt_client2` task when the queue2 worker becomes ready. A process lock and dispatch flag prevent duplicate dispatches from repeated worker-ready signals. |
+| `wareApp/tasks.py` | `mqtt_client1()` / `mqtt_client2()` | Celery task entry points for the dedicated queue1 and queue2 MQTT clients. |
+| `wareApp/tasks.py` | `start_queue_one_mqtt_client()` / `start_queue_two_mqtt_client()` | Starts one listener task when its dedicated worker becomes ready. Shared process-local duplicate protection and active-task inspection prevent repeated worker-ready signals from creating duplicate subscribers. |
 | `wareApp/mqtt/routing.py` | `QUEUE_TWO_SUBSCRIPTIONS` | Defines the narrow queue2 subscription: only `LoadData` topics. |
 | `wareApp/mqtt/consumers.py` | `run_mqtt_client2()` | Connects to Mosquitto, subscribes to queue2 topics, validates topic/site information, and invokes the LoadData handler. |
 | `wareApp/load_data/parser.py` | `parse_load_data_message()` | Normalizes and validates payload fields, returning immutable `LoadReading(load_value, leg_id, meter_number, created, epoch_time)`. Invalid or incomplete payloads raise `ValueError`. |
@@ -61,9 +61,9 @@ Benefits:
 - The queue2 worker can be monitored and scaled independently.
 - Topic validation prevents unexpected messages from entering the LoadData path.
 
-### 2. One MQTT Client Per queue2 Worker
+### 2. One MQTT Client Per Listener Worker
 
-The worker-ready startup is guarded with a process-level lock and dispatch flag. Legacy task dispatch from `warehouse/urls.py` was removed because it created a second MQTT client whenever Django loaded the URL configuration.
+The queue1 and queue2 worker-ready startup is guarded with a process-level lock and dispatch state. Legacy task dispatch from `warehouse/urls.py` was removed because it created a second MQTT client whenever Django loaded the URL configuration.
 
 Verified test-server state after deployment:
 

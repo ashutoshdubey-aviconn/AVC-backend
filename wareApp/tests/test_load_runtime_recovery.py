@@ -20,8 +20,18 @@ class LoadRuntimeRecoveryTests(SimpleTestCase):
         )
 
         self.assertEqual(source, 1)
-        self.assertEqual(recovery_hours, ["2026-10-01 10:00:00.000000", ""])
-        self.assertEqual(recovery_values, ["7", ""])
+        self.assertEqual(recovery_hours, ["2026-10-01 10:00:00.000000"])
+        self.assertEqual(recovery_values, ["7"])
+
+    def test_parser_keeps_final_value_without_a_trailing_comma(self):
+        message = self.message.rstrip(",")
+
+        _, recovery_hours, recovery_values = (
+            load_runtime_recovery._parse_load_runtime_recovery_message(message)
+        )
+
+        self.assertEqual(recovery_hours, ["2026-10-01 10:00:00.000000"])
+        self.assertEqual(recovery_values, ["7"])
 
     def test_updates_existing_runtime_record(self):
         runtime_entry = Mock()
