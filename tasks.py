@@ -1,17 +1,31 @@
+import os
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "warehouse.settings")
+
+import django
+
+django.setup()
+
+from celery import Celery
 import paho.mqtt.client as mqtt
 import re
 import requests
 import math
-from celery import Celery
 from wareApp.models import *
 from datetime import datetime, timedelta, timezone
 from datetime import datetime
 from warehouse import settings
 from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
+from wareApp.load_data import handle_load_data_message
+from wareApp.mqtt.routing import QUEUE_ONE_SUBSCRIPTIONS, QUEUE_TWO_SUBSCRIPTIONS
+from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
+from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_unit_consumption
+from wareApp.fuel_providers import fetch_loconav_fuel, fetch_roadcast_fuel
 from wareApp.sendmail import *
 
-app = Celery("warehouse", broker="amqp://guest@localhost//")
+app = Celery("root_mqtt")
+app.config_from_object("django.conf:settings", namespace="CELERY")
 
 
 def roadcasteAPI(start_time, end_time):
@@ -38,115 +52,28 @@ def roadcasteAPI(start_time, end_time):
 
 
 def roadcasteAPIUpdated(vehical, start_date, end_date):
-    url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    header = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
-    from_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-    end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
-    parms = {"device_imei": vehical, "from_time": from_date, "to_time": end_date}
-    print(parms)
-    d = requests.get(url, params=parms, headers=header)
-    res = d.json()
-    try:
-        return res["fuel_consumed"]
-    except:
-        print(res)
-        return 0
+    """Compatibility wrapper using the retrying Roadcast provider client."""
+    return fetch_roadcast_fuel(vehical, start_date, end_date)
 
 
 def get_loconav_fuel_data(vehicle_number, dg_start_date, dg_end_date):
-    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
-    fetch_fuel = requests.get(
-        f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}",
-        headers=headers,
-    ).json()
-    fuel = 0
-    if "data" in fetch_fuel:
-        fetch_fuel = fetch_fuel["data"]
-        if "fuel_consumption" in fetch_fuel:
-            fuel = fetch_fuel["fuel_consumption"]["value"]
-    return fuel
+    """Compatibility wrapper using the retrying LocoNav provider client."""
+    return fetch_loconav_fuel(vehicle_number, dg_start_date, dg_end_date)
 
 
 def DG_fuel_for_Roadcaste(site_id, aisle_group, new_unit_consumption, entry_time):
-    print("for site 124")
+    """Compatibility bridge to the normalized DG-session lifecycle."""
     site = Site.objects.get(id=site_id)
-    dg_unit = DgUnitConsumption.objects.filter(
-        site=int(site_id), aisle_group=aisle_group[0]
-    )
-    if dg_unit.exists():
-        print("DgUnitConsumption entries are present for aisle : ", aisle_group[0])
-        last_entry = dg_unit.last()
-        check_dg_status = last_entry.is_dg_on
-        if check_dg_status and aisle_group[0].power_source not in [0, 2]:
-            print("DG of site 124 is already running")
-            epoch_time = int(entry_time.timestamp() * 1000)
-            last_entry.unit_consumption = (
-                last_entry.unit_consumption + new_unit_consumption
-            )
-            last_entry.epoch_time = epoch_time
-            last_entry.dg_end_date = entry_time
-            last_entry.save()
-        elif aisle_group[0].power_source not in [0, 2] and new_unit_consumption > 0:
-            print("DG is Still Running on Site 124")
-            if last_entry.fetch_fuel_data:
-                last_record = (
-                    DgUnitConsumption.objects.filter(
-                        site=int(site_id), aisle_group=aisle_group[0], is_dg_on=False
-                    )
-                    .order_by("-created")
-                    .first()
-                )
-                dg_start_date = int(last_record.dg_start_date.timestamp())
-                dg_end_date = int(last_record.dg_end_date.timestamp())
-                epoch_time = int(entry_time.timestamp() * 1000)
-                fetch_fuel = roadcasteAPIUpdated(
-                    site.partner_dg_fuel_id, last_record.dg_start_date.date
-                )
-                if fetch_fuel:
-                    last_record.dg_fuel_consumption = fetch_fuel
-                    last_record.save()
-            DgUnitConsumption.objects.create(
-                site=site,
-                aisle_group=aisle_group[0],
-                unit_consumption=new_unit_consumption,
-                created=entry_time,
-                epoch_time=epoch_time,
-                dg_start_date=entry_time,
-                dg_end_date=entry_time,
-                is_dg_on=True,
-            )
-        elif aisle_group[0].power_source in [0, 2] and new_unit_consumption > 0:
-            print("turning Off the DG for Site 124")
-            print(
-                "power source: ",
-                aisle_group[0].power_source,
-                " consumption : ",
-                new_unit_consumption,
-            )
-            print(
-                "power source is currently running is mains supply , making dg last entry off"
-            )
-            last_entry.is_dg_on = False
-            last_entry.save()
-            last_record = (
-                DgUnitConsumption.objects.filter(
-                    site=int(site_id), aisle_group=aisle_group[0], is_dg_on=False
-                )
-                .order_by("-created")
-                .first()
-            )
-            dg_start_date = int(last_record.dg_start_date.timestamp())
-            dg_end_date = int(last_record.dg_end_date.timestamp())
-            fetch_fuel = roadcasteAPIUpdated(
-                site.partner_dg_fuel_id, last_record.dg_start_date.date
-            )
-            print("fetched fuel data : ", fetch_fuel)
-            if fetch_fuel:
-                last_record.dg_fuel_consumption = fetch_fuel
-                last_record.save()
-            else:
-                last_record.fetch_fuel_data = True
-                last_record.save()
+    aisle = aisle_group[0] if hasattr(aisle_group, "__getitem__") else aisle_group
+    result = reconcile_daily_unit_consumption(site, reading_date=entry_time.date())
+    for unit in DgUnitConsumption.objects.filter(
+        site=site,
+        aisle_group=aisle,
+        created__date=entry_time.date(),
+        fetch_fuel_data=True,
+    ):
+        attempt_fetch_for_unit(unit)
+    return result
 
 
 @app.task(queue="queue1")
@@ -160,7 +87,8 @@ def mqtt_client1():
 
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
-        client.subscribe("/Acclivate/iOmniControl/#")
+        for topic in QUEUE_ONE_SUBSCRIPTIONS:
+            client.subscribe(topic)
 
     def send_mail_for_alarms(site_id, aisle_id, alarm_type):
         from_mail = settings.EMAIL_HOST_USER
@@ -673,7 +601,7 @@ def mqtt_client1():
                 )
                 hourly_entry = aisle_entry.filter(
                     reading_from__gte=dateHourLowerLimitCheck,
-                    reading_from__lte=dateHourUpperLimitCheck,
+                    reading_from__lt=dateHourUpperLimitCheck,
                 )
                 daily_entry = DailySiteReading.objects.filter(
                     associated_Site=int(location_id),
@@ -1001,11 +929,9 @@ def mqtt_client1():
                     aisle_group_status = True
                 if aisle_group[0].is_active:
                     aisle_group_active = True
-                if hourly_entry.exists():
-                    # new_consumption = hourly_entry[0].unit_consumption + new_unit_consumption
-                    hourly_entry.update(
-                        unit_consumption=current_hour_gw_unit_consumption
-                    )
+                if hourly_entry.update(
+                    unit_consumption=current_hour_gw_unit_consumption
+                ):
                     print(
                         "The hourly reading for leg id {} in site {} updated".format(
                             aisle_group_id, site.site_name
@@ -1022,18 +948,17 @@ def mqtt_client1():
                     dateHourLowerLimitCheck1 = dateHourLowerLimitCheck - timedelta(
                         hours=1
                     )
-                    dateHourUpperLimitCheck1 = dateHourUpperLimitCheck - timedelta(
-                        hours=1
-                    )
+                    dateHourUpperLimitCheck1 = dateHourLowerLimitCheck
                     previous_hour_entry = aisle_entry.filter(
                         reading_from__gte=dateHourLowerLimitCheck1,
-                        reading_from__lte=dateHourUpperLimitCheck1,
+                        reading_from__lt=dateHourUpperLimitCheck1,
                     )
-                    if previous_hour_entry.exists():
+                    previous_hour_record = previous_hour_entry.first()
+                    if previous_hour_record:
                         print("Checking for any loss in previous hour data.")
-                        pervious_hour_server_unit_consumption = previous_hour_entry[
-                            0
-                        ].unit_consumption
+                        pervious_hour_server_unit_consumption = (
+                            previous_hour_record.unit_consumption
+                        )
                         if (
                             pervious_hour_server_unit_consumption
                             != previous_hour_gw_unit_consumption
@@ -1055,6 +980,9 @@ def mqtt_client1():
                             previous_hour_entry.update(
                                 unit_consumption=previous_hour_gw_unit_consumption
                             )
+                            pervious_hour_server_unit_consumption = (
+                                previous_hour_gw_unit_consumption
+                            )
                             print(
                                 "Server hourly consumption synced with gateway hourly consumption."
                             )
@@ -1074,12 +1002,12 @@ def mqtt_client1():
                             print("Now calculating saving for previous hour.")
                             hourly_saving = (
                                 leg_hourly_baseline
-                                - previous_hour_entry[0].unit_consumption
+                                - pervious_hour_server_unit_consumption
                             )
                             previous_hour_entry.update(energy_saved=hourly_saving)
                             print(
                                 "Hourly saving of {} in {} of {} hour updated.".format(
-                                    previous_hour_entry[0].leg_id,
+                                    previous_hour_record.leg_id,
                                     site.site_name,
                                     dateHourLowerLimitCheck1,
                                 )
@@ -2421,8 +2349,8 @@ def mqtt_client1():
     client.loop_forever()
 
 
-@app.task(queue="queue2")
-def mqtt_client2():
+def _retired_mqtt_client2_inline_load_data():
+    """Inactive pre-optimization LoadData listener kept only for rollback reference."""
     # app = Celery('mqtt_client', broker='amqp://guest@localhost/')
 
     # The callback for when the client receives a CONNACK response from the server.
@@ -2793,109 +2721,7 @@ def mqtt_client2():
                 result = 0
         return result
 
-    # def consumption_alarms(site_id, leg_id, current_consumption):
-    #     site = Site.objects.get(id=site_id)
-    #     customer = site.customer
-    #     max_threshold_value = site.max_threshold_value
-    #     min_threshold_value = site.min_threshold_value
 
-    #     current_date = datetime.now()
-    #     date = current_date - timedelta(days=7)
-    #     daily = DailySiteReading.objects.filter(associated_Site=site_id, leg_id=leg_id, reading_for__gte=date.date())
-    #     unit_consumption = 0.0
-    #     for i in daily:
-    #         unit_consumption += i.unit_consumption
-    #     average_consumption = unit_consumption / 7
-    #     max_consumption = (average_consumption * max_threshold_value) / 100
-    #     min_consumption = (average_consumption * min_threshold_value) / 100
-    #     total_max_consumption = round(average_consumption + max_consumption, 2)
-    #     total_min_consumption = round(average_consumption - min_consumption, 2)
-    #     if current_consumption > total_max_consumption:
-    #         print("high consumption alarm")
-    #         high_alarm = AlarmNotifications.objects.create(created_by=customer, user_level=4, site_id=site_id,
-    #                                                        object_type=0,
-    #                                                        Alarm_type=7, Alarm_priority=1, created_time=current_date)
-    #         print("high alarm generated: ", high_alarm)
-    #     elif current_consumption < total_min_consumption:
-    #         print("low consumption alarm")
-    #         low_alarm = AlarmNotifications.objects.create(created_by=customer, user_level=4, site_id=site_id,
-    #                                                       object_type=0,
-    #                                                       Alarm_type=8, Alarm_priority=1, created_time=current_date)
-    #         print("low alarm generated: ", low_alarm)
-    #     else:
-    #         print("consumption is nearly as average of last 7 days")
-    #     return True
-
-    # def consumption_alarms(site_id, leg_id, current_consumption):
-    #     try:
-    #         try:
-    #             site = Site.objects.get(id=site_id)
-    #         except Site.DoesNotExist:
-    #             print(f"Site not found for site_id: {site_id}")
-    #             return False
-
-    #         customer = site.customer
-    #         max_threshold_value = site.max_threshold_value
-    #         min_threshold_value = site.min_threshold_value
-
-    #         if max_threshold_value is None or min_threshold_value is None:
-    #             print("Site min or max threshold value is not set, skipping alarm calculation.")
-    #             return False
-
-    #         current_date = datetime.now()
-    #         date = current_date - timedelta(days=7)
-    #         daily = DailySiteReading.objects.filter(
-    #             associated_Site=site_id,
-    #             leg_id=leg_id,
-    #             reading_for__gte=date.date(),
-    #             reading_for__lt=current_date.date()
-    #         )
-
-    #         count = daily.count()
-    #         if count == 0:
-    #             print("Not enough daily data to calculate average consumption.")
-    #             return True
-
-    #         unit_consumption = sum(i.unit_consumption for i in daily)
-    #         average_consumption = unit_consumption / count
-
-    #         max_consumption = (average_consumption * max_threshold_value) / 100
-    #         min_consumption = (average_consumption * min_threshold_value) / 100
-    #         total_max_consumption = round(average_consumption + max_consumption, 2)
-    #         total_min_consumption = round(average_consumption - min_consumption, 2)
-
-    #         start_of_day = current_date.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    #         if current_consumption > total_max_consumption:
-    #             print(f"high consumption alarm for site {site.site_name}")
-    #             if not AlarmNotifications.objects.filter(site_id=site_id, aisle_group_id=leg_id, Alarm_type=7, created_time__gte=start_of_day).exists():
-    #                 high_alarm = AlarmNotifications.objects.create(
-    #                     created_by=customer, user_level=4, site_id=site_id,
-    #                     object_type=0, aisle_group_id=leg_id,
-    #                     Alarm_type=7, Alarm_priority=1, created_time=current_date
-    #                 )
-    #                 print("high alarm generated: ", high_alarm)
-    #                 # send_mail_for_alarms(site_id, leg_id, 7)
-    #             else:
-    #                 print("High consumption alarm already generated today.")
-    #         elif current_consumption < total_min_consumption:
-    #             print(f"low consumption alarm for site {site.site_name}")
-    #             if not AlarmNotifications.objects.filter(site_id=site_id, aisle_group_id=leg_id, Alarm_type=8, created_time__gte=start_of_day).exists():
-    #                 low_alarm = AlarmNotifications.objects.create(
-    #                     created_by=customer, user_level=4, site_id=site_id,
-    #                     object_type=0, aisle_group_id=leg_id,
-    #                     Alarm_type=8, Alarm_priority=1, created_time=current_date
-    #                 )
-    #                 print("low alarm generated: ", low_alarm)
-    #                 # send_mail_for_alarms(site_id, leg_id, 8)
-    #             else:
-    #                 print("Low consumption alarm already generated today.")
-    #         else:
-    #             print(f"For site {site.site_name}, the consumption is nearly as average of past days.")
-    #         return True
-    #     except Exception as e:
-    #         print(f"Exception in consumption_alarms for site_id {site_id}: {str(e)}")
-    #         return False
 
     def consumption_alarms(site_id, leg_id, current_consumption):
         import logging
@@ -3950,8 +3776,190 @@ def mqtt_client2():
     print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     # client.username_pw_set("djgpjqqt","AfTkXiiaov8c")
 
+
+def _deferred_task(*_args, **_kwargs):
+    def decorator(function):
+        return function
+
+    return decorator
+
+
+def _run_mqtt_listener(listener, description):
+    result = listener()
+    if result not in (None, MQTT_ERR_SUCCESS):
+        raise RuntimeError(f"{description} MQTT listener exited with status {result}")
+    return result
+
+
+@_deferred_task(
+    name="tasks.mqtt_client1",
+    queue="queue1",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=30,
+    retry_jitter=False,
+    max_retries=None,
+)
+def _deferred_mqtt_client1():
+    return _run_mqtt_listener(run_mqtt_client1, "Queue1")
+
+
+@_deferred_task(
+    name="tasks.mqtt_client2",
+    queue="queue2",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=30,
+    retry_jitter=False,
+    max_retries=None,
+)
+def _deferred_mqtt_client2():
+    return _run_mqtt_listener(run_mqtt_client2, "Queue2")
+
+
+def _publish_supply_time_recovery(topic, message):
+    mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
+
+
+def _publish_consumption_recovery(topic, message):
+    mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
+
+
+@_deferred_task(name="tasks.process_load_data_message", queue="queue2_processing")
+def process_load_data_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued LoadData for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_load_data_message(None, site, site_id, gateway_id, message, ["LoadData"])
+
+
+@_deferred_task(name="tasks.process_supply_time_message", queue="queue1_processing")
+def process_supply_time_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued SupplyTime for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_supply_time_message(
+        None,
+        site,
+        site_id,
+        gateway_id,
+        message,
+        publish_recovery=_publish_supply_time_recovery,
+    )
+
+
+@_deferred_task(name="tasks.process_load_runtime_recovery_message", queue="queue1_processing")
+def process_load_runtime_recovery_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued loadRuntime recovery for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
+
+
+@_deferred_task(name="tasks.process_daily_consumption_recovery_message", queue="queue1_processing")
+def process_daily_consumption_recovery_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued dailyConsumption recovery for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)
+
+
+@_deferred_task(name="tasks.process_hourly_consumption_recovery_message", queue="queue1_processing")
+def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued hourlyConsumption recovery for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_hourly_consumption_recovery_message(site, site_id, gateway_id, message)
+
+
+@_deferred_task(name="tasks.process_fire_alarm_message", queue="queue1_processing")
+def process_fire_alarm_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued FIREALARM for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_fire_alarm_message(site, site_id, gateway_id, message)
+
+
+@_deferred_task(name="tasks.process_consumption_message", queue="queue1_processing")
+def process_consumption_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued consumption for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_consumption_message(
+        site,
+        site_id,
+        gateway_id,
+        message,
+        publish_recovery=_publish_consumption_recovery,
+    )
+
+
+@_deferred_task(name="tasks.process_load_message", queue="queue1_processing")
+def process_load_message(site_id, gateway_id, message):
+    try:
+        site = Site.objects.get(id=site_id)
+    except Site.DoesNotExist:
+        logger.warning("Ignoring queued load message for missing site %s from gateway %s", site_id, gateway_id)
+        return
+    handle_load_message(site, site_id, gateway_id, message)
+
     # Blocking call that processes network traffic, dispatches callbacks and
     # handles reconnecting.
     # Other loop*() functions are available that give a threaded interface and a
     # manual interface.
+    client.loop_forever()
+
+
+@app.task(queue="queue2")
+def mqtt_client2():
+    """Consume only LoadData and delegate persistence to the optimized handler."""
+
+    def on_connect(client, userdata, flags, rc):
+        print("Connected with result code queue 2 " + str(rc))
+        for topic in QUEUE_TWO_SUBSCRIPTIONS:
+            client.subscribe(topic)
+
+    def on_message(client, userdata, msg):
+        try:
+            topic = parse_gateway_topic(msg.topic)
+            if topic.message_type != "LoadData":
+                print("Ignoring non-LoadData message on queue 2: ", msg.topic)
+                return
+
+            message = (
+                msg.payload.decode("utf-8")
+                if isinstance(msg.payload, bytes)
+                else str(msg.payload)
+            )
+            site = Site.objects.get(id=topic.site_id)
+            handle_load_data_message(
+                client,
+                site,
+                topic.site_id,
+                topic.gateway_id,
+                message,
+                [topic.message_type],
+            )
+        except (TopicParseError, Site.DoesNotExist, UnicodeDecodeError, ValueError) as error:
+            print("LoadData message skipped: ", error)
+
+    client = mqtt.Client("server_paho_client_2")
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect("127.0.0.1", 1883, 60)
+    print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     client.loop_forever()

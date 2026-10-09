@@ -229,8 +229,8 @@ class SupplyLoadTimeShare(models.Model):
     # power_source = models.CharField(max_length=40, blank=True, null=True)
     hourly_run_time = models.IntegerField()
     # total_run_time_till_date = models.IntegerField()
-    reading_from = models.DateTimeField(default=datetime.now())
-    reading_to = models.DateTimeField(default=datetime.now())
+    reading_from = models.DateTimeField(default=timezone.now)
+    reading_to = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return self.get_power_source_display()
@@ -774,7 +774,7 @@ class MonthlyLoadSharePercentage(models.Model):
     monthly_time_based_percentage = models.PositiveIntegerField(default=0)
     monthly_energy_based_percentage = models.PositiveIntegerField(default=0)
     for_month = models.CharField(max_length=50, null=True, blank=True)
-    created_on = models.DateTimeField(default=datetime.now())
+    created_on = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return str(self.time_based_percentage)

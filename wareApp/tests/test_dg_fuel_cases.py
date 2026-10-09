@@ -12,6 +12,7 @@ from wareApp.models import (
     NewAlarmsNotifications,
 )
 from wareApp.dg_fuel.sessions import (
+    _main_database_alias,
     attempt_fetch_for_unit,
     reconcile_daily_unit_consumption,
 )
@@ -28,6 +29,9 @@ class DgFuelEdgeCasesTests(TestCase):
         self.aisle = AisleGroup.objects.create(
             site=self.site, aisleGroupName="A1", power_source=1
         )
+
+    def test_reconciliation_uses_default_test_database(self):
+        self.assertEqual(_main_database_alias(), "default")
 
     def make_daily_reading(self, aisle=None, unit_consumption=79.69):
         aisle = aisle or self.aisle

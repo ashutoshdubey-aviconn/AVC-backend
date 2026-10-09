@@ -22,6 +22,7 @@ from wareApp.fuel_providers import (
 )
 from wareApp.dg_fuel.ingestion import record_fuel_alert
 from wareApp.models import (
+    AisleGroup,
     DailySiteReading,
     DGFuelAlertsData,
     DgUnitConsumption,
@@ -59,6 +60,11 @@ def fuel_configuration_for_aisle(site: Site, aisle_group: Any) -> dict[str, str 
 
 
 def _main_database_alias() -> str:
+    # Django creates a separate default database during tests. The production
+    # `main` connection is not part of that isolated test schema.
+    default_database_name = str(connections["default"].settings_dict.get("NAME") or "")
+    if default_database_name.startswith("test_"):
+        return "default"
     if "main" in connections.databases:
         return "main"
     return "default"
@@ -157,7 +163,6 @@ def reconcile_daily_unit_consumption(
             aisle_group__power_source__gte=1,
         )
         .exclude(aisle_group_id__isnull=True)
-        .select_related("aisle_group")
         .order_by("aisle_group_id", "-id")
     )
 
@@ -170,9 +175,8 @@ def reconcile_daily_unit_consumption(
         seen_aisles.add(aisle_id)
 
         unit_value = as_float(daily_reading.unit_consumption)
-        fuel_configuration = fuel_configuration_for_aisle(
-            site, daily_reading.aisle_group
-        )
+        aisle_group = AisleGroup.objects.filter(id=aisle_id).first()
+        fuel_configuration = fuel_configuration_for_aisle(site, aisle_group)
 
         if unit_value is None:
             skipped += 1
@@ -211,7 +215,9 @@ def reconcile_daily_unit_consumption(
             .first()
         )
 
-        best_dg_end_time = _best_dg_end_time_for_unit(site, aisle_id, reading_date)
+        best_dg_end_time = (
+            _best_dg_end_time_for_unit(site, aisle_id, reading_date) or day_end
+        )
         if unit:
             update_fields = []
             previous_value = unit.unit_consumption

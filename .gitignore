@@ -17,6 +17,10 @@ logges/
 logs/
 *.log
 
+# Locally collected server-performance evidence
+monitoring/data/
+monitoring/servers.json
+
 # Static / Media
 static/
 media/

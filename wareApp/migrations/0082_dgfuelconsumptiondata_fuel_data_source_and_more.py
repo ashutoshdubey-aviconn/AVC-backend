@@ -12,15 +12,30 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="dgfuelconsumptiondata",
-            name="fuel_data_source",
-            field=models.CharField(blank=True, max_length=32, null=True),
+        # Migration 0074 creates this physical column with guarded SQL for
+        # legacy databases. Record it in Django's migration state without
+        # issuing a second ADD COLUMN on a freshly built database.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AddField(
+                    model_name="dgfuelconsumptiondata",
+                    name="fuel_data_source",
+                    field=models.CharField(blank=True, max_length=32, null=True),
+                ),
+            ],
         ),
-        migrations.AddField(
-            model_name="site",
-            name="baseline_date",
-            field=models.DateTimeField(blank=True, null=True),
+        # Legacy guarded migrations create this physical column. Keep the
+        # migration state aligned without attempting another ADD COLUMN.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AddField(
+                    model_name="site",
+                    name="baseline_date",
+                    field=models.DateTimeField(blank=True, null=True),
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name="monthlyloadsharepercentage",
