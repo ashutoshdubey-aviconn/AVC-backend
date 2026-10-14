@@ -51,9 +51,11 @@ def _hourly_baseline(location_id, aisle_group_id):
             associated_site_id=int(location_id), leg_id=str(aisle_group_id)
         )
         .order_by("-baseline_to", "-id")
+        .values_list("baseline_value", "working_hours")
         .first()
     )
-    return baseline.baseline_value / baseline.working_hours, baseline.baseline_value
+    baseline_value, working_hours = baseline
+    return baseline_value / working_hours, baseline_value
 
 
 def _consumption_alarms(site, leg_id, current_consumption):

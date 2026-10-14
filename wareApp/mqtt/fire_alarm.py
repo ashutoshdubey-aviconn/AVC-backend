@@ -47,14 +47,15 @@ def _send_fire_alarm_email(site, user_email, device_name, alarm_type, power_stat
 def _send_throttled_motor_on_email(
     site, user_email, device_name, alarm_type, power_status
 ):
-    previous_email = (
+    previous_created = (
         Email_History.objects.filter(
             fire_site=site, deviceName=device_name, email_for=5
         )
         .order_by("-created")
+        .values_list("created", flat=True)
         .first()
     )
-    if previous_email and (datetime.now() - previous_email.created).total_seconds() <= 600:
+    if previous_created and (datetime.now() - previous_created).total_seconds() <= 600:
         return
     _send_fire_alarm_email(
         site, user_email, device_name, alarm_type, power_status, email_for=5

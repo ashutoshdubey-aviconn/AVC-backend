@@ -95,7 +95,9 @@ def _record_voltage_alarm(site, values, parameter_type):
             site_id=site,
             power_source=values["power_source"],
             parameter_type=parameter_type,
-        ).order_by("-created")[:7]
+        )
+        .order_by("-created")
+        .values("r_phase", "y_phase", "b_phase")[:7]
     )
     if len(recent) <= 6:
         return
@@ -114,16 +116,16 @@ def _record_voltage_alarm(site, values, parameter_type):
     )
     if parameter_type == 0:
         violated = all(
-            item.r_phase > thresholds[0]
-            or item.y_phase > thresholds[1]
-            or item.b_phase > thresholds[2]
+            item["r_phase"] > thresholds[0]
+            or item["y_phase"] > thresholds[1]
+            or item["b_phase"] > thresholds[2]
             for item in recent[:5]
         )
     else:
         violated = all(
-            item.r_phase < thresholds[0]
-            or item.y_phase < thresholds[1]
-            or item.b_phase < thresholds[2]
+            item["r_phase"] < thresholds[0]
+            or item["y_phase"] < thresholds[1]
+            or item["b_phase"] < thresholds[2]
             for item in recent[:5]
         )
     if not violated:
@@ -212,7 +214,7 @@ def handle_load_message(site, location_id, gateway_id, message):
             Supply_Source=values["power_source"],
             Meter_Number=values["meter_number"],
         )
-        record = entries.first()
+        record_exists = entries.exists()
         if site.show_voltage_alarms and all(
             values[key] > 0 for key in ("r_volt", "y_volt", "b_volt")
         ):
@@ -231,7 +233,7 @@ def handle_load_message(site, location_id, gateway_id, message):
             "Status": values["status"],
             "Updated_on": datetime.now(),
         }
-        if record:
+        if record_exists:
             _record_power_factor_alarm(site, values)
             factors = values.get("power_factors", (0.0, 0.0, 0.0))
             entries.update(

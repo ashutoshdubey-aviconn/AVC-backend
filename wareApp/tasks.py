@@ -1,7 +1,9 @@
 import logging
+from functools import wraps
 from threading import Lock
 
 from celery.signals import worker_ready
+from django.db import close_old_connections
 from kombu.exceptions import KombuError
 from paho.mqtt import publish as mqtt_publish
 from paho.mqtt.client import MQTT_ERR_SUCCESS
@@ -136,16 +138,36 @@ def _publish_consumption_recovery(topic, message):
     mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
 
 
-@app.task(queue="queue2_processing")
-def process_load_data_message(site_id, gateway_id, message):
+def _site_for_queued_message(site_id, gateway_id, message_type):
     try:
-        site = Site.objects.get(id=site_id)
+        return Site.objects.get(id=site_id)
     except Site.DoesNotExist:
         logger.warning(
-            "Ignoring queued LoadData for missing site %s from gateway %s",
+            "Ignoring queued %s for missing site %s from gateway %s",
+            message_type,
             site_id,
             gateway_id,
         )
+        return None
+
+
+def _with_database_connection_cleanup(task_handler):
+    @wraps(task_handler)
+    def wrapped(*args, **kwargs):
+        close_old_connections()
+        try:
+            return task_handler(*args, **kwargs)
+        finally:
+            close_old_connections()
+
+    return wrapped
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
+def process_load_data_message(site_id, gateway_id, message):
+    site = _site_for_queued_message(site_id, gateway_id, "LoadData")
+    if site is None:
         return
 
     handle_load_data_message(
@@ -159,15 +181,10 @@ def process_load_data_message(site_id, gateway_id, message):
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_supply_time_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued SupplyTime for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "SupplyTime")
+    if site is None:
         return
 
     handle_supply_time_message(
@@ -181,75 +198,50 @@ def process_supply_time_message(site_id, gateway_id, message):
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_load_runtime_recovery_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued loadRuntime recovery for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "loadRuntime recovery")
+    if site is None:
         return
 
     handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_daily_consumption_recovery_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued dailyConsumption recovery for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "dailyConsumption recovery")
+    if site is None:
         return
 
     handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued hourlyConsumption recovery for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "hourlyConsumption recovery")
+    if site is None:
         return
 
     handle_hourly_consumption_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_fire_alarm_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued FIREALARM for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "FIREALARM")
+    if site is None:
         return
 
     handle_fire_alarm_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_consumption_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued consumption for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "consumption")
+    if site is None:
         return
 
     handle_consumption_message(
@@ -262,15 +254,10 @@ def process_consumption_message(site_id, gateway_id, message):
 
 
 @app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
 def process_load_message(site_id, gateway_id, message):
-    try:
-        site = Site.objects.get(id=site_id)
-    except Site.DoesNotExist:
-        logger.warning(
-            "Ignoring queued load message for missing site %s from gateway %s",
-            site_id,
-            gateway_id,
-        )
+    site = _site_for_queued_message(site_id, gateway_id, "load message")
+    if site is None:
         return
 
     handle_load_message(site, site_id, gateway_id, message)

@@ -160,7 +160,7 @@ def reconcile_daily_unit_consumption(
         .filter(
             associated_Site_id=site.id,
             reading_for=reading_date,
-            aisle_group__power_source__gte=1,
+            aisle_group__power_source=1,
         )
         .exclude(aisle_group_id__isnull=True)
         .order_by("aisle_group_id", "-id")

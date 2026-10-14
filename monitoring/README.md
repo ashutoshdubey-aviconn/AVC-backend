@@ -40,6 +40,23 @@ Run the collector during comparable workload windows before and after a change.
 Keep the resulting local `server_samples.csv`, `server_samples.jsonl`, and
 `top_processes.csv` as the raw evidence.
 
+## Process CSV Rotation
+
+`top_processes.csv` has a checked-in logrotate policy at
+`monitoring/logrotate/top_processes.conf`. It rotates weekly, or sooner at
+25 MiB, retains 12 compressed archives, and creates a fresh CSV for the next
+collector sample.
+
+Install it once on the machine that runs the collector:
+
+```bash
+sudo install -m 644 monitoring/logrotate/top_processes.conf /etc/logrotate.d/top_processes-monitoring
+sudo logrotate --force /etc/logrotate.d/top_processes-monitoring
+```
+
+The collector opens the CSV on each sample, so standard rename-and-create
+rotation is safe and no collector restart is required.
+
 ## Metrics
 
 Each sample records:

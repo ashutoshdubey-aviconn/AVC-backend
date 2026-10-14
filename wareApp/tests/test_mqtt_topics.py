@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from django.db import OperationalError as DatabaseOperationalError
 from django.test import SimpleTestCase
 from kombu.exceptions import OperationalError
 from paho.mqtt.client import MQTT_ERR_CONN_LOST, MQTT_ERR_SUCCESS
@@ -359,13 +360,9 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/999999/gateway-01/in/consumption/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get") as get_site,
-            patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
-        get_site.assert_not_called()
         enqueue.assert_called_once_with(
             args=(999999, "gateway-01", "payload"), queue="queue1_processing"
         )
@@ -379,16 +376,84 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/LoadData/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get") as get_site,
-            patch("wareApp.tasks.process_load_data_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_load_data_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
-        get_site.assert_not_called()
         enqueue.assert_called_once_with(
             args=(156, "gateway-01", "payload"), queue="queue2_processing"
         )
+
+    def test_queue_one_processing_task_cleans_connections(self):
+        site = SimpleNamespace(id=156)
+
+        with (
+            patch("wareApp.tasks.Site.objects.get", return_value=site),
+            patch("wareApp.tasks.handle_supply_time_message") as handle_message,
+            patch("wareApp.tasks.close_old_connections") as close_connections,
+        ):
+            tasks.process_supply_time_message.run(156, "gateway-01", "payload")
+
+        self.assertEqual(close_connections.call_count, 2)
+        handle_message.assert_called_once_with(
+            None,
+            site,
+            156,
+            "gateway-01",
+            "payload",
+            publish_recovery=tasks._publish_supply_time_recovery,
+        )
+
+    def test_queue_two_rejects_malformed_topics_without_enqueueing(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client2()
+
+        with patch("wareApp.tasks.process_load_data_message.apply_async") as enqueue:
+            client.on_message(
+                client,
+                None,
+                SimpleNamespace(topic="/invalid/topic", payload=b"payload"),
+            )
+
+        enqueue.assert_not_called()
+
+    def test_queue_one_listener_survives_database_error_while_dispatching(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client1()
+
+        message = SimpleNamespace(
+            topic="/Acclivate/iOmniControl/156/gateway-01/in/consumption/state",
+            payload=b"payload",
+        )
+        with (
+            patch(
+                "wareApp.mqtt.consumers._queue_one_message_for_processing",
+                side_effect=DatabaseOperationalError(
+                    "SSL connection has been closed unexpectedly"
+                ),
+            ),
+        ):
+            client.on_message(client, None, message)
+
+    def test_queue_two_listener_survives_database_error_while_dispatching(self):
+        client = FakeMqttClient()
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
+            consumers.run_mqtt_client2()
+
+        message = SimpleNamespace(
+            topic="/Acclivate/iOmniControl/156/gateway-01/in/LoadData/state",
+            payload=b"payload",
+        )
+        with (
+            patch(
+                "wareApp.tasks.process_load_data_message.apply_async",
+                side_effect=DatabaseOperationalError(
+                    "SSL connection has been closed unexpectedly"
+                ),
+            ),
+        ):
+            client.on_message(client, None, message)
 
     def test_queue_one_queues_consumption_for_processing(self):
         client = FakeMqttClient()
@@ -411,15 +476,11 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/SupplyTime/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch("wareApp.tasks.process_supply_time_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_supply_time_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -431,15 +492,11 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/FIREALARM/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch("wareApp.tasks.process_fire_alarm_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_fire_alarm_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -451,15 +508,11 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/load/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch("wareApp.tasks.process_load_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_load_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -471,7 +524,6 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic=(
                 "/Acclivate/iOmniControl/156/gateway-01/in/"
@@ -479,12 +531,9 @@ class GatewayTopicParserTests(SimpleTestCase):
             ),
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch(
-                "wareApp.tasks.process_hourly_consumption_recovery_message.apply_async"
-            ) as enqueue,
-        ):
+        with patch(
+            "wareApp.tasks.process_hourly_consumption_recovery_message.apply_async"
+        ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -496,17 +545,13 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/recovery/loadRuntime",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch(
-                "wareApp.tasks.process_load_runtime_recovery_message.apply_async"
-            ) as enqueue,
-        ):
+        with patch(
+            "wareApp.tasks.process_load_runtime_recovery_message.apply_async"
+        ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -518,17 +563,13 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/recovery/dailyConsumption",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch(
-                "wareApp.tasks.process_daily_consumption_recovery_message.apply_async"
-            ) as enqueue,
-        ):
+        with patch(
+            "wareApp.tasks.process_daily_consumption_recovery_message.apply_async"
+        ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
@@ -540,15 +581,11 @@ class GatewayTopicParserTests(SimpleTestCase):
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
             consumers.run_mqtt_client1()
 
-        site = SimpleNamespace(id=156, site_name="Test site")
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/sync/state",
             payload=b"payload",
         )
-        with (
-            patch("wareApp.mqtt.consumers.Site.objects.get", return_value=site),
-            patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue,
-        ):
+        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_not_called()

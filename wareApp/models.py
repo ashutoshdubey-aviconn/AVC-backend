@@ -696,6 +696,10 @@ class SiteLoadPower(models.Model):
                 fields=["Associated_Site", "Supply_Source", "Meter_Number"],
                 name="idx_sitepower_site_src_meter",
             ),
+            models.Index(
+                fields=["Associated_Site", "Meter_Number"],
+                name="idx_sitepower_site_meter",
+            ),
         ]
 
     def __str__(self):
@@ -819,9 +823,7 @@ class FirePumpAlarm(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=["Site", "Meter_Number"], name="idx_fpalarm_site_meter"
-            )
+            models.Index(fields=["Site", "Meter_Number"], name="idx_fpalarm_site_meter")
         ]
 
 
@@ -975,6 +977,7 @@ class DailyLoadData(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["site", "created"], name="idx_dailyload_site_created"),
             models.Index(
                 fields=["site", "aisle_group", "created"],
                 name="idx_dailyload_rollup",
@@ -1020,6 +1023,14 @@ class MonthlyMinMaxLoadData(models.Model):
     max_load = models.FloatField(default=0, blank=True, null=True)
     max_load_created = models.DateTimeField(blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["site", "supply_source", "created"],
+                name="idx_monthlyload_site_src_time",
+            ),
+        ]
 
     def __str__(self):
         return self.supply_source

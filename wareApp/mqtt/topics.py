@@ -5,7 +5,7 @@ class TopicParseError(ValueError):
     """Raised when an MQTT topic does not match the gateway topic contract."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GatewayTopic:
     site_id: int
     gateway_id: str
@@ -15,9 +15,9 @@ class GatewayTopic:
 
 def parse_gateway_topic(topic: str) -> GatewayTopic:
     """Parse a gateway inbound MQTT topic into its stable routing fields."""
-    segments = topic.split("/")
+    segments = topic.split("/", 8)
 
-    if len(segments) < 8 or segments[1:3] != ["Acclivate", "iOmniControl"]:
+    if len(segments) < 8 or segments[1] != "Acclivate" or segments[2] != "iOmniControl":
         raise TopicParseError("unexpected gateway topic format")
 
     if segments[5] != "in":
@@ -29,7 +29,7 @@ def parse_gateway_topic(topic: str) -> GatewayTopic:
         raise TopicParseError("gateway topic site ID must be an integer") from error
 
     gateway_id = segments[4]
-    message_type = segments[6].split("_", 1)[0]
+    message_type, _, _ = segments[6].partition("_")
     message_subtype = segments[7]
     if not gateway_id or not message_type or not message_subtype:
         raise TopicParseError("gateway topic contains an empty routing field")

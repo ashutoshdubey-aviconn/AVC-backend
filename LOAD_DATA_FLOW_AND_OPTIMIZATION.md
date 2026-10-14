@@ -71,7 +71,23 @@ Verified test-server state after deployment:
 - No reserved duplicate task.
 - `queue2` had zero pending messages and one consumer.
 
-### 3. Immediate Raw Storage with Efficient Rollups
+### 3. Database Connection Resilience
+
+Before and after each MQTT message callback, both Queue 1 and Queue 2 call
+`django.db.close_old_connections()`.
+
+- A healthy PostgreSQL connection remains open and is reused for later messages.
+- Django closes a connection only when it is stale, expired, or unusable, such as
+    after PostgreSQL has closed its SSL connection.
+- After a failed database operation, the callback logs the error and continues
+    running; it does not terminate the long-running MQTT listener.
+- The next database query automatically opens a fresh PostgreSQL connection when
+    the prior connection was closed.
+
+This avoids creating a database connection for every MQTT message while ensuring
+that one transient database connection failure cannot stop either MQTT queue.
+
+### 4. Immediate Raw Storage with Efficient Rollups
 
 Every valid packet is written directly to `RawLoadData`; packets are not delayed waiting for a five-second, ten-second, or multi-minute arrival interval. Rollups operate only on completed time buckets and are guarded to run once per observed minute per site.
 
@@ -81,7 +97,7 @@ Benefits:
 - Repeated packets in the same minute do not repeatedly run the same site rollup.
 - Historical and delayed packets can still be included during the configured rollup lookback window.
 
-### 4. Index-Friendly Monthly Query
+### 5. Index-Friendly Monthly Query
 
 The monthly min/max lookup previously filtered with:
 

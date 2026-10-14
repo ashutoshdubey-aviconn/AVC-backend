@@ -370,11 +370,6 @@ def update_daily_from_hourly(
 #             "error": str(e),
 #         }
 
-print("=" * 80)
-print("PROCESS HOURLY CALLED")
-print("=" * 80)
-
-
 @transaction.atomic  # for safe transaction handling
 def process_hourly(
     site,

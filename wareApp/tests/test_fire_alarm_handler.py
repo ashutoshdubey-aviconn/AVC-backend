@@ -36,7 +36,7 @@ class FireAlarmHandlerTests(SimpleTestCase):
         )
         fire_pump_entries = Mock(first=Mock(return_value=record))
         previous_emails = Mock()
-        previous_emails.order_by.return_value.first.return_value = None
+        previous_emails.order_by.return_value.values_list.return_value.first.return_value = None
 
         with patch(
             "wareApp.mqtt.fire_alarm.FirePumpAlarm.objects.filter",
@@ -54,6 +54,9 @@ class FireAlarmHandlerTests(SimpleTestCase):
             )
 
         fire_pump_entries.update.assert_called_once()
+        previous_emails.order_by.return_value.values_list.assert_called_once_with(
+            "created", flat=True
+        )
         send.assert_called_once_with(
             "test@example.com", "Motor-On in Auto-Mode", "Pump A", 1
         )

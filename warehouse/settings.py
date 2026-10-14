@@ -97,7 +97,10 @@ SETTINGS_PATH = os.path.normpath(os.path.dirname(__file__))
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
-DATABASE_ROUTERS = ["wareApp.routers.SecondaryDBRouter"]
+USE_SECONDARY_DATABASE = config("USE_SECONDARY_DATABASE", default=False, cast=bool)
+DATABASE_ROUTERS = (
+    ["wareApp.routers.SecondaryDBRouter"] if USE_SECONDARY_DATABASE else []
+)
 if env in {"Local", "PROD"}:
     DATABASES = {
         "default": {
@@ -259,7 +262,7 @@ LOGGING = {
         "recovery_file": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{LOG_FILE}/recovery.log",
+            "filename": f"{LOG_FILE}/recovery/recovery.log",
             "formatter": "verbose",
             "maxBytes": 5 * 1024 * 1024,
             "backupCount": 5,

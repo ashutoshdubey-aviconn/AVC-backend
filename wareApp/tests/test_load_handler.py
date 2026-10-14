@@ -36,7 +36,7 @@ class LoadHandlerTests(SimpleTestCase):
 
     def test_creates_first_load_power_record(self):
         site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=False)
-        entries = Mock(first=Mock(return_value=None))
+        entries = Mock(exists=Mock(return_value=False))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
         ), patch("wareApp.mqtt.load.SiteLoadPower.objects.create") as create:
@@ -47,7 +47,7 @@ class LoadHandlerTests(SimpleTestCase):
 
     def test_updates_existing_load_power_record(self):
         site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=False)
-        entries = Mock(first=Mock(return_value=object()))
+        entries = Mock(exists=Mock(return_value=True))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
         ):
@@ -58,7 +58,7 @@ class LoadHandlerTests(SimpleTestCase):
 
     def test_does_not_evaluate_power_factor_for_first_load_record(self):
         site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=True)
-        entries = Mock(first=Mock(return_value=None))
+        entries = Mock(exists=Mock(return_value=False))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
         ), patch("wareApp.mqtt.load.SiteLoadPower.objects.create"), patch(
@@ -111,8 +111,8 @@ class LoadHandlerTests(SimpleTestCase):
             "meter_number": 2,
         }
         history = Mock()
-        history.order_by.return_value = [
-            SimpleNamespace(r_phase=230, y_phase=230, b_phase=230) for _ in range(7)
+        history.order_by.return_value.values.return_value = [
+            {"r_phase": 230, "y_phase": 230, "b_phase": 230} for _ in range(7)
         ]
         existing_alarms = Mock(exists=Mock(return_value=False))
 
@@ -132,6 +132,9 @@ class LoadHandlerTests(SimpleTestCase):
             load._record_voltage_alarm(site, values, parameter_type=0)
 
         create_parameter.assert_called_once()
+        history.order_by.return_value.values.assert_called_once_with(
+            "r_phase", "y_phase", "b_phase"
+        )
         create_alarm.assert_called_once()
         notify.assert_called_once_with(
             {
@@ -163,8 +166,8 @@ class LoadHandlerTests(SimpleTestCase):
             "meter_number": 2,
         }
         history = Mock()
-        history.order_by.return_value = [
-            SimpleNamespace(r_phase=170, y_phase=170, b_phase=170) for _ in range(7)
+        history.order_by.return_value.values.return_value = [
+            {"r_phase": 170, "y_phase": 170, "b_phase": 170} for _ in range(7)
         ]
         existing_alarms = Mock(exists=Mock(return_value=True))
 

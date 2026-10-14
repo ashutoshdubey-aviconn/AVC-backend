@@ -33,6 +33,22 @@ class ConsumptionHandlerTests(SimpleTestCase):
         self.assertEqual(values["aisle_group_id"], 967)
         self.assertEqual(values["current_hour_consumption"], 12.5)
 
+    def test_hourly_baseline_reads_only_required_values(self):
+        baselines = Mock()
+        baselines.filter.return_value.order_by.return_value.values_list.return_value.first.return_value = (
+            48.0,
+            24.0,
+        )
+
+        with patch("wareApp.mqtt.consumption.SiteBaseline.objects", baselines):
+            hourly_baseline, daily_baseline = consumption._hourly_baseline(156, 967)
+
+        self.assertEqual(hourly_baseline, 2.0)
+        self.assertEqual(daily_baseline, 48.0)
+        baselines.filter.return_value.order_by.return_value.values_list.assert_called_once_with(
+            "baseline_value", "working_hours"
+        )
+
     def test_processing_locks_the_aisle_group(self):
         site = SimpleNamespace(id=156)
         aisle_group = SimpleNamespace(on_sensor_power=False, is_active=False)

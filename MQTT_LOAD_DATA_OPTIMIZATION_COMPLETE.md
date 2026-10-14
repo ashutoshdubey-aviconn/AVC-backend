@@ -5,6 +5,10 @@
 This document records the completed low-risk optimization work for gateway MQTT traffic.
 It covers the isolated `LoadData` path and the remaining queue-1 message families.
 
+The implementation and validation notes below reflect the current local workspace.
+No migration, broker configuration, worker restart, or test/production deployment is
+performed as part of this local optimization work.
+
 ## Tested Tags
 
 | Tag | Commit | Coverage |
@@ -22,10 +26,11 @@ Gateway topics have the form:
 
 | Celery queue | MQTT subscription | Owned message types |
 | --- | --- | --- |
-| `queue1` | `/Acclivate/iOmniControl/+/+/in/<queue1-type>/#` | `consumption`, `sync`, `FIREALARM`, `load`, `SupplyTime`, `recovery`, `remoteAccess` |
+| `queue1` | One subscription for each supported business type | `consumption`, `FIREALARM`, `load`, `SupplyTime`, `recovery` |
 | `queue2` | `/Acclivate/iOmniControl/+/+/in/LoadData/#` | `LoadData` only |
 
 The routing contract is defined in `wareApp/mqtt/routing.py`. Narrow broker subscriptions keep high-rate `LoadData` packets out of queue-1 instead of filtering them after delivery.
+`sync` and `remoteAccess` remain recognized for compatibility, but are not subscribed as inbound queue-1 traffic.
 
 ## Processing Flow
 
@@ -40,14 +45,14 @@ flowchart LR
     P1 --> S1[Business message\nprocessing worker]
     S1 --> DB1
 
-    Q2 --> T2[Validate topic and site]
+    Q1 --> T1[Validate topic and enqueue]
     T2 --> P[LoadData parser]
-    P --> R[RawLoadData write]
-    R --> M[Monthly min/max update\nwhen graph is visible]
+    P1 --> S1[Resolve site and process
+  business message]
     M --> U[Hourly and daily rollups]
     U --> DB2[(LoadData tables)]
-```
-
+    Q2 --> T2[Validate topic and enqueue]
+    T2 --> P[Resolve site and parse LoadData]
 ## LoadData Improvements
 
 - Moved active LoadData handling into focused modules for parsing, raw persistence, monthly extrema, and rollups.
@@ -58,9 +63,12 @@ flowchart LR
   - `RawLoadData(site, created)`
   - `HourlyLoadData(site, aisle_group, created)`
   - `DailyLoadData(site, aisle_group, created)`
-- Batched materialized-bucket checks and extrema inserts.
-- Deferred `SiteLoadPower` work until a new monthly minimum or maximum is found.
-- Aligned raw rollup ordering with the raw composite index.
+- Rollups stream projected rows in chunks, retain only per-bucket extrema, and batch target inserts with `bulk_create`.
+- Per-site locks serialize different-minute rollups for the same site while allowing unrelated sites to roll up concurrently.
+- The scheduler suppresses duplicate minute work and performs daily rollups at most once per completed hour for each site.
+- Monthly extrema reads only min/max scalars, batches changed bounds into one update, and skips `SiteLoadPower` entirely when neither bound changes.
+- Added staged index migrations `0088` through `0090` for daily rollups, monthly extrema lookups, and site/meter load-power updates. They are unapplied locally pending migration-backlog reconciliation.
+- Local reads use the default database. Secondary routing is disabled unless `USE_SECONDARY_DATABASE` is explicitly enabled.
 
 ## Queue-1 Improvements
 
@@ -77,12 +85,16 @@ flowchart LR
 - Removed the common-path consumption daily-row read; it now uses an atomic update and only loads that row during hourly-gap reconciliation.
 - Replaced SupplyTime month-end Python scans with an indexed grouped database aggregate and idempotent monthly-share persistence.
 - Added the queue1 composite query indexes in migration `0086_add_queue_one_query_indexes`.
+- Kept listener callbacks database-free. Each queue processing task calls `close_old_connections()` before and after ORM work, allowing stale PostgreSQL connections to be discarded without closing healthy ones per packet.
+- Replaced boolean-only `SiteLoadPower` hydration with `exists()`, projected only phase values for voltage history checks, projected scalar consumption baseline fields, and projected the fire-email throttle timestamp.
 
 ## Full Optimization: Active Callback Offloads
 
 `consumption`, `load`, `SupplyTime`, `FIREALARM`, `recovery/loadRuntime`, `recovery/dailyConsumption`, and `recovery/hourlyConsumption` are moved out of the MQTT callback. The queue-1 subscriber validates and routes the topic, then places compact payloads on `queue1_processing` without querying the database. The processing worker validates the site, then performs consumption, load, fire-pump, runtime, and recovery database updates, monthly aggregation, and any recovery publish.
 
 This creates a durable RabbitMQ handoff and keeps the Paho callback independent of business database, notification, and recovery-publish latency. The active implementations are `wareApp/mqtt/consumption.py`, `wareApp/mqtt/load.py`, `wareApp/mqtt/supply_time.py`, `wareApp/mqtt/fire_alarm.py`, `wareApp/mqtt/load_runtime_recovery.py`, `wareApp/mqtt/daily_consumption_recovery.py`, `wareApp/mqtt/hourly_consumption_recovery.py`, `wareApp.tasks.process_consumption_message`, `wareApp.tasks.process_load_message`, `wareApp.tasks.process_supply_time_message`, `wareApp.tasks.process_fire_alarm_message`, `wareApp.tasks.process_load_runtime_recovery_message`, `wareApp.tasks.process_daily_consumption_recovery_message`, and `wareApp.tasks.process_hourly_consumption_recovery_message`.
+
+Both isolated Paho clients reconnect with a one-to-thirty-second delay. Listener task failures are retried by Celery with bounded exponential backoff; callback exceptions are logged and contained so a malformed packet or transient enqueue error does not stop `loop_forever()`.
 
 `sync` remains an outbound gateway-recovery command and `remoteAccess` has no implemented inbound contract. Both topic names remain recognized for compatibility, but queue1 does not subscribe to either one, so they do not create no-op callback work.
 
@@ -99,7 +111,17 @@ Unsupported subtypes, including unknown recovery subtypes, stop at the dispatche
 | `ERROR` with traceback | Unexpected branch failures captured through `logger.exception`. |
 | `DEBUG` | Legacy queue-1 diagnostic print output redirected through the logger. |
 
-## Validation Performed
+## Validation
+
+Latest local verification completed without deployment or database migration:
+
+```text
+manage.py test wareApp.tests.test_mqtt_topics wareApp.tests.test_consumption_handler wareApp.tests.test_supply_time_handler wareApp.tests.test_load_handler wareApp.tests.test_fire_alarm_handler wareApp.tests.test_daily_consumption_recovery wareApp.tests.test_hourly_consumption_recovery wareApp.tests.test_load_runtime_recovery wareApp.tests.test_load_data
+```
+
+Result: `112` tests passed. The touched MQTT modules and tests also passed `py_compile`, `git diff --check`, and editor diagnostics.
+
+Historical validation completed during earlier rollout work:
 
 - Focused Django test suite:
 
@@ -107,7 +129,7 @@ Unsupported subtypes, including unknown recovery subtypes, stop at the dispatche
   manage.py test wareApp.tests.test_load_data wareApp.tests.test_mqtt_topics
   ```
 
-  Result: `65` queue1 routing and handler tests passed.
+  Result: `65` queue1 routing and handler tests passed at that point in the rollout.
 
 - Python compile checks for active consumer and LoadData modules.
 - `git diff --check` completed without whitespace errors.

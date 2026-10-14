@@ -5775,7 +5775,7 @@ class LoadGraphApiForEverySecond(APIView):
         try:
             site_id = data.get("site_id")
             epoch_time = data.get("epoch_time")
-            raw_data = RawLoadData.objects.using("secondary").filter(
+            raw_data = RawLoadData.objects.using("default").filter(
                 site=site_id, epoch_time__gt=epoch_time
             )
             res = []
@@ -5804,7 +5804,7 @@ class LoadGraphApiForHourlyData(APIView):
             selected_date = data.get("date")
             selected_date = datetime.strptime(selected_date, "%Y/%m/%d")
             hourly_data = (
-                HourlyLoadData.objects.using("secondary")
+                HourlyLoadData.objects.using("default")
                 .filter(site=site_id, created__date=selected_date.date())
                 .order_by("created")
             )
@@ -5837,7 +5837,7 @@ class LoadGraphApiForDailyData(APIView):
             till_date = datetime.strptime(selected_date, "%Y/%m/%d")
             from_date = till_date - timedelta(days=31)
             hourly_data = (
-                DailyLoadData.objects.using("secondary")
+                DailyLoadData.objects.using("default")
                 .filter(
                     site=site_id,
                     created__date__gte=from_date.date(),
@@ -6182,7 +6182,7 @@ class LoadGraphApiForMainsDgDailyData(APIView):
             for aisle in all_aisles:
                 series_color = self._series_color(aisle.aisleGroupName)
                 hourly_data = (
-                    MainsDgLoadData.objects.using("secondary")
+                    MainsDgLoadData.objects.using("default")
                     .filter(
                         site=site_id,
                         aisle_group=aisle.id,

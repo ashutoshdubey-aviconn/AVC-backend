@@ -6,11 +6,14 @@ import django
 
 django.setup()
 
+import logging
 from celery import Celery
 import paho.mqtt.client as mqtt
+from paho.mqtt.client import MQTT_ERR_SUCCESS
 import re
 import requests
 import math
+from django.db import close_old_connections
 from wareApp.models import *
 from datetime import datetime, timedelta, timezone
 from datetime import datetime
@@ -18,6 +21,7 @@ from warehouse import settings
 from django.core.mail import EmailMessage, send_mail, EmailMultiAlternatives
 from django.utils import timezone
 from wareApp.load_data import handle_load_data_message
+from wareApp.mqtt.consumers import run_mqtt_client1, run_mqtt_client2
 from wareApp.mqtt.routing import QUEUE_ONE_SUBSCRIPTIONS, QUEUE_TWO_SUBSCRIPTIONS
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
 from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_unit_consumption
@@ -26,6 +30,22 @@ from wareApp.sendmail import *
 
 app = Celery("root_mqtt")
 app.config_from_object("django.conf:settings", namespace="CELERY")
+logger = logging.getLogger(__name__)
+
+
+def _resilient_mqtt_callback(callback, listener_name):
+    def wrapped(client, userdata, msg):
+        close_old_connections()
+        try:
+            return callback(client, userdata, msg)
+        except Exception:
+            logger.exception(
+                "%s MQTT message processing failed; keeping listener running", listener_name
+            )
+        finally:
+            close_old_connections()
+
+    return wrapped
 
 
 def roadcasteAPI(start_time, end_time):
@@ -76,8 +96,7 @@ def DG_fuel_for_Roadcaste(site_id, aisle_group, new_unit_consumption, entry_time
     return result
 
 
-@app.task(queue="queue1")
-def mqtt_client1():
+def _retired_mqtt_client1_inline():
     # app = Celery('mqtt_client', broker='amqp://guest@localhost/')
 
     # The callback for when the client receives a CONNACK response from the server.
@@ -2336,7 +2355,7 @@ def mqtt_client1():
 
     client = mqtt.Client("server_paho_client_1")
     client.on_connect = on_connect
-    client.on_message = on_message
+    client.on_message = _resilient_mqtt_callback(on_message, "Queue1")
 
     client.connect("127.0.0.1", 1883, 60)
     print("MQTT Client 1 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -3770,7 +3789,7 @@ def _retired_mqtt_client2_inline_load_data():
 
     client = mqtt.Client("server_paho_client_2")
     client.on_connect = on_connect
-    client.on_message = on_message
+    client.on_message = _resilient_mqtt_callback(on_message, "Queue2")
 
     client.connect("127.0.0.1", 1883, 60)
     print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -3791,7 +3810,7 @@ def _run_mqtt_listener(listener, description):
     return result
 
 
-@_deferred_task(
+@app.task(
     name="tasks.mqtt_client1",
     queue="queue1",
     autoretry_for=(Exception,),
@@ -3800,11 +3819,11 @@ def _run_mqtt_listener(listener, description):
     retry_jitter=False,
     max_retries=None,
 )
-def _deferred_mqtt_client1():
+def mqtt_client1():
     return _run_mqtt_listener(run_mqtt_client1, "Queue1")
 
 
-@_deferred_task(
+@app.task(
     name="tasks.mqtt_client2",
     queue="queue2",
     autoretry_for=(Exception,),
@@ -3813,7 +3832,7 @@ def _deferred_mqtt_client1():
     retry_jitter=False,
     max_retries=None,
 )
-def _deferred_mqtt_client2():
+def mqtt_client2():
     return _run_mqtt_listener(run_mqtt_client2, "Queue2")
 
 
@@ -3924,8 +3943,7 @@ def process_load_message(site_id, gateway_id, message):
     client.loop_forever()
 
 
-@app.task(queue="queue2")
-def mqtt_client2():
+def _retired_mqtt_client2_direct():
     """Consume only LoadData and delegate persistence to the optimized handler."""
 
     def on_connect(client, userdata, flags, rc):
@@ -3959,7 +3977,7 @@ def mqtt_client2():
 
     client = mqtt.Client("server_paho_client_2")
     client.on_connect = on_connect
-    client.on_message = on_message
+    client.on_message = _resilient_mqtt_callback(on_message, "Queue2")
     client.connect("127.0.0.1", 1883, 60)
     print("MQTT Client 2 is Running >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     client.loop_forever()

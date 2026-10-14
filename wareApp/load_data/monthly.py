@@ -25,43 +25,48 @@ def update_monthly_min_max_load(site, aisle_group, reading: LoadReading):
             created__gte=month_start,
             created__lt=next_month_start,
         )
-        monthly_load = monthly_min_max_load.first()
+        monthly_load = monthly_min_max_load.values("min_load", "max_load").first()
         if monthly_load:
-            monthly_min_load = monthly_load.min_load
-            monthly_max_load = monthly_load.max_load
-            if monthly_min_load > reading.load_value:
-                monthly_min_max_load.update(
+            monthly_min_load = monthly_load["min_load"]
+            monthly_max_load = monthly_load["max_load"]
+            initialized_minimum = (
+                monthly_min_load == 0.0 and monthly_min_load <= reading.load_value
+            )
+            update_minimum = (
+                monthly_min_load > reading.load_value or monthly_min_load == 0.0
+            )
+            update_maximum = monthly_max_load < reading.load_value
+            monthly_updates = {}
+            site_load_updates = {}
+            if update_minimum:
+                monthly_updates.update(
                     min_load=reading.load_value, min_load_created=today_date
                 )
-                SiteLoadPower.objects.filter(
-                    Associated_Site=site.id, Meter_Number=reading.meter_number
-                ).update(min_load=reading.load_value)
-                logger.info(
-                    "Updated monthly minimum load for site %s, source %s to %s",
-                    site.id,
-                    power_source,
-                    reading.load_value,
-                )
-            elif monthly_min_load == 0.0:
-                monthly_min_max_load.update(
-                    min_load=reading.load_value, min_load_created=today_date
-                )
-                SiteLoadPower.objects.filter(
-                    Associated_Site=site.id, Meter_Number=reading.meter_number
-                ).update(min_load=reading.load_value)
-                logger.info(
-                    "Initialized monthly minimum load for site %s, source %s to %s",
-                    site.id,
-                    power_source,
-                    reading.load_value,
-                )
-            if monthly_max_load < reading.load_value:
-                monthly_min_max_load.update(
+                site_load_updates["min_load"] = reading.load_value
+            if update_maximum:
+                monthly_updates.update(
                     max_load=reading.load_value, max_load_created=today_date
                 )
+                site_load_updates["max_load"] = reading.load_value
+
+            if monthly_updates:
+                monthly_min_max_load.update(**monthly_updates)
                 SiteLoadPower.objects.filter(
                     Associated_Site=site.id, Meter_Number=reading.meter_number
-                ).update(max_load=reading.load_value)
+                ).update(**site_load_updates)
+
+            if update_minimum:
+                logger.info(
+                    (
+                        "Initialized monthly minimum load for site %s, source %s to %s"
+                        if initialized_minimum
+                        else "Updated monthly minimum load for site %s, source %s to %s"
+                    ),
+                    site.id,
+                    power_source,
+                    reading.load_value,
+                )
+            if update_maximum:
                 logger.info(
                     "Updated monthly maximum load for site %s, source %s to %s",
                     site.id,
