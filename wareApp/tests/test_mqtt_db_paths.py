@@ -206,8 +206,11 @@ class SyncStatusWriteTests(MqttDbTestCase):
         observed = datetime(2026, 10, 2, 10)
         self.mark_healthy(observed)
         with self.captureOnCommitCallbacks(execute=True):
-            sync_status.mark_recovery_requested(
-                self.site, "gw-1", self.aisle, observed, observed
+            sync_status.upsert_status(
+                self.site,
+                "gw-1",
+                {"sync_status": "recovery_requested"},
+                aisle_group=self.aisle,
             )
 
         self.assertTrue(self.mark_healthy(observed))
@@ -250,8 +253,10 @@ class RecoveryWriteTests(MqttDbTestCase):
             )
 
         self.assertEqual(HourlySiteReading.objects.count(), 38)
-        # aisle lookup + status writes + 1 select + 1 bulk insert (+ savepoints)
-        self.assertLessEqual(len(queries), 12)
+        # aisle lookup, recovery monitor + status writes, one SELECT and one
+        # bulk INSERT for the 38 rows, gap verification (+ savepoints).
+        # Was one autocommitted UPDATE/INSERT per hour (~45-85 statements).
+        self.assertLessEqual(len(queries), 16)
 
     def test_daily_recovery_never_lowers_a_known_value(self):
         self.daily(20.0, day=1)

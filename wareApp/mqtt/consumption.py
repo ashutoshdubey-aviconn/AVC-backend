@@ -21,7 +21,12 @@ from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
     release_recovery_request,
 )
-from wareApp.mqtt.sync_status import mark_recovery_requested, mark_sync_healthy
+from wareApp.mqtt.services.recovery_status import (
+    HOURLY_CONSUMPTION,
+    RecoveryScope,
+    RecoveryStatusService,
+)
+from wareApp.mqtt.sync_status import mark_sync_healthy
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +268,8 @@ def _consumption_alarms(site, aisle_group, daily_reading):
         )
 
 
-def _publish_consumption_recovery(
-    publish_recovery, location_id, gateway_id, aisle_group_id, last_hourly_entry
-):
+def _consumption_recovery_request(location_id, gateway_id, aisle_group_id, last_hourly_entry):
+    """Build the gateway sync command for a consumption gap, or None."""
     if not last_hourly_entry.reading_to:
         logger.warning(
             "Skipping consumption recovery with incomplete prior reading: site=%s homegateway_id=%s aisle_group=%s reading_id=%s",
@@ -274,7 +278,7 @@ def _publish_consumption_recovery(
             aisle_group_id,
             last_hourly_entry.id,
         )
-        return False
+        return None
 
     topic = (
         f"/Acclivate/iOmniControl/{location_id}/{gateway_id}/in/sync/"
@@ -286,8 +290,7 @@ def _publish_consumption_recovery(
         f"Aisle_grp :{aisle_group_id},Last_Synced_hour :"
         f"{last_hourly_entry.reading_to.strftime('%Y-%m-%d %H:%M:%S.%f')}"
     )
-    publish_recovery(topic, message)
-    return True
+    return topic, message
 
 
 class _BaselineMemo:
@@ -476,29 +479,32 @@ def handle_consumption_message(
                     "-reading_from", "-id"
                 ).first()
                 if last_hourly_entry is not None:
-                    recovery_requested = _publish_consumption_recovery(
-                        publish_recovery,
-                        location_id,
-                        gateway_id,
-                        aisle_group_id,
-                        last_hourly_entry,
+                    request = _consumption_recovery_request(
+                        location_id, gateway_id, aisle_group_id, last_hourly_entry
                     )
-                    if recovery_requested:
-                        mark_recovery_requested(
-                            site,
-                            home_gateway_id,
-                            aisle_group,
-                            last_hourly_entry.reading_to,
+                    if request is not None:
+                        topic, request_message = request
+                        decision = RecoveryStatusService(
+                            site, home_gateway_id
+                        ).request_recovery(
+                            RecoveryScope.aisle(aisle_group),
+                            HOURLY_CONSUMPTION,
+                            last_hourly_entry.reading_from,
                             observed_at,
+                            topic,
+                            request_message,
                         )
-                        logger.warning(
-                            "Queue1 consumption recovery requested: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s observed_at=%s",
-                            location_id,
-                            home_gateway_id,
-                            aisle_group_id,
-                            aisle_group.aisleGroupName,
-                            observed_at,
-                        )
+                        if decision.publish:
+                            publish_recovery(topic, request_message)
+                            logger.warning(
+                                "Queue1 consumption recovery requested: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s observed_at=%s attempt=%s",
+                                location_id,
+                                home_gateway_id,
+                                aisle_group_id,
+                                aisle_group.aisleGroupName,
+                                observed_at,
+                                decision.monitor.attempt,
+                            )
                     return
 
                 # First ever reading for this aisle: no gap, so give back the

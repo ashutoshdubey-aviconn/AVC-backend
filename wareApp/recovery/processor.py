@@ -13,6 +13,7 @@ Author:
     Aviconn Recovery Refactor
 """
 
+import json
 import re
 import logging
 from datetime import datetime
@@ -26,6 +27,13 @@ from wareApp.models import (
     HourlySiteReading,
     SiteBaseline,
     DailySiteReading,
+)
+
+from wareApp.mqtt.services.recovery_status import (
+    HOURLY_CONSUMPTION,
+    RecoveryScope,
+    RecoverySlot,
+    RecoveryStatusService,
 )
 
 logger = logging.getLogger(__name__)
@@ -408,6 +416,7 @@ def process_hourly(
                 continue
 
             processed_dates = set()
+            status_slots = []
 
             aisle_group_active = aisle.is_active
 
@@ -481,6 +490,10 @@ def process_hourly(
                             },
                         )
 
+                        status_slots.append(
+                            RecoverySlot(lower, str(unit) == "ERROR404")
+                        )
+
                         if created_flag:
 
                             created += 1
@@ -507,6 +520,15 @@ def process_hourly(
                     aisle_group_id=aisle_group_id,
                     reading_date=reading_date,
                 )
+
+            # Same recovery status / history as the MQTT transport.
+            if status_slots:
+                scope = RecoveryScope.aisle(aisle)
+                status = RecoveryStatusService(site, gateway_id)
+                monitor = status.record_response(
+                    scope, HOURLY_CONSUMPTION, status_slots, json.dumps(dates, default=str)
+                )
+                status.record_applied(monitor, scope, status_slots)
 
         logger.info(
             "Recovery Complete | Created=%s Updated=%s Failed=%s",

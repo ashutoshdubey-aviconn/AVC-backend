@@ -20,7 +20,7 @@ class ConsumptionHandlerTests(SimpleTestCase):
     def setUp(self):
         self.mark_sync_healthy = patch("wareApp.mqtt.consumption.mark_sync_healthy")
         self.mark_recovery_requested = patch(
-            "wareApp.mqtt.consumption.mark_recovery_requested"
+            "wareApp.mqtt.consumption.RecoveryStatusService"
         )
         self.mark_sync_healthy.start()
         self.mark_recovery_requested.start()

@@ -80,10 +80,16 @@ class SupplyTimeHandlerTests(SimpleTestCase):
         )
         client = Mock()
 
+        status_service = Mock()
+        status_service.return_value.request_recovery.return_value = SimpleNamespace(
+            publish=True, monitor=SimpleNamespace(attempt=1)
+        )
         with patch(
             "wareApp.mqtt.supply_time.SupplyLoadTimeShare.objects.filter",
             return_value=run_time,
-        ), patch("wareApp.mqtt.supply_time._update_monthly_share_if_due"):
+        ), patch("wareApp.mqtt.supply_time._update_monthly_share_if_due"), patch(
+            "wareApp.mqtt.supply_time.RecoveryStatusService", status_service
+        ):
             supply_time.handle_supply_time_message(
                 client, SimpleNamespace(), 156, "gateway-01", self.message
             )

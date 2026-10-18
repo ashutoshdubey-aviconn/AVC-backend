@@ -285,22 +285,59 @@ class SiteCeleryPingAdmin(admin.ModelAdmin):
 admin.site.register(SiteCeleryPing, SiteCeleryPingAdmin)
 
 
+def _retry_recovery(monitors):
+    """Re-arm failed/timed-out requests: the next gap packet publishes again."""
+    from django.core.cache import cache
+
+    count = 0
+    for monitor in monitors:
+        monitor.status = "timeout"
+        monitor.attempt = 0
+        monitor.is_active = True
+        monitor.failed_reason = None
+        monitor.save(update_fields=["status", "attempt", "is_active", "failed_reason"])
+        scope = (
+            f"aisle:{monitor.leg_id}"
+            if monitor.leg_id
+            else f"source:{monitor.power_source}"
+        )
+        cache.delete(f"mqtt:recovery-req:{monitor.site_id}:{scope}")
+        AisleSyncRecoveryStatus.objects.filter(recovery_monitor=monitor).update(
+            sync_status="missing", last_error=None
+        )
+        count += 1
+    return count
+
+
 @admin.register(AisleSyncRecoveryStatus)
 class AisleSyncRecoveryStatusAdmin(admin.ModelAdmin):
     list_display = [
         "site",
         "home_gateway_id",
         "aisle_group",
+        "power_source",
         "leg_id",
         "sync_status",
         "is_sync_gone",
-        "recovery_requested",
-        "recovery_received",
+        "has_data_loss",
+        "missing_slots",
+        "recovered_slots",
         "last_sync_at",
         "updated_at",
     ]
-    list_filter = ["sync_status", "is_sync_gone", "recovery_requested"]
+    list_filter = ["sync_status", "is_sync_gone", "has_data_loss", "site"]
     search_fields = ["site__site_name", "home_gateway_id", "leg_id"]
+    actions = ["retry_failed_recovery"]
+
+    @admin.action(description="Retry recovery for selected (failed) rows")
+    def retry_failed_recovery(self, request, queryset):
+        monitors = RecoveryMonitor.objects.filter(
+            id__in=queryset.exclude(recovery_monitor__isnull=True).values(
+                "recovery_monitor_id"
+            ),
+            status__in=("failed", "timeout"),
+        )
+        self.message_user(request, f"{_retry_recovery(monitors)} request(s) re-armed.")
 
 
 @admin.register(RecoveryMonitor)
@@ -310,11 +347,15 @@ class RecoveryMonitorAdmin(admin.ModelAdmin):
         "site",
         "recovery_type",
         "status",
+        "attempt",
         "leg_id",
         "power_source",
+        "missing_from",
+        "missing_to",
         "expected_slots",
         "recovered_slots",
         "error_slots",
+        "catch_up_at",
         "requested_at",
         "is_active",
     ]
@@ -325,4 +366,11 @@ class RecoveryMonitorAdmin(admin.ModelAdmin):
         "response_received_at",
         "applied_at",
         "verified_at",
+        "catch_up_at",
     ]
+    actions = ["retry_recovery"]
+
+    @admin.action(description="Retry selected failed / timed-out requests")
+    def retry_recovery(self, request, queryset):
+        count = _retry_recovery(queryset.filter(status__in=("failed", "timeout")))
+        self.message_user(request, f"{count} request(s) re-armed.")

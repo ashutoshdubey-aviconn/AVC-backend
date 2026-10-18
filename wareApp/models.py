@@ -1310,6 +1310,11 @@ class RecoveryMonitor(models.Model):
     verified_at = models.DateTimeField(blank=True, null=True)
     failed_reason = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    # Request attempts for the same gap (retried after each cooldown).
+    attempt = models.PositiveSmallIntegerField(default=1)
+    # First hour that carries the consumption of an outage reported as
+    # ERROR404 (the meter's cumulative difference lands here). Alarms skip it.
+    catch_up_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         indexes = [
@@ -1348,8 +1353,13 @@ class AisleSyncRecoveryStatus(models.Model):
 
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     home_gateway_id = models.CharField(max_length=200)
-    aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
-    leg_id = models.CharField(max_length=50)
+    # Consumption status rows are per aisle group; SupplyTime / loadRuntime
+    # status rows are per power source (aisle_group empty).
+    aisle_group = models.ForeignKey(
+        AisleGroup, on_delete=models.CASCADE, blank=True, null=True
+    )
+    power_source = models.IntegerField(blank=True, null=True)
+    leg_id = models.CharField(max_length=50, blank=True, default="")
     sync_status = models.CharField(
         max_length=30, choices=SYNC_STATUSES, default="unknown"
     )
@@ -1365,6 +1375,8 @@ class AisleSyncRecoveryStatus(models.Model):
     missing_slots = models.PositiveIntegerField(default=0)
     recovered_slots = models.PositiveIntegerField(default=0)
     last_error = models.TextField(blank=True, null=True)
+    # Recovered, but some hours were ERROR404 (no data on the gateway).
+    has_data_loss = models.BooleanField(default=False)
     recovery_monitor = models.ForeignKey(
         RecoveryMonitor,
         on_delete=models.SET_NULL,
@@ -1378,8 +1390,14 @@ class AisleSyncRecoveryStatus(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["site", "home_gateway_id", "aisle_group"],
+                condition=models.Q(aisle_group__isnull=False),
                 name="uniq_sync_status_site_gateway_aisle",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["site", "home_gateway_id", "power_source"],
+                condition=models.Q(aisle_group__isnull=True),
+                name="uniq_sync_status_site_gateway_source",
+            ),
         ]
         indexes = [
             models.Index(
