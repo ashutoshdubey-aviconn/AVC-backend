@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from django.db.models import F, Sum
 
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
-
+from wareApp.mqtt.log_context import home_gateway_id_for
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,22 @@ def _parse_supply_time_message(message):
         key, separator, value = field.partition(":")
         if not separator:
             raise ValueError(f"Invalid SupplyTime field: {field!r}")
-        fields[key.strip().lower()] = value.strip()
+        fields[key.strip().lower().replace("_", "").replace("-", "")] = value.strip()
+
+    def value_for(*keys):
+        for key in keys:
+            if key in fields:
+                return fields[key]
+        raise ValueError(f"Missing SupplyTime field: {keys[0]}")
 
     try:
-        source = int(fields["source"])
-        run_time = float(fields["runtime"])
-        observed_at = datetime.fromisoformat(fields["time"])
-    except KeyError as error:
-        raise ValueError(f"Missing SupplyTime field: {error.args[0]}") from error
+        source = int(value_for("source", "supplysource"))
+        run_time = float(value_for("runtime"))
+        observed_at = datetime.fromisoformat(value_for("time", "messagetime"))
+    except ValueError as error:
+        if str(error).startswith("Missing SupplyTime field:"):
+            raise
+        raise ValueError("Invalid SupplyTime field value") from error
 
     return source, run_time, observed_at
 
@@ -70,6 +78,7 @@ def handle_supply_time_message(
     client, site, location_id, gateway_id, message, publish_recovery=None
 ):
     """Persist one SupplyTime packet and request gateway recovery for a detected gap."""
+    home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         source, source_run_time, observed_at = _parse_supply_time_message(message)
         hour_start = observed_at.replace(minute=0, second=0, microsecond=0)
@@ -83,9 +92,11 @@ def handle_supply_time_message(
         )
         if current_hour.update(hourly_run_time=F("hourly_run_time") + source_run_time):
             logger.info(
-                "Updated SupplyTime for site %s, source %s, hour %s",
+                "Queue1 SupplyTime updated: site=%s home_gateway_id=%s source=%s runtime=%s hour=%s",
                 location_id,
+                home_gateway_id,
                 source,
+                source_run_time,
                 hour_start,
             )
             return
@@ -107,9 +118,11 @@ def handle_supply_time_message(
                 reading_to=hour_end,
             )
             logger.info(
-                "Created SupplyTime for site %s, source %s, hour %s",
+                "Queue1 SupplyTime created: site=%s home_gateway_id=%s source=%s runtime=%s hour=%s",
                 location_id,
+                home_gateway_id,
                 source,
+                source_run_time,
                 hour_start,
             )
             return
@@ -127,14 +140,14 @@ def handle_supply_time_message(
         else:
             client.publish(recovery_topic, recovery_message, qos=0, retain=False)
         logger.warning(
-            "Requested SupplyTime recovery for site %s, source %s from gateway %s",
+            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s",
             location_id,
+            home_gateway_id,
             source,
-            gateway_id,
         )
     except Exception:
         logger.exception(
-            "Queue1 SupplyTime processing failed for site %s from gateway %s",
+            "Queue1 SupplyTime processing failed: site=%s home_gateway_id=%s",
             location_id,
-            gateway_id,
+            home_gateway_id,
         )

@@ -97,7 +97,16 @@ class AisleGroupFields(admin.ModelAdmin):
 
 
 class SiteFields(admin.ModelAdmin):
-    list_display = ["id", "customer", "site_name", "site_type", "location"]
+    list_display = [
+        "id",
+        "customer",
+        "site_name",
+        "site_type",
+        "location",
+        "nl_operation_hours",
+        "high_consumption_units",
+        "bypass_consumption_units",
+    ]
 
     class Meta:
         model = Site
@@ -274,6 +283,24 @@ class SiteCeleryPingAdmin(admin.ModelAdmin):
 
 
 admin.site.register(SiteCeleryPing, SiteCeleryPingAdmin)
+
+
+@admin.register(AisleSyncRecoveryStatus)
+class AisleSyncRecoveryStatusAdmin(admin.ModelAdmin):
+    list_display = [
+        "site",
+        "home_gateway_id",
+        "aisle_group",
+        "leg_id",
+        "sync_status",
+        "is_sync_gone",
+        "recovery_requested",
+        "recovery_received",
+        "last_sync_at",
+        "updated_at",
+    ]
+    list_filter = ["sync_status", "is_sync_gone", "recovery_requested"]
+    search_fields = ["site__site_name", "home_gateway_id", "leg_id"]
 
 
 @admin.register(RecoveryMonitor)

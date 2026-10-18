@@ -14,6 +14,18 @@ class HourlyConsumptionRecoveryTests(SimpleTestCase):
         "Unit_consumptions : 12.5,; GW_total_cumulative : 0"
     )
 
+    def setUp(self):
+        self.mark_recovery_received = patch(
+            "wareApp.mqtt.hourly_consumption_recovery.mark_recovery_received"
+        )
+        self.mark_recovered = patch(
+            "wareApp.mqtt.hourly_consumption_recovery.mark_recovered"
+        )
+        self.mark_recovery_received.start()
+        self.mark_recovered.start()
+        self.addCleanup(self.mark_recovery_received.stop)
+        self.addCleanup(self.mark_recovered.stop)
+
     def test_parser_reads_gateway_payload(self):
         aisle_group_id, hours, consumptions = (
             hourly_consumption_recovery._parse_hourly_recovery_message(self.message)
@@ -34,7 +46,7 @@ class HourlyConsumptionRecoveryTests(SimpleTestCase):
         self.assertEqual(consumptions, ["12.5"])
 
     def test_updates_existing_hourly_recovery_record(self):
-        aisle_group = SimpleNamespace(is_active=False)
+        aisle_group = SimpleNamespace(is_active=True, aisleGroupName="Main Supply")
         hourly_entries = Mock()
         hourly_entries.update.return_value = 1
 
@@ -56,7 +68,7 @@ class HourlyConsumptionRecoveryTests(SimpleTestCase):
         )
 
     def test_creates_missing_hourly_recovery_record(self):
-        aisle_group = SimpleNamespace(is_active=False)
+        aisle_group = SimpleNamespace(is_active=False, aisleGroupName="Main Supply")
         hourly_entries = Mock()
         hourly_entries.update.return_value = 0
         site = SimpleNamespace()
