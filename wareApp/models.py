@@ -126,6 +126,12 @@ class Site(models.Model):
     min_saving = models.FloatField(null=True, blank=True)
     max_threshold_value = models.FloatField(blank=True, null=True)
     min_threshold_value = models.FloatField(blank=True, null=True)
+    nl_operation_hours = models.PositiveSmallIntegerField(blank=True, null=True)
+    nl_operation_start_time = models.TimeField(blank=True, null=True)
+    nl_operation_end_time = models.TimeField(blank=True, null=True)
+    high_consumption_units = models.FloatField(blank=True, null=True)
+    bypass_consumption_units = models.FloatField(blank=True, null=True)
+    high_consumption_baseline_percent = models.FloatField(blank=True, null=True)
     is_pf_visible = models.BooleanField(default=False)
     is_loadGraph_visible = models.BooleanField(default=False)
     show_dg_mains_run_time = models.BooleanField(default=False)
@@ -617,6 +623,9 @@ class AlarmNotifications(models.Model):
         (7, "High Consumption"),
         (8, "Low Consumption"),
         (9, "No DG Run"),
+        (10, "Meter Reading Issue"),
+        (11, "Bypassed"),
+        (12, "Operation Hours Increased"),
     )
     Alarm_type = models.PositiveIntegerField(choices=alarm_type)
     create_DateTime = models.DateTimeField(auto_now=False, auto_now_add=True)
@@ -1314,6 +1323,66 @@ class RecoveryMonitor(models.Model):
 
     def __str__(self):
         return "{} {} {}".format(self.site, self.recovery_type, self.status)
+
+
+class AisleSyncRecoveryStatus(models.Model):
+    SYNC_STATUSES = (
+        ("unknown", "Unknown"),
+        ("healthy", "Healthy"),
+        ("late", "Late"),
+        ("missing", "Missing"),
+        ("recovery_requested", "Recovery Requested"),
+        ("recovery_received", "Recovery Received"),
+        ("recovered", "Recovered"),
+        ("failed", "Failed"),
+    )
+
+    site = models.ForeignKey(Site, on_delete=models.CASCADE)
+    home_gateway_id = models.CharField(max_length=200)
+    aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
+    leg_id = models.CharField(max_length=50)
+    sync_status = models.CharField(
+        max_length=30, choices=SYNC_STATUSES, default="unknown"
+    )
+    is_sync_gone = models.BooleanField(default=False)
+    recovery_requested = models.BooleanField(default=False)
+    recovery_received = models.BooleanField(default=False)
+    last_sync_at = models.DateTimeField(blank=True, null=True)
+    last_recovery_requested_at = models.DateTimeField(blank=True, null=True)
+    last_recovery_received_at = models.DateTimeField(blank=True, null=True)
+    last_recovery_applied_at = models.DateTimeField(blank=True, null=True)
+    expected_from = models.DateTimeField(blank=True, null=True)
+    expected_to = models.DateTimeField(blank=True, null=True)
+    missing_slots = models.PositiveIntegerField(default=0)
+    recovered_slots = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, null=True)
+    recovery_monitor = models.ForeignKey(
+        RecoveryMonitor,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="current_statuses",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["site", "home_gateway_id", "aisle_group"],
+                name="uniq_sync_status_site_gateway_aisle",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["site", "sync_status"], name="idx_sync_status_site_state"
+            ),
+            models.Index(
+                fields=["site", "leg_id"], name="idx_sync_status_site_leg"
+            ),
+        ]
+
+    def __str__(self):
+        return "{} {} {}".format(self.site, self.leg_id, self.sync_status)
 
 
 class MeterDisconnectionEvent(models.Model):

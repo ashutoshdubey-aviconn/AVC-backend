@@ -7,6 +7,7 @@ from wareApp.models import (
     SiteLoadParameters,
     SiteLoadPower,
 )
+from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.sendmail import (
     send_alarm_for_high_voltage,
     send_alarm_for_low_voltage,
@@ -26,31 +27,38 @@ def _parse_load_message(message):
         key, separator, value = field.partition(":")
         if not separator:
             raise ValueError(f"Invalid load field: {field!r}")
-        fields[key.strip().lower().replace("_", "")] = value.strip().strip("'")
+        fields[key.strip().lower().replace("_", "").replace("-", "")] = (
+            value.strip().strip("'")
+        )
 
-    def value_for(key):
-        try:
-            return fields[key]
-        except KeyError as error:
-            raise ValueError(f"Missing load field: {key}") from error
+    def value_for(*keys):
+        for key in keys:
+            if key in fields:
+                return fields[key]
+        raise ValueError(f"Missing load field: {keys[0]}")
 
     values = {
-        "load_power": float(value_for("loadpower")),
-        "r_volt": float(value_for("rvolt")),
-        "y_volt": float(value_for("yvolt")),
-        "b_volt": float(value_for("bvolt")),
-        "r_current": float(value_for("rcurrent")),
-        "y_current": float(value_for("ycurrent")),
-        "b_current": float(value_for("bcurrent")),
+        "load_power": float(value_for("loadpower", "totalload")),
+        "r_volt": float(value_for("rvolt", "rphasevoltage")),
+        "y_volt": float(value_for("yvolt", "yphasevoltage")),
+        "b_volt": float(value_for("bvolt", "bphasevoltage")),
+        "r_current": float(value_for("rcurrent", "rphasecurrent")),
+        "y_current": float(value_for("ycurrent", "yphasecurrent")),
+        "b_current": float(value_for("bcurrent", "bphasecurrent")),
         "power_source": value_for("powersource"),
         "status": value_for("status"),
         "meter_number": int(value_for("meternumber")),
     }
-    if {"rpowerfactor", "ypowerfactor", "bpowerfactor"}.issubset(fields):
+    power_factor_keys = (
+        ("rpowerfactor", "rphasepowerfactor"),
+        ("ypowerfactor", "yphasepowerfactor"),
+        ("bpowerfactor", "bphasepowerfactor"),
+    )
+    if all(any(key in fields for key in aliases) for aliases in power_factor_keys):
         values["power_factors"] = (
-            float(value_for("rpowerfactor")),
-            float(value_for("ypowerfactor")),
-            float(value_for("bpowerfactor")),
+            float(value_for(*power_factor_keys[0])),
+            float(value_for(*power_factor_keys[1])),
+            float(value_for(*power_factor_keys[2])),
         )
     return values
 
@@ -163,6 +171,11 @@ def _record_power_factor_alarm(site, values):
         site.y_phase_pf_threshold,
         site.b_phase_pf_threshold,
     )
+    if any(threshold is None for threshold in thresholds):
+        logger.warning(
+            "Skipping PF alarm for site %s without all PF thresholds", site.id
+        )
+        return
     if not any(value < threshold for value, threshold in zip(factors, thresholds)):
         return
     PowerFactorData.objects.create(
@@ -207,6 +220,7 @@ def _record_power_factor_alarm(site, values):
 
 def handle_load_message(site, location_id, gateway_id, message):
     """Persist real-time load parameters and evaluate legacy voltage/PF alarms."""
+    home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         values = _parse_load_message(message)
         entries = SiteLoadPower.objects.filter(
@@ -242,6 +256,16 @@ def handle_load_message(site, location_id, gateway_id, message):
                 y_power_factor=factors[1],
                 b_power_factor=factors[2],
             )
+            logger.info(
+                "Queue1 load reading updated: site=%s home_gateway_id=%s source=%s meter=%s load=%s status=%s updated_at=%s",
+                location_id,
+                home_gateway_id,
+                values["power_source"],
+                values["meter_number"],
+                values["load_power"],
+                values["status"],
+                update_values["Updated_on"],
+            )
             return
         SiteLoadPower.objects.create(
             **update_values,
@@ -250,9 +274,19 @@ def handle_load_message(site, location_id, gateway_id, message):
             Supply_Source=values["power_source"],
             Meter_Number=values["meter_number"],
         )
+        logger.info(
+            "Queue1 load reading created: site=%s home_gateway_id=%s source=%s meter=%s load=%s status=%s created_at=%s",
+            location_id,
+            home_gateway_id,
+            values["power_source"],
+            values["meter_number"],
+            values["load_power"],
+            values["status"],
+            update_values["Updated_on"],
+        )
     except Exception:
         logger.exception(
-            "Queue1 load processing failed for site %s from gateway %s",
+            "Queue1 load processing failed: site=%s home_gateway_id=%s",
             location_id,
-            gateway_id,
+            home_gateway_id,
         )

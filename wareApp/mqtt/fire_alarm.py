@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from wareApp.models import Email_History, FirePumpAlarm
+from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.sendmail import send_mail_fire_alarm_user
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,9 @@ def _parse_fire_alarm_message(message):
     )
 
 
-def _send_fire_alarm_email(site, user_email, device_name, alarm_type, power_status, email_for):
+def _send_fire_alarm_email(
+    site, user_email, device_name, alarm_type, power_status, email_for
+):
     send_mail_fire_alarm_user(user_email, alarm_type, device_name, power_status)
     Email_History.objects.create(
         fire_site=site,
@@ -64,6 +67,7 @@ def _send_throttled_motor_on_email(
 
 def handle_fire_alarm_message(site, location_id, gateway_id, message):
     """Update a fire-pump reading and emit the legacy state-change notifications."""
+    home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         meter_number, r_volt, y_volt, b_volt, power_status = _parse_fire_alarm_message(
             message
@@ -73,6 +77,12 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
         )
         fire_pump_record = fire_pump_alarm.first()
         if not fire_pump_record:
+            logger.warning(
+                "Queue1 fire alarm skipped: site=%s home_gateway_id=%s meter=%s reason=no_fire_pump_record",
+                location_id,
+                home_gateway_id,
+                meter_number,
+            )
             return
 
         initial_r_volt = fire_pump_record.r_volt
@@ -85,6 +95,16 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
             motor_status=power_status,
             Meter_Number=meter_number,
             Updated_on=datetime.now(),
+        )
+        logger.info(
+            "Queue1 fire alarm updated: site=%s home_gateway_id=%s meter=%s power_status=%s r_volt=%s y_volt=%s b_volt=%s",
+            location_id,
+            home_gateway_id,
+            meter_number,
+            power_status,
+            r_volt,
+            y_volt,
+            b_volt,
         )
         device_name = fire_pump_record.aisleGroup
         user_email = site.customer.email
@@ -203,7 +223,7 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
             )
     except Exception:
         logger.exception(
-            "Queue1 FIREALARM processing failed for site %s from gateway %s",
+            "Queue1 FIREALARM processing failed: site=%s home_gateway_id=%s",
             location_id,
-            gateway_id,
+            home_gateway_id,
         )

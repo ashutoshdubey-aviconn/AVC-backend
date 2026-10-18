@@ -14,6 +14,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import api_view
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -437,7 +438,12 @@ class SuperUserAllAlarmsPriorityBasedOnCustomersList(APIView):
 
 
 class SuperUserAllAlarmsTypeBasedOnCustomersList(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        if request.user.UserType != 1:
+            raise PermissionDenied("Only Super_Admin users can view alarms.")
+
         data = request.data
         print("data : ", data)
         user_id = data.get("user_id")

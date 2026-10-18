@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
+from wareApp.mqtt.log_context import home_gateway_id_for
 
 logger = logging.getLogger(__name__)
 
@@ -34,16 +35,28 @@ def _baseline_for_day(location_id, aisle_group_id, observed_at):
     if baseline:
         return baseline.baseline_value
 
-    return (
+    baseline = (
         SiteBaseline.objects.filter(
             associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-        ).order_by("-baseline_to", "-id").first()
-        .baseline_value
+        )
+        .order_by("-baseline_to", "-id")
+        .first()
     )
+    if baseline:
+        return baseline.baseline_value
+
+    logger.warning(
+        "Queue1 daily recovery baseline missing: site=%s aisle_group=%s date=%s",
+        location_id,
+        aisle_group_id,
+        observed_at.date(),
+    )
+    return 0.0
 
 
 def handle_daily_consumption_recovery_message(site, location_id, gateway_id, message):
     """Persist recovered daily consumption readings without lowering known values."""
+    home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         aisle_group_id, recovery_dates, recovery_values = _parse_daily_recovery_message(
             message
@@ -56,11 +69,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
 
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
-            consumption = (
-                0.0
-                if recovery_value == "ERROR404"
-                else float(recovery_value)
-            )
+            consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
             baseline_value = 0.0
             saving = 0.0
             if aisle_group.is_active:
@@ -83,9 +92,23 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                         energy_saved=saving,
                     )
                     logger.info(
-                        "Updated recovered daily consumption for site %s, leg %s, date %s",
+                        "Queue1 daily recovery updated: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s date=%s",
                         location_id,
+                        home_gateway_id,
                         aisle_group_id,
+                        aisle_group.aisleGroupName,
+                        consumption,
+                        observed_at.date(),
+                    )
+                else:
+                    logger.info(
+                        "Queue1 daily recovery skipped: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s incoming_consumption=%s existing_consumption=%s date=%s",
+                        location_id,
+                        home_gateway_id,
+                        aisle_group_id,
+                        aisle_group.aisleGroupName,
+                        consumption,
+                        daily_record.unit_consumption,
                         observed_at.date(),
                     )
                 continue
@@ -101,14 +124,17 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 is_visible=True,
             )
             logger.info(
-                "Created recovered daily consumption for site %s, leg %s, date %s",
+                "Queue1 daily recovery created: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s date=%s",
                 location_id,
+                home_gateway_id,
                 aisle_group_id,
+                aisle_group.aisleGroupName,
+                consumption,
                 observed_at.date(),
             )
     except Exception:
         logger.exception(
-            "Queue1 daily consumption recovery failed for site %s from gateway %s",
+            "Queue1 daily consumption recovery failed: site=%s home_gateway_id=%s",
             location_id,
-            gateway_id,
+            home_gateway_id,
         )

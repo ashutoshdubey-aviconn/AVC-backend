@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -16,6 +16,16 @@ class ConsumptionHandlerTests(SimpleTestCase):
         "Aisle_group:967,GW_total_cumulative:0,Previous_hour_total_consumption:11"
     )
 
+    def setUp(self):
+        self.mark_sync_healthy = patch("wareApp.mqtt.consumption.mark_sync_healthy")
+        self.mark_recovery_requested = patch(
+            "wareApp.mqtt.consumption.mark_recovery_requested"
+        )
+        self.mark_sync_healthy.start()
+        self.mark_recovery_requested.start()
+        self.addCleanup(self.mark_sync_healthy.stop)
+        self.addCleanup(self.mark_recovery_requested.stop)
+
     def test_parser_reads_gateway_payload(self):
         values = consumption._parse_consumption_message(self.message)
 
@@ -32,6 +42,112 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
         self.assertEqual(values["aisle_group_id"], 967)
         self.assertEqual(values["current_hour_consumption"], 12.5)
+
+    def test_meter_reading_issue_is_stored_and_throttled(self):
+        site = SimpleNamespace(id=156)
+        aisle_group = SimpleNamespace(aisleGroupName="Main Supply")
+        message = (
+            "ERROR!!! New meter reading for energy of aisle group id 967 "
+            "is smaller than previous meter reading."
+        )
+
+        with patch(
+            "wareApp.mqtt.consumption.AisleGroup.objects.filter",
+            return_value=Mock(first=Mock(return_value=aisle_group)),
+        ) as aisle_groups, patch(
+            "wareApp.mqtt.consumption.cache.add", return_value=True
+        ) as cache_add, patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
+        ) as create:
+            consumption._notify_meter_reading_issue(site, 156, "gateway-01", message)
+
+        aisle_groups.assert_called_once_with(site=site, attached_leg_id="967")
+        cache_add.assert_called_once_with(
+            "meter-reading-issue-storage:156:gateway-01:967",
+            True,
+            timeout=consumption.METER_READING_ISSUE_COOLDOWN_SECONDS,
+        )
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs["site_id"], 156)
+        self.assertEqual(create.call_args.kwargs["object_id"], 967)
+        self.assertEqual(create.call_args.kwargs["aisle_group"], aisle_group)
+        self.assertEqual(create.call_args.kwargs["Alarm_type"], 10)
+        self.assertEqual(
+            create.call_args.kwargs["to_do"],
+            "Gateway gateway-01: lower meter reading reported.",
+        )
+
+    def test_meter_reading_issue_does_not_store_a_throttled_duplicate(self):
+        site = SimpleNamespace(id=156)
+        message = (
+            "ERROR!!! New meter reading for energy of aisle group id 967 "
+            "is smaller than previous meter reading."
+        )
+
+        with patch(
+            "wareApp.mqtt.consumption.AisleGroup.objects.filter",
+            return_value=Mock(first=Mock(return_value=None)),
+        ), patch("wareApp.mqtt.consumption.cache.add", return_value=False), patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
+        ) as create:
+            consumption._notify_meter_reading_issue(site, 156, "gateway-01", message)
+
+        create.assert_not_called()
+
+    def test_daily_consumption_records_high_consumption_at_configured_threshold(self):
+        site = SimpleNamespace(
+            id=156,
+            high_consumption_units=250.0,
+            bypass_consumption_units=400.0,
+            high_consumption_baseline_percent=None,
+            min_threshold_value=None,
+        )
+        aisle_group = SimpleNamespace(id=967, attached_leg_id="967")
+        daily_reading = SimpleNamespace(
+            unit_consumption=250.0,
+            daily_baseline_value=100.0,
+            reading_for=date(2026, 10, 16),
+        )
+        existing = Mock(exists=Mock(return_value=False))
+
+        with patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.filter",
+            return_value=existing,
+        ), patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
+        ) as create:
+            consumption._consumption_alarms(site, aisle_group, daily_reading)
+
+        self.assertEqual(create.call_args.kwargs["Alarm_type"], 7)
+        self.assertEqual(create.call_args.kwargs["object_id"], 967)
+        self.assertIn("threshold=250.00", create.call_args.kwargs["to_do"])
+
+    def test_daily_consumption_records_bypass_instead_of_high_consumption(self):
+        site = SimpleNamespace(
+            id=156,
+            high_consumption_units=250.0,
+            bypass_consumption_units=400.0,
+            high_consumption_baseline_percent=None,
+            min_threshold_value=None,
+        )
+        aisle_group = SimpleNamespace(id=967, attached_leg_id="967")
+        daily_reading = SimpleNamespace(
+            unit_consumption=400.0,
+            daily_baseline_value=100.0,
+            reading_for=date(2026, 10, 16),
+        )
+        existing = Mock(exists=Mock(return_value=False))
+
+        with patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.filter",
+            return_value=existing,
+        ), patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
+        ) as create:
+            consumption._consumption_alarms(site, aisle_group, daily_reading)
+
+        self.assertEqual(create.call_args.kwargs["Alarm_type"], 11)
+        self.assertIn("threshold=400.00", create.call_args.kwargs["to_do"])
 
     def test_hourly_baseline_reads_only_required_values(self):
         baselines = Mock()
@@ -51,7 +167,9 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
     def test_processing_locks_the_aisle_group(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(on_sensor_power=False, is_active=False)
+        aisle_group = SimpleNamespace(
+            on_sensor_power=False, is_active=False, aisleGroupName="Test Aisle"
+        )
         current_hour = Mock(update=Mock(return_value=1))
         hourly_entries = Mock()
         hourly_entries.filter.return_value = current_hour
@@ -82,7 +200,9 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
     def test_updates_current_hour_and_daily_records(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(on_sensor_power=False, is_active=False)
+        aisle_group = SimpleNamespace(
+            on_sensor_power=False, is_active=False, aisleGroupName="Test Aisle"
+        )
         current_hour = Mock(update=Mock(return_value=1))
         hourly_entries = Mock()
         hourly_entries.filter.return_value = current_hour
@@ -114,7 +234,9 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
     def test_reconciliation_aggregates_the_full_calendar_day(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(on_sensor_power=False, is_active=False)
+        aisle_group = SimpleNamespace(
+            on_sensor_power=False, is_active=False, aisleGroupName="Test Aisle"
+        )
         current_hour = Mock(update=Mock(return_value=0))
         previous_entries = Mock()
         previous_entries.first.return_value = SimpleNamespace(unit_consumption=11)
