@@ -68,6 +68,35 @@ def _parse_consumption_message(message):
     }
 
 
+WAREHOUSE_SAVING_SITE_TYPE = 2
+WAREHOUSE_SAVING_MAX_UNITS = 10000
+
+
+def _cap_warehouse_saving_values(site, values):
+    """Apply the legacy guard against meter glitches on energy-saving sites.
+
+    The legacy root tasks.py replaced any consumption above 10000 units with 0
+    for ``site_type == 2`` sites; the modular handler keeps that behaviour.
+    """
+    if getattr(site, "site_type", None) != WAREHOUSE_SAVING_SITE_TYPE:
+        return values
+    for key in (
+        "new_unit_consumption",
+        "current_hour_consumption",
+        "previous_hour_consumption",
+    ):
+        if values[key] > WAREHOUSE_SAVING_MAX_UNITS:
+            logger.warning(
+                "Consumption value above %s replaced with 0: site=%s field=%s value=%s",
+                WAREHOUSE_SAVING_MAX_UNITS,
+                getattr(site, "id", None),
+                key,
+                values[key],
+            )
+            values[key] = 0.0
+    return values
+
+
 def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     match = METER_READING_ISSUE_PATTERN.search(str(message))
     if not match:
@@ -277,7 +306,9 @@ def handle_consumption_message(
             _notify_meter_reading_issue(site, location_id, home_gateway_id, message)
             return
 
-        values = _parse_consumption_message(message)
+        values = _cap_warehouse_saving_values(
+            site, _parse_consumption_message(message)
+        )
         observed_at = values["observed_date"].replace(
             hour=values["observed_hour"], minute=0, second=0, microsecond=0
         )

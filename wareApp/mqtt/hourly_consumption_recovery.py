@@ -4,6 +4,7 @@ from datetime import datetime
 
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.sync_status import mark_recovered, mark_recovery_received
 
 logger = logging.getLogger(__name__)
@@ -19,11 +20,8 @@ def _parse_hourly_recovery_message(message):
         raise ValueError("Invalid hourlyConsumption recovery payload")
 
     aisle_group_id, recovery_hours, unit_consumptions, _ = match.groups()
-    return (
-        aisle_group_id,
-        [value for value in recovery_hours.split(",") if value],
-        [value for value in unit_consumptions.split(",") if value],
-    )
+    slots, values = split_paired_lists(recovery_hours, unit_consumptions, "hourlyConsumption")
+    return aisle_group_id, slots, values
 
 
 def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, message):

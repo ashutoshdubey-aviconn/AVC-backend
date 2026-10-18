@@ -4,6 +4,7 @@ from datetime import datetime
 
 from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import split_paired_lists
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,8 @@ def _parse_daily_recovery_message(message):
         raise ValueError("Invalid dailyConsumption recovery payload")
 
     aisle_group_id, recovery_dates, unit_consumptions, _ = match.groups()
-    return (
-        aisle_group_id,
-        [value for value in recovery_dates.split(",") if value],
-        [value for value in unit_consumptions.split(",") if value],
-    )
+    slots, values = split_paired_lists(recovery_dates, unit_consumptions, "dailyConsumption")
+    return aisle_group_id, slots, values
 
 
 def _baseline_for_day(location_id, aisle_group_id, observed_at):
@@ -70,6 +68,9 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
+            if getattr(site, "site_type", None) == 2 and consumption > 10000:
+                # Legacy guard for energy-saving sites: treat meter glitches as 0.
+                consumption = 0.0
             baseline_value = 0.0
             saving = 0.0
             if aisle_group.is_active:
