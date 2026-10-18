@@ -62,7 +62,11 @@ def processing_queue_for_site(site_id: int) -> str:
     return f"mqtt.site.{int(site_id) % partitions}"
 
 
-def subscribe(client, topics: Iterable[str]) -> None:
-    """Subscribe a Paho client to every topic assigned to its queue."""
+def subscribe(client, topics: Iterable[str], qos: int = 1) -> None:
+    """Subscribe a Paho client to every topic assigned to its queue.
+
+    QoS 1 together with the listener's persistent session lets Mosquitto keep
+    messages while the listener restarts (see deploy/mosquitto/).
+    """
     for topic in topics:
-        client.subscribe(topic)
+        client.subscribe(topic, qos=qos)

@@ -1459,3 +1459,27 @@ class HomeGatewayStatus(models.Model):
 
     def __str__(self):
         return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"
+
+
+class MqttDeadLetter(models.Model):
+    """An MQTT packet that could not be processed (kept for inspection/replay)."""
+
+    message_type = models.CharField(max_length=50)
+    site_id = models.IntegerField(blank=True, null=True)
+    gateway_id = models.CharField(max_length=200, blank=True, default="")
+    payload = models.TextField()
+    error = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_resolved = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["message_type", "is_resolved", "created_at"],
+                name="idx_deadletter_type_time",
+            ),
+            models.Index(fields=["site_id", "created_at"], name="idx_deadletter_site_time"),
+        ]
+
+    def __str__(self):
+        return "{} site={} {}".format(self.message_type, self.site_id, self.created_at)

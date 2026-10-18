@@ -266,6 +266,8 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         self.assertEqual(queue_one_client.subscriptions, list(QUEUE_ONE_SUBSCRIPTIONS))
         self.assertEqual(queue_two_client.subscriptions, list(QUEUE_TWO_SUBSCRIPTIONS))
+        self.assertEqual(queue_one_client.subscription_qos, {1})
+        self.assertEqual(queue_two_client.subscription_qos, {1})
 
     def test_consumers_retry_initial_broker_connection_with_bounded_backoff(self):
         queue_one_client = FakeMqttClient()
@@ -619,8 +621,9 @@ class FakeMqttClient:
     def reconnect_delay_set(self, min_delay, max_delay):
         self.reconnect_delay = (min_delay, max_delay)
 
-    def subscribe(self, topic):
+    def subscribe(self, topic, qos=0):
         self.subscriptions.append(topic)
+        self.subscription_qos = getattr(self, "subscription_qos", set()) | {qos}
 
     def loop_forever(self, retry_first_connection=False):
         self.retry_first_connection = retry_first_connection

@@ -129,3 +129,69 @@ class NotificationTests(TestCase):
         with patch("wareApp.sendmail.send_alarm_for_low_voltage") as send:
             tasks.send_notification.run("send_alarm_for_low_voltage", [{"site_id": 2}])
         send.assert_called_once_with({"site_id": 2})
+
+
+class FailureHandlingTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_transient_database_error_is_retried_in_place(self):
+        from django.db import OperationalError
+
+        from wareApp.mqtt.services.failures import run_with_db_retry
+
+        calls = []
+
+        def flaky():
+            calls.append(1)
+            if len(calls) < 3:
+                raise OperationalError("server closed the connection")
+            return "done"
+
+        self.assertEqual(run_with_db_retry(flaky, sleep=lambda _: None), "done")
+        self.assertEqual(len(calls), 3)
+
+    def test_retry_gives_up_after_the_last_delay(self):
+        from django.db import OperationalError
+
+        from wareApp.mqtt.services.failures import run_with_db_retry
+
+        def broken():
+            raise OperationalError("down")
+
+        with self.assertRaises(OperationalError):
+            run_with_db_retry(broken, delays=(0, 0), sleep=lambda _: None)
+
+    def test_unprocessable_packet_is_stored_once_as_dead_letter(self):
+        from wareApp.models import MqttDeadLetter
+        from wareApp.mqtt import supply_time
+
+        for _ in range(3):
+            supply_time.handle_supply_time_message(
+                None, SimpleNamespace(id=1), 1, "gw-1", "garbage-without-fields"
+            )
+
+        letter = MqttDeadLetter.objects.get()
+        self.assertEqual(letter.message_type, "SupplyTime")
+        self.assertEqual(letter.site_id, 1)
+        self.assertIn("ValueError", letter.error)
+
+    def test_handlers_reraise_transient_database_errors(self):
+        from django.db import OperationalError
+
+        from wareApp.mqtt import load
+
+        with patch(
+            "wareApp.mqtt.load._parse_load_message",
+            side_effect=OperationalError("gone"),
+        ):
+            with self.assertRaises(OperationalError):
+                load.handle_load_message(SimpleNamespace(id=1), 1, "gw-1", "x")
+
+    def test_listener_uses_a_persistent_session(self):
+        client = Mock()
+        client.loop_forever.return_value = 0
+        with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client) as factory:
+            consumers.run_mqtt_client1()
+
+        self.assertFalse(factory.call_args.kwargs["clean_session"])

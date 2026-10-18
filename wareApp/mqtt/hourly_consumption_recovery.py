@@ -6,6 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.slot_writes import upsert_slots
 from wareApp.mqtt.services.recovery_status import (
@@ -97,9 +98,12 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             created,
             monitor.status,
         )
-    except Exception:
+    except TRANSIENT_DB_ERRORS:
+        raise
+    except Exception as error:
         logger.exception(
             "Queue1 hourly consumption recovery failed: site=%s home_gateway_id=%s",
             location_id,
             home_gateway_id,
         )
+        record_dead_letter("recovery/hourlyConsumption", location_id, gateway_id, message, error)

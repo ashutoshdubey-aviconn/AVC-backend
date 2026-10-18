@@ -16,6 +16,7 @@ from wareApp.models import (
     SensorAisleUnitConsumption,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
@@ -597,9 +598,12 @@ def handle_consumption_message(
             observed_at.date(),
         )
         mark_sync_healthy(site, home_gateway_id, aisle_group, observed_at)
-    except Exception:
+    except TRANSIENT_DB_ERRORS:
+        raise
+    except Exception as error:
         logger.exception(
             "Queue1 consumption processing failed: site=%s home_gateway_id=%s",
             location_id,
             home_gateway_id,
         )
+        record_dead_letter("consumption", location_id, gateway_id, message, error)

@@ -48,3 +48,16 @@ site's packets are never split across two queues.
 3. Admin: *Aisle sync recovery statuses* and *Recovery monitors* show the
    current state and the request/response history; both have a "retry" action
    for failed requests.
+
+## Delivery guarantees (M6)
+
+* Listeners connect with `clean_session=False` and subscribe at QoS 1, using
+  the stable client IDs `MQTT_QUEUE1_CLIENT_ID` / `MQTT_QUEUE2_CLIENT_ID`.
+  Apply `deploy/mosquitto/persistence.conf` so the broker queues messages
+  (including the gateways' QoS 0 publishes) while a listener restarts.
+* `CELERY_BROKER_TRANSPORT_OPTIONS = {"confirm_publish": True}`: the listener's
+  `apply_async` returns only after RabbitMQ has the message.
+* Transient database errors are retried inside the processing task (0.5 s,
+  1 s, 2 s); all other failures are stored in **MQTT dead letters** (admin),
+  once per gateway/error per 10 minutes, instead of only being logged.
+* Run `python manage.py migrate` for 0094 (`MqttDeadLetter`).

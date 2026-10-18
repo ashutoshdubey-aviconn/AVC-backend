@@ -211,6 +211,9 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 MQTT_SITE_PARTITIONS = config("MQTT_SITE_PARTITIONS", default=0, cast=int)
 MQTT_BROKER_HOST = config("MQTT_BROKER_HOST", default="127.0.0.1")
 MQTT_BROKER_PORT = config("MQTT_BROKER_PORT", default=1883, cast=int)
+# Stable, unique client IDs: the persistent broker session is keyed on them.
+MQTT_QUEUE1_CLIENT_ID = config("MQTT_QUEUE1_CLIENT_ID", default="server_paho_client_1")
+MQTT_QUEUE2_CLIENT_ID = config("MQTT_QUEUE2_CLIENT_ID", default="server_paho_client_2")
 # One recovery request per (site, aisle or power source) per cooldown window.
 MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS = config(
     "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", default=600, cast=int
@@ -244,6 +247,8 @@ CELERY_TASK_QUEUES = (
 # The MQTT pipeline is fire-and-forget: nothing reads task results, so do not
 # publish a result message for every processed packet.
 CELERY_TASK_IGNORE_RESULT = True
+# apply_async returns only after RabbitMQ has confirmed the message.
+CELERY_BROKER_TRANSPORT_OPTIONS = {"confirm_publish": True}
 # CELERYBEAT_SCHEDULER='djcelery'
 
 # SECURE_PROXY_SSL_HEADER         = None
