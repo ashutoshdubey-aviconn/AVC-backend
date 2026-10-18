@@ -192,7 +192,7 @@ class LoadHandlerTests(SimpleTestCase):
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
-        with patch("wareApp.tasks.Site.objects.get", return_value=site), patch(
+        with patch("wareApp.tasks.site_config.site", return_value=site), patch(
             "wareApp.tasks.handle_load_message"
         ) as handle:
             tasks.process_load_message.run(156, "gateway-01", self.message)

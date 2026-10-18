@@ -75,6 +75,26 @@ def _update_monthly_share_if_due(site, location_id, last_runtime_entry, now):
             )
 
 
+def _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end):
+    """Answer "is the previous hour stored?" from the latest row when possible.
+
+    The latest row was already fetched, so the extra ``exists()`` query is only
+    needed when that row is newer than the previous hour (late packet).
+    """
+    previous_start = hour_start - timedelta(hours=1)
+    previous_end = hour_end - timedelta(hours=1)
+    if last_runtime_entry is None:
+        return False
+    latest = last_runtime_entry.reading_from
+    if previous_start <= latest <= previous_end:
+        return True
+    if latest < previous_start:
+        return False
+    return run_time.filter(
+        reading_from__gte=previous_start, reading_from__lte=previous_end
+    ).exists()
+
+
 def handle_supply_time_message(
     client, site, location_id, gateway_id, message, publish_recovery=None
 ):
@@ -106,11 +126,9 @@ def handle_supply_time_message(
         _update_monthly_share_if_due(
             site, location_id, last_runtime_entry, datetime.now()
         )
-        previous_hour = run_time.filter(
-            reading_from__gte=hour_start - timedelta(hours=1),
-            reading_from__lte=hour_end - timedelta(hours=1),
-        )
-        if previous_hour.exists() or not last_runtime_entry:
+        if _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end) or (
+            not last_runtime_entry
+        ):
             SupplyLoadTimeShare.objects.create(
                 site=site,
                 power_source=source,
