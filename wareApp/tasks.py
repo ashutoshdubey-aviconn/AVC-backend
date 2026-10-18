@@ -21,6 +21,7 @@ from wareApp.mqtt.hourly_consumption_recovery import (
 from wareApp.mqtt.load import handle_load_message
 from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
 from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
+from wareApp.mqtt.services import idempotency
 from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.failures import run_with_db_retry
 from wareApp.mqtt.services.publisher import publish_after_commit
@@ -190,6 +191,32 @@ def _with_database_connection_cleanup(task_handler):
     return wrapped
 
 
+def _process_once(family):
+    """Skip a packet that was already processed (see services/idempotency.py)."""
+
+    def decorator(task_handler):
+        @wraps(task_handler)
+        def wrapped(site_id, gateway_id, message):
+            key = idempotency.claim(family, site_id, gateway_id, message)
+            if key is None:
+                logger.info(
+                    "Skipped duplicate %s packet: site=%s gateway=%s",
+                    family,
+                    site_id,
+                    gateway_id,
+                )
+                return None
+            try:
+                return task_handler(site_id, gateway_id, message)
+            except BaseException:
+                idempotency.release(key)
+                raise
+
+        return wrapped
+
+    return decorator
+
+
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):
@@ -265,6 +292,7 @@ def process_fire_alarm_message(site_id, gateway_id, message):
 
 
 @app.task(queue="queue1_processing")
+@_process_once("consumption")
 @_with_database_connection_cleanup
 def process_consumption_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "consumption")

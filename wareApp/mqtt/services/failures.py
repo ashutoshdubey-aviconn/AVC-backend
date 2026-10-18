@@ -59,8 +59,9 @@ def record_dead_letter(message_type, site_id, gateway_id, payload, error):
         )
 
 
-def run_with_db_retry(function, *args, delays=DB_RETRY_DELAYS, sleep=time.sleep, **kwargs):
+def run_with_db_retry(function, *args, delays=DB_RETRY_DELAYS, sleep=None, **kwargs):
     """Run ``function``; on a transient DB error reconnect and retry in place."""
+    sleep = sleep or time.sleep
     for attempt, delay in enumerate((*delays, None)):
         try:
             return function(*args, **kwargs)

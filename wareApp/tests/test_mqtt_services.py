@@ -195,3 +195,40 @@ class FailureHandlingTests(TestCase):
             consumers.run_mqtt_client1()
 
         self.assertFalse(factory.call_args.kwargs["clean_session"])
+
+
+@override_settings(MQTT_IDEMPOTENCY_TTL_SECONDS=3600)
+class IdempotencyTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_duplicate_consumption_packet_is_processed_once(self):
+        site = SimpleNamespace(id=156)
+        with patch("wareApp.tasks.site_config.site", return_value=site), patch(
+            "wareApp.tasks.handle_consumption_message"
+        ) as handle:
+            tasks.process_consumption_message.run(156, "gw-1", "payload-A")
+            tasks.process_consumption_message.run(156, "gw-1", "payload-A")
+            tasks.process_consumption_message.run(156, "gw-1", "payload-B")
+
+        self.assertEqual(handle.call_count, 2)
+
+    def test_failed_packet_can_be_processed_again(self):
+        from django.db import OperationalError
+
+        site = SimpleNamespace(id=156)
+        with patch("wareApp.tasks.site_config.site", return_value=site), patch(
+            "wareApp.tasks.handle_consumption_message",
+            side_effect=[OperationalError("down")] * 4 + [None],
+        ) as handle, patch("wareApp.mqtt.services.failures.time.sleep"):
+            with self.assertRaises(OperationalError):
+                tasks.process_consumption_message.run(156, "gw-1", "payload-A")
+            tasks.process_consumption_message.run(156, "gw-1", "payload-A")
+
+        self.assertEqual(handle.call_count, 5)
+
+    def test_other_families_are_not_guarded(self):
+        from wareApp.mqtt.services import idempotency
+
+        self.assertIsNotNone(idempotency.claim("SupplyTime", 1, "gw", "same"))
+        self.assertIsNotNone(idempotency.claim("SupplyTime", 1, "gw", "same"))
