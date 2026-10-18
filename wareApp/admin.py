@@ -374,3 +374,11 @@ class RecoveryMonitorAdmin(admin.ModelAdmin):
     def retry_recovery(self, request, queryset):
         count = _retry_recovery(queryset.filter(status__in=("failed", "timeout")))
         self.message_user(request, f"{count} request(s) re-armed.")
+
+
+@admin.register(MqttDeadLetter)
+class MqttDeadLetterAdmin(admin.ModelAdmin):
+    list_display = ["id", "message_type", "site_id", "gateway_id", "created_at", "is_resolved"]
+    list_filter = ["message_type", "is_resolved"]
+    search_fields = ["gateway_id", "error", "payload"]
+    readonly_fields = ["message_type", "site_id", "gateway_id", "payload", "error", "created_at"]

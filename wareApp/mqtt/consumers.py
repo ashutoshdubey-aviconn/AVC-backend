@@ -1,6 +1,7 @@
 import logging
 
 import paho.mqtt.client as mqtt
+from django.conf import settings
 
 from wareApp.mqtt.routing import (
     QUEUE_ONE_MESSAGE_TYPES,
@@ -77,11 +78,17 @@ def _run_isolated_mqtt_client(client_id, subscriptions, description, on_message)
         subscribe(client, subscriptions)
         logger.info("%s MQTT connected", description)
 
-    client = mqtt.Client(client_id)
+    # clean_session=False: the broker keeps this listener's subscriptions and
+    # queues its messages while it is disconnected (restart, deploy, crash).
+    client = mqtt.Client(client_id, clean_session=False)
     client.on_connect = on_connect
     client.on_message = on_message
     client.reconnect_delay_set(min_delay=1, max_delay=30)
-    client.connect_async("127.0.0.1", 1883, 60)
+    client.connect_async(
+        getattr(settings, "MQTT_BROKER_HOST", "127.0.0.1"),
+        getattr(settings, "MQTT_BROKER_PORT", 1883),
+        60,
+    )
     logger.info("%s MQTT client started", description)
     return client.loop_forever(retry_first_connection=True)
 
@@ -108,7 +115,7 @@ def run_mqtt_client1():
             logger.exception("Failed to queue queue1 message from topic %s", msg.topic)
 
     return _run_isolated_mqtt_client(
-        "server_paho_client_1",
+        getattr(settings, "MQTT_QUEUE1_CLIENT_ID", "server_paho_client_1"),
         QUEUE_ONE_SUBSCRIPTIONS,
         "Queue1",
         on_message,
@@ -151,7 +158,7 @@ def run_mqtt_client2():
             )
 
     return _run_isolated_mqtt_client(
-        "server_paho_client_2",
+        getattr(settings, "MQTT_QUEUE2_CLIENT_ID", "server_paho_client_2"),
         QUEUE_TWO_SUBSCRIPTIONS,
         "Queue2 LoadData",
         on_message,

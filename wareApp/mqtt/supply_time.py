@@ -5,6 +5,7 @@ from django.db.models import F, Sum
 
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.cooldown import recovery_request_allowed
 from wareApp.mqtt.services.recovery_status import (
     LOAD_RUNTIME,
@@ -190,9 +191,12 @@ def handle_supply_time_message(
             source,
             decision.monitor.attempt,
         )
-    except Exception:
+    except TRANSIENT_DB_ERRORS:
+        raise
+    except Exception as error:
         logger.exception(
             "Queue1 SupplyTime processing failed: site=%s home_gateway_id=%s",
             location_id,
             home_gateway_id,
         )
+        record_dead_letter("SupplyTime", location_id, gateway_id, message, error)

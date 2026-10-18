@@ -22,6 +22,7 @@ from wareApp.mqtt.load import handle_load_message
 from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
 from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
 from wareApp.mqtt.services import site_cache as site_config
+from wareApp.mqtt.services.failures import run_with_db_retry
 from wareApp.mqtt.services.publisher import publish_after_commit
 from wareApp.mqtt.supply_time import handle_supply_time_message
 from warehouse.celery import app
@@ -171,11 +172,18 @@ def _site_for_queued_message(site_id, gateway_id, message_type):
 
 
 def _with_database_connection_cleanup(task_handler):
+    """Fresh DB connection per task; transient DB errors retried in place.
+
+    Handlers re-raise only transient database errors (everything else is
+    stored as an MqttDeadLetter). Retrying inside the task keeps the packet in
+    its place in the site's queue instead of re-queueing it behind newer ones.
+    """
+
     @wraps(task_handler)
     def wrapped(*args, **kwargs):
         close_old_connections()
         try:
-            return task_handler(*args, **kwargs)
+            return run_with_db_retry(task_handler, *args, **kwargs)
         finally:
             close_old_connections()
 

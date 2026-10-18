@@ -6,6 +6,7 @@ from django.db import transaction
 
 from wareApp.models import SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
     LOAD_RUNTIME,
@@ -76,9 +77,12 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
             updated,
             created,
         )
-    except Exception:
+    except TRANSIENT_DB_ERRORS:
+        raise
+    except Exception as error:
         logger.exception(
             "Queue1 loadRuntime recovery failed: site=%s home_gateway_id=%s",
             location_id,
             home_gateway_id,
         )
+        record_dead_letter("recovery/loadRuntime", location_id, gateway_id, message, error)
