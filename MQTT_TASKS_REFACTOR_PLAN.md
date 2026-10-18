@@ -507,3 +507,24 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 11. High consumption: is the rule "≥ 50 % of baseline" or a per-site absolute value (250 kWh on site 183), and does it apply per aisle, per site total, or both?
 12. NL hourly baseline outside the operation window: 0 (so 24 hourly values sum to the daily baseline)?
 13. Can an aisle name carry an explicit `NL` token (e.g. `HB-Part-1_NL`), or is NL always "not EL"?
+
+---
+
+## 5. Progress on branch `full-optimization-v2` (2026-10-19)
+
+| Step | Status | Commit |
+| --- | --- | --- |
+| Baseline: local `fully_optimization` work | done | `8f834c9` |
+| M1 parity (site_type 2 cap, recovery list check) | done | `e4df7b3` |
+| M2 single Celery app units + settings | done (root `tasks.py` stays until main cutover) | `774cf8a` |
+| M3 site partitions, cooldown, persistent publisher, async email | done | `70e2748` |
+| M4 DB-hit reduction (+ alarm `site_id` bug fix) | done | `e589d7e` |
+| M5 recovery status completion | done | `94f79cd` |
+| M6 delivery guarantees, dead letters | done | `41601d0` |
+| M7 part 1: consumption de-duplication, duplicate report | done | `1dc4a69` |
+| M7 part 2: unique constraints + `acks_late` | waiting on `report_reading_duplicates` output from main and the merge rule | — |
+| M8 ingestion daemon (paho 2.x, manual ack) | next | — |
+| Code shape (envelope, payload parser, handler classes) | next | — |
+
+Test suite (SQLite, `ENV=CI`): 233 tests; the only failures are 18 pre-existing
+DG-fuel tests that need PostgreSQL (`fuel_data_source` column).
