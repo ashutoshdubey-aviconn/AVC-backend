@@ -4,6 +4,7 @@ from datetime import datetime
 
 from wareApp.models import SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import split_paired_lists
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,8 @@ def _parse_load_runtime_recovery_message(message):
         raise ValueError("Invalid loadRuntime recovery payload")
 
     source, recovery_hours, recovery_values = match.groups()
-    return (
-        int(source),
-        [value for value in recovery_hours.split(",") if value],
-        [value for value in recovery_values.split(",") if value],
-    )
+    slots, values = split_paired_lists(recovery_hours, recovery_values, "loadRuntime")
+    return int(source), slots, values
 
 
 def handle_load_runtime_recovery_message(site, location_id, gateway_id, message):
