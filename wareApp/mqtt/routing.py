@@ -46,6 +46,22 @@ def queue_for_parsed_topic(topic: GatewayTopic) -> str | None:
     return None
 
 
+def processing_queue_for_site(site_id: int) -> str:
+    """Return the processing queue for a queue-1 message of ``site_id``.
+
+    With ``MQTT_SITE_PARTITIONS = 0`` every message goes to the single serial
+    ``queue1_processing`` queue (legacy behaviour). With N partitions a site
+    always maps to ``mqtt.site.<site_id % N>``, so each site stays strictly
+    ordered while different sites are processed in parallel.
+    """
+    from django.conf import settings
+
+    partitions = getattr(settings, "MQTT_SITE_PARTITIONS", 0) or 0
+    if partitions <= 0:
+        return "queue1_processing"
+    return f"mqtt.site.{int(site_id) % partitions}"
+
+
 def subscribe(client, topics: Iterable[str]) -> None:
     """Subscribe a Paho client to every topic assigned to its queue."""
     for topic in topics:

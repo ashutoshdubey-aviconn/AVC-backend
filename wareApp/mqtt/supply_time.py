@@ -5,6 +5,7 @@ from django.db.models import F, Sum
 
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.cooldown import recovery_request_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,13 @@ def handle_supply_time_message(
             )
             return
 
+        if not recovery_request_allowed(location_id, "source", source):
+            logger.debug(
+                "Queue1 SupplyTime recovery already requested: site=%s source=%s",
+                location_id,
+                source,
+            )
+            return
         loss_time = (datetime.now() - last_runtime_entry.reading_from).total_seconds()
         recovery_topic = (
             f"/Acclivate/iOmniControl/{location_id}/{gateway_id}/in/sync/loadTime/state"

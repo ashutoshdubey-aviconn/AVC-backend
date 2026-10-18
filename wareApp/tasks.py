@@ -5,7 +5,6 @@ from threading import Lock
 from celery.signals import worker_ready
 from django.db import close_old_connections
 from kombu.exceptions import KombuError
-from paho.mqtt import publish as mqtt_publish
 from paho.mqtt.client import MQTT_ERR_SUCCESS
 
 from wareApp.load_data import handle_load_data_message
@@ -21,6 +20,8 @@ from wareApp.mqtt.hourly_consumption_recovery import (
 )
 from wareApp.mqtt.load import handle_load_message
 from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
+from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
+from wareApp.mqtt.services.publisher import publish_after_commit
 from wareApp.mqtt.supply_time import handle_supply_time_message
 from warehouse.celery import app
 
@@ -131,11 +132,28 @@ def start_queue_two_mqtt_client(sender, **kwargs):
 
 
 def _publish_supply_time_recovery(topic, message):
-    mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
+    publish_after_commit(topic, message)
 
 
 def _publish_consumption_recovery(topic, message):
-    mqtt_publish.single(topic, payload=message, hostname="127.0.0.1", port=1883)
+    publish_after_commit(topic, message)
+
+
+@app.task(
+    queue="notifications",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    max_retries=5,
+)
+def send_notification(function_name, args):
+    """Send one alarm email queued by ``wareApp.mqtt.services.notifications``."""
+    if function_name not in ALLOWED_NOTIFICATIONS:
+        logger.error("Rejected unknown notification function %r", function_name)
+        return
+    from wareApp import sendmail
+
+    getattr(sendmail, function_name)(*args)
 
 
 def _site_for_queued_message(site_id, gateway_id, message_type):

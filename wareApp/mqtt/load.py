@@ -8,6 +8,7 @@ from wareApp.models import (
     SiteLoadPower,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import (
     send_alarm_for_high_voltage,
     send_alarm_for_low_voltage,
@@ -157,9 +158,9 @@ def _record_voltage_alarm(site, values, parameter_type):
     )
     data = _voltage_alarm_data(site, values, maximum=parameter_type == 0)
     if parameter_type == 0:
-        send_alarm_for_high_voltage(data)
+        notify(send_alarm_for_high_voltage, data)
     else:
-        send_alarm_for_low_voltage(data)
+        notify(send_alarm_for_low_voltage, data)
 
 
 def _record_power_factor_alarm(site, values):
@@ -204,7 +205,8 @@ def _record_power_factor_alarm(site, values):
         y_phase=factors[1],
         b_phase=factors[2],
     )
-    send_mail_for_pf_fluctuation(
+    notify(
+        send_mail_for_pf_fluctuation,
         {
             "r_pf": factors[0],
             "y_pf": factors[1],
@@ -214,7 +216,7 @@ def _record_power_factor_alarm(site, values):
             "b_pf_threshold": thresholds[2],
             "site_id": site.id,
             "power_source": values["power_source"],
-        }
+        },
     )
 
 
