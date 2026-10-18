@@ -408,3 +408,18 @@ class DailyAlarmDedupeTests(MqttDbTestCase):
         )
 
         self.assertEqual(AlarmNotifications.objects.filter(Alarm_type=10).count(), 1)
+
+
+class DuplicateReportTests(MqttDbTestCase):
+    def test_report_lists_duplicate_hourly_keys(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        self.hourly(5, 1.0)
+        self.hourly(5, 2.0)
+        output = StringIO()
+        call_command("report_reading_duplicates", stdout=output)
+
+        self.assertIn("HourlySiteReading: 1 duplicated key(s)", output.getvalue())
+        self.assertIn("DailySiteReading: 0 duplicated key(s)", output.getvalue())

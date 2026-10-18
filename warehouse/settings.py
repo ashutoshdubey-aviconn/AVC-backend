@@ -215,6 +215,10 @@ MQTT_BROKER_PORT = config("MQTT_BROKER_PORT", default=1883, cast=int)
 MQTT_QUEUE1_CLIENT_ID = config("MQTT_QUEUE1_CLIENT_ID", default="server_paho_client_1")
 MQTT_QUEUE2_CLIENT_ID = config("MQTT_QUEUE2_CLIENT_ID", default="server_paho_client_2")
 # One recovery request per (site, aisle or power source) per cooldown window.
+# Consumption packets already processed are skipped for this long (0 = off).
+MQTT_IDEMPOTENCY_TTL_SECONDS = config(
+    "MQTT_IDEMPOTENCY_TTL_SECONDS", default=6 * 60 * 60, cast=int
+)
 MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS = config(
     "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", default=600, cast=int
 )
