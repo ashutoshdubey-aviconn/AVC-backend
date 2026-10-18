@@ -229,13 +229,13 @@ class LoadDataTests(SimpleTestCase):
         site = SimpleNamespace(id=156)
 
         with (
-            patch("wareApp.tasks.Site.objects.get", return_value=site) as get_site,
+            patch("wareApp.tasks.site_config.site", return_value=site) as get_site,
             patch("wareApp.tasks.handle_load_data_message") as handle_message,
             patch("wareApp.tasks.close_old_connections") as close_connections,
         ):
             tasks.process_load_data_message.run(156, "gateway-01", "payload")
 
-        get_site.assert_called_once_with(id=156)
+        get_site.assert_called_once_with(156)
         self.assertEqual(close_connections.call_count, 2)
         handle_message.assert_called_once_with(
             None, site, 156, "gateway-01", "payload", ["LoadData"]
@@ -246,7 +246,7 @@ class LoadDataTests(SimpleTestCase):
 
         with (
             self.assertRaisesRegex(RuntimeError, "database unavailable"),
-            patch("wareApp.tasks.Site.objects.get", return_value=site),
+            patch("wareApp.tasks.site_config.site", return_value=site),
             patch(
                 "wareApp.tasks.handle_load_data_message",
                 side_effect=RuntimeError("database unavailable"),

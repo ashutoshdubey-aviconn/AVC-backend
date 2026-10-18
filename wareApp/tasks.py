@@ -21,6 +21,7 @@ from wareApp.mqtt.hourly_consumption_recovery import (
 from wareApp.mqtt.load import handle_load_message
 from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
 from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
+from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.publisher import publish_after_commit
 from wareApp.mqtt.supply_time import handle_supply_time_message
 from warehouse.celery import app
@@ -158,7 +159,7 @@ def send_notification(function_name, args):
 
 def _site_for_queued_message(site_id, gateway_id, message_type):
     try:
-        return Site.objects.get(id=site_id)
+        return site_config.site(site_id)
     except Site.DoesNotExist:
         logger.warning(
             "Ignoring queued %s for missing site %s from gateway %s",

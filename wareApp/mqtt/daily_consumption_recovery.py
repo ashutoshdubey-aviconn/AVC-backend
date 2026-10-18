@@ -2,9 +2,12 @@ import logging
 import re
 from datetime import datetime
 
+from django.db import transaction
+
 from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.payloads import split_paired_lists
+from wareApp.mqtt.slot_writes import upsert_slots
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +68,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
         if not aisle_group:
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
+        slots = {}
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
@@ -78,61 +82,46 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                     location_id, aisle_group_id, observed_at
                 )
                 saving = baseline_value - consumption
+            slots[observed_at.date()] = {
+                "unit_consumption": consumption,
+                "daily_baseline_value": baseline_value,
+                "energy_saved": saving,
+            }
 
-            daily_entries = DailySiteReading.objects.filter(
-                associated_Site=site,
-                leg_id=aisle_group_id,
-                reading_for=observed_at,
+        with transaction.atomic():
+            updated, created, skipped = upsert_slots(
+                DailySiteReading.objects.filter(
+                    associated_Site=site,
+                    leg_id=aisle_group_id,
+                    reading_for__in=list(slots),
+                ).order_by("pk"),
+                key_of=lambda row: row.reading_for,
+                slots=slots,
+                update_fields=["unit_consumption", "daily_baseline_value", "energy_saved"],
+                build_row=lambda reading_for, values: DailySiteReading(
+                    associated_Site=site,
+                    aisle_group=aisle_group,
+                    leg_id=aisle_group_id,
+                    reading_for=reading_for,
+                    is_visible=True,
+                    **values,
+                ),
+                # Never lower a known daily value (unchanged rule).
+                should_update=lambda rows, values: (
+                    rows[0].unit_consumption < values["unit_consumption"]
+                ),
             )
-            daily_record = daily_entries.first()
-            if daily_record:
-                if daily_record.unit_consumption < consumption:
-                    daily_entries.update(
-                        unit_consumption=consumption,
-                        daily_baseline_value=baseline_value,
-                        energy_saved=saving,
-                    )
-                    logger.info(
-                        "Queue1 daily recovery updated: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s date=%s",
-                        location_id,
-                        home_gateway_id,
-                        aisle_group_id,
-                        aisle_group.aisleGroupName,
-                        consumption,
-                        observed_at.date(),
-                    )
-                else:
-                    logger.info(
-                        "Queue1 daily recovery skipped: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s incoming_consumption=%s existing_consumption=%s date=%s",
-                        location_id,
-                        home_gateway_id,
-                        aisle_group_id,
-                        aisle_group.aisleGroupName,
-                        consumption,
-                        daily_record.unit_consumption,
-                        observed_at.date(),
-                    )
-                continue
-
-            DailySiteReading.objects.create(
-                associated_Site=site,
-                aisle_group=aisle_group,
-                leg_id=aisle_group_id,
-                unit_consumption=consumption,
-                daily_baseline_value=baseline_value,
-                energy_saved=saving,
-                reading_for=observed_at,
-                is_visible=True,
-            )
-            logger.info(
-                "Queue1 daily recovery created: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s date=%s",
-                location_id,
-                home_gateway_id,
-                aisle_group_id,
-                aisle_group.aisleGroupName,
-                consumption,
-                observed_at.date(),
-            )
+        logger.info(
+            "Queue1 daily recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s skipped=%s",
+            location_id,
+            home_gateway_id,
+            aisle_group_id,
+            aisle_group.aisleGroupName,
+            len(slots),
+            updated,
+            created,
+            skipped,
+        )
     except Exception:
         logger.exception(
             "Queue1 daily consumption recovery failed: site=%s home_gateway_id=%s",

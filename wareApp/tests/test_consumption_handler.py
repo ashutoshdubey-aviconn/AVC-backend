@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.db.models import F
+from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from wareApp import tasks
@@ -68,7 +69,7 @@ class ConsumptionHandlerTests(SimpleTestCase):
             timeout=consumption.METER_READING_ISSUE_COOLDOWN_SECONDS,
         )
         create.assert_called_once()
-        self.assertEqual(create.call_args.kwargs["site_id"], 156)
+        self.assertIs(create.call_args.kwargs["site_id"], site)
         self.assertEqual(create.call_args.kwargs["object_id"], 967)
         self.assertEqual(create.call_args.kwargs["aisle_group"], aisle_group)
         self.assertEqual(create.call_args.kwargs["Alarm_type"], 10)
@@ -150,13 +151,14 @@ class ConsumptionHandlerTests(SimpleTestCase):
         self.assertIn("threshold=400.00", create.call_args.kwargs["to_do"])
 
     def test_hourly_baseline_reads_only_required_values(self):
+        cache.clear()
         baselines = Mock()
         baselines.filter.return_value.order_by.return_value.values_list.return_value.first.return_value = (
             48.0,
             24.0,
         )
 
-        with patch("wareApp.mqtt.consumption.SiteBaseline.objects", baselines):
+        with patch("wareApp.mqtt.services.site_cache.SiteBaseline.objects", baselines):
             hourly_baseline, daily_baseline = consumption._hourly_baseline(156, 967)
 
         self.assertEqual(hourly_baseline, 2.0)
@@ -276,7 +278,7 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
-        with patch("wareApp.tasks.Site.objects.get", return_value=site), patch(
+        with patch("wareApp.tasks.site_config.site", return_value=site), patch(
             "wareApp.tasks.handle_consumption_message"
         ) as handle:
             tasks.process_consumption_message.run(156, "gateway-01", self.message)

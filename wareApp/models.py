@@ -637,6 +637,15 @@ class AlarmNotifications(models.Model):
     cloud_time = models.DateTimeField(auto_now=False, auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        indexes = [
+            # Daily consumption-alarm dedupe: site + aisle + type + time range.
+            models.Index(
+                fields=["site_id", "aisle_group", "Alarm_type", "created_time"],
+                name="idx_alarm_site_aisle_type_time",
+            ),
+        ]
+
     def __unicode__(self):
         return "Notification for {}".format(str(self.site_id))
 

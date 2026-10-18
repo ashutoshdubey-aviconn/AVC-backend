@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import F, FloatField, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from wareApp.models import (
@@ -13,10 +14,13 @@ from wareApp.models import (
     DailySiteReading,
     HourlySiteReading,
     SensorAisleUnitConsumption,
-    SiteBaseline,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
-from wareApp.mqtt.services.cooldown import recovery_request_allowed
+from wareApp.mqtt.services import site_cache as site_config
+from wareApp.mqtt.services.cooldown import (
+    recovery_request_allowed,
+    release_recovery_request,
+)
 from wareApp.mqtt.sync_status import mark_recovery_requested, mark_sync_healthy
 
 logger = logging.getLogger(__name__)
@@ -120,7 +124,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     AlarmNotifications.objects.create(
         created_by=None,
         user_level=2,
-        site_id=site.id,
+        site_id=site,
         object_type=4,
         object_id=int(meter_id),
         aisle_group=aisle_group,
@@ -141,14 +145,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
 
 
 def _hourly_baseline(location_id, aisle_group_id):
-    baseline = (
-        SiteBaseline.objects.filter(
-            associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-        )
-        .order_by("-baseline_to", "-id")
-        .values_list("baseline_value", "working_hours")
-        .first()
-    )
+    baseline = site_config.latest_baseline(location_id, aisle_group_id)
     if baseline is None:
         logger.warning(
             "No baseline configured for site %s, leg %s", location_id, aisle_group_id
@@ -170,10 +167,13 @@ def _record_daily_consumption_alarm(
     site, aisle_group, daily_reading, alarm_type, threshold, description
 ):
     if AlarmNotifications.objects.filter(
-        site_id=site.id,
+        site_id=site,
         aisle_group=aisle_group,
         Alarm_type=alarm_type,
-        created_time__date=daily_reading.reading_for,
+        created_time__gte=datetime.combine(daily_reading.reading_for, datetime.min.time()),
+        created_time__lt=datetime.combine(
+            daily_reading.reading_for + timedelta(days=1), datetime.min.time()
+        ),
         is_active=True,
     ).exists():
         return
@@ -183,7 +183,7 @@ def _record_daily_consumption_alarm(
     AlarmNotifications.objects.create(
         created_by=None,
         user_level=2,
-        site_id=site.id,
+        site_id=site,
         object_type=4,
         object_id=object_id,
         aisle_group=aisle_group,
@@ -254,7 +254,7 @@ def _consumption_alarms(site, aisle_group, daily_reading):
         AlarmNotifications.objects.create(
             created_by=None,
             user_level=2,
-            site_id=site.id,
+            site_id=site,
             object_type=0,
             aisle_group=aisle_group,
             Alarm_type=8,
@@ -288,6 +288,56 @@ def _publish_consumption_recovery(
     )
     publish_recovery(topic, message)
     return True
+
+
+class _BaselineMemo:
+    """Look the aisle baseline up at most once per packet (and only if active)."""
+
+    def __init__(self, location_id, aisle_group_id, is_active):
+        self._args = (location_id, aisle_group_id)
+        self._is_active = is_active
+        self._values = None
+
+    def _load(self):
+        if self._values is None:
+            self._values = (
+                _hourly_baseline(*self._args) if self._is_active else (0.0, 0.0)
+            )
+        return self._values
+
+    @property
+    def hourly(self):
+        return self._load()[0]
+
+    @property
+    def daily(self):
+        return self._load()[1]
+
+
+def _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at):
+    """Set the day's total to the sum of its hourly readings in one UPDATE.
+
+    Replaces aggregate() + save() (two round trips) with a correlated
+    subquery. The calendar-day window matches the previous implementation.
+    """
+    day_start = observed_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    hourly_total = (
+        HourlySiteReading.objects.filter(
+            associated_Site=site,
+            aisle_group=aisle_group,
+            reading_from__gte=day_start,
+            reading_from__lt=day_start + timedelta(days=1),
+        )
+        .order_by()
+        .values("aisle_group")
+        .annotate(total=Sum("unit_consumption"))
+        .values("total")[:1]
+    )
+    DailySiteReading.objects.filter(pk=daily_record.pk).update(
+        unit_consumption=Coalesce(
+            Subquery(hourly_total, output_field=FloatField()), Value(0.0)
+        )
+    )
 
 
 @transaction.atomic
@@ -351,6 +401,7 @@ def handle_consumption_message(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
         daily_record = None
+        baselines = _BaselineMemo(location_id, aisle_group_id, aisle_group.is_active)
 
         if not current_hour_entries.update(
             unit_consumption=values["current_hour_consumption"]
@@ -363,45 +414,30 @@ def handle_consumption_message(
             previous_record = previous_entries.first()
             if previous_record:
                 daily_record = daily_entries.first()
+                # Sync the previous hour with the gateway total and store its
+                # saving in one UPDATE (previously up to two).
+                previous_updates = {}
                 if (
                     previous_record.unit_consumption
                     != values["previous_hour_consumption"]
                 ):
-                    previous_entries.update(
-                        unit_consumption=values["previous_hour_consumption"]
-                    )
+                    previous_updates["unit_consumption"] = values[
+                        "previous_hour_consumption"
+                    ]
                     previous_record.unit_consumption = values[
                         "previous_hour_consumption"
                     ]
 
-                hourly_baseline = 0.0
+                hourly_baseline = baselines.hourly
                 if aisle_group.is_active:
-                    hourly_baseline, _ = _hourly_baseline(location_id, aisle_group_id)
-                    previous_entries.update(
-                        energy_saved=(
-                            hourly_baseline - previous_record.unit_consumption
-                        )
+                    previous_updates["energy_saved"] = (
+                        hourly_baseline - previous_record.unit_consumption
                     )
+                if previous_updates:
+                    previous_entries.update(**previous_updates)
 
                 if daily_record:
-                    day_start = observed_at.replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
-                    hourly_readings = HourlySiteReading.objects.filter(
-                        associated_Site=site,
-                        aisle_group=aisle_group,
-                        reading_from__gte=day_start,
-                        reading_from__lt=day_start + timedelta(days=1),
-                    )
-                    total = (
-                        hourly_readings.aggregate(total=Sum("unit_consumption"))[
-                            "total"
-                        ]
-                        or 0
-                    )
-                    if total != daily_record.unit_consumption:
-                        daily_record.unit_consumption = total
-                        daily_record.save()
+                    _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at)
 
                 HourlySiteReading.objects.create(
                     associated_Site=site,
@@ -423,50 +459,53 @@ def handle_consumption_message(
                     values["current_hour_consumption"],
                     observed_at,
                 )
-            elif hourly_entries.exists():
+            else:
                 if not recovery_request_allowed(location_id, "aisle", aisle_group_id):
-                    # The gap was already requested inside the cooldown window;
-                    # keep dropping the packet (agreed behaviour) without
-                    # re-publishing or rewriting the sync status.
+                    # This gap was already requested inside the cooldown window:
+                    # keep dropping the packet (agreed behaviour) without another
+                    # query, publish or sync-status write.
                     logger.debug(
                         "Queue1 consumption recovery already requested: site=%s aisle_group=%s",
                         location_id,
                         aisle_group_id,
                     )
                     return
+                # One indexed query (backward scan, LIMIT 1) replaces the former
+                # exists() + order_by("-reading_to") pair.
                 last_hourly_entry = hourly_entries.order_by(
-                    "-reading_to", "-id"
+                    "-reading_from", "-id"
                 ).first()
-                recovery_requested = _publish_consumption_recovery(
-                    publish_recovery,
-                    location_id,
-                    gateway_id,
-                    aisle_group_id,
-                    last_hourly_entry,
-                )
-                if recovery_requested:
-                    mark_recovery_requested(
-                        site,
-                        home_gateway_id,
-                        aisle_group,
-                        last_hourly_entry.reading_to,
-                        observed_at,
-                    )
-                    logger.warning(
-                        "Queue1 consumption recovery requested: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s observed_at=%s",
+                if last_hourly_entry is not None:
+                    recovery_requested = _publish_consumption_recovery(
+                        publish_recovery,
                         location_id,
-                        home_gateway_id,
+                        gateway_id,
                         aisle_group_id,
-                        aisle_group.aisleGroupName,
-                        observed_at,
+                        last_hourly_entry,
                     )
-                return
-            else:
-                hourly_baseline = daily_baseline = 0.0
-                if aisle_group.is_active:
-                    hourly_baseline, daily_baseline = _hourly_baseline(
-                        location_id, aisle_group_id
-                    )
+                    if recovery_requested:
+                        mark_recovery_requested(
+                            site,
+                            home_gateway_id,
+                            aisle_group,
+                            last_hourly_entry.reading_to,
+                            observed_at,
+                        )
+                        logger.warning(
+                            "Queue1 consumption recovery requested: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s observed_at=%s",
+                            location_id,
+                            home_gateway_id,
+                            aisle_group_id,
+                            aisle_group.aisleGroupName,
+                            observed_at,
+                        )
+                    return
+
+                # First ever reading for this aisle: no gap, so give back the
+                # cooldown slot claimed above.
+                release_recovery_request(location_id, "aisle", aisle_group_id)
+                hourly_baseline = baselines.hourly
+                daily_baseline = baselines.daily
                 HourlySiteReading.objects.create(
                     associated_Site=site,
                     aisle_group=aisle_group,
@@ -510,9 +549,7 @@ def handle_consumption_message(
                 observed_at,
             )
 
-        daily_baseline = 0.0
-        if aisle_group.is_active:
-            _, daily_baseline = _hourly_baseline(location_id, aisle_group_id)
+        daily_baseline = baselines.daily
         if daily_record:
             daily_entries.update(
                 unit_consumption=F("unit_consumption") + values["new_unit_consumption"],
