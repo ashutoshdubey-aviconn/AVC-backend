@@ -111,6 +111,7 @@ if env in {"Local", "PROD"}:
             "HOST": config("DB_HOST"),
             "PORT": config("DB_PORT"),
             "CONN_MAX_AGE": 60,
+            "CONN_HEALTH_CHECKS": True,
         },
         "main": {
             "ENGINE": "django.db.backends.postgresql",
@@ -186,6 +187,8 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", "")
 EMAIL_PORT = config("EMAIL_PORT", "")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", "")
 EMAIL_BACKEND = config("EMAIL_BACKEND", "")
+# Never let a slow SMTP server block an MQTT processing worker indefinitely.
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
 # ADMINS = [('gyan', 'gyanender@aviconn.in')]
 
 # CELERY STUFF
@@ -200,13 +203,34 @@ CELERY_BROKER_URL = config("CELERY_BROKER_URL", "amqp://guest@localhost//")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", "rpc://")
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# MQTT processing topology.
+# MQTT_SITE_PARTITIONS = 0 keeps the single serial ``queue1_processing`` queue.
+# MQTT_SITE_PARTITIONS = N routes queue-1 messages to ``mqtt.site.0`` ..
+# ``mqtt.site.N-1`` by ``site_id % N``; run one worker (concurrency 1) per
+# partition so every site stays strictly ordered while sites run in parallel.
+MQTT_SITE_PARTITIONS = config("MQTT_SITE_PARTITIONS", default=0, cast=int)
+MQTT_BROKER_HOST = config("MQTT_BROKER_HOST", default="127.0.0.1")
+MQTT_BROKER_PORT = config("MQTT_BROKER_PORT", default=1883, cast=int)
+# One recovery request per (site, aisle or power source) per cooldown window.
+MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS = config(
+    "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", default=600, cast=int
+)
+# Send alarm emails through the ``notifications`` queue after commit instead
+# of inline in the MQTT processing worker.
+MQTT_ASYNC_NOTIFICATIONS = config("MQTT_ASYNC_NOTIFICATIONS", default=True, cast=bool)
+
 CELERY_TASK_QUEUES = (
     Queue("celery"),
     Queue("queue1"),
     Queue("queue2"),
     Queue("queue1_processing"),
     Queue("queue2_processing"),
+    Queue("notifications"),
+    *(Queue(f"mqtt.site.{index}") for index in range(MQTT_SITE_PARTITIONS)),
 )
+# The MQTT pipeline is fire-and-forget: nothing reads task results, so do not
+# publish a result message for every processed packet.
+CELERY_TASK_IGNORE_RESULT = True
 # CELERYBEAT_SCHEDULER='djcelery'
 
 # SECURE_PROXY_SSL_HEADER         = None
@@ -319,12 +343,20 @@ LOGGING = {
     },
 }
 
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": "redis://127.0.0.1:6379/1",
-#         "OPTIONS": {
-#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#         },
-#     }
-# }
+REDIS_URL = config("REDIS_URL", default="")
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+            "KEY_PREFIX": "avc",
+        }
+    }
+else:
+    # Per-process cache. Cooldowns and config caching still work with the
+    # site-partitioned workers (a site always lands on the same worker), but a
+    # shared Redis cache is recommended in production.
+    CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }

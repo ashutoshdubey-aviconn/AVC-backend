@@ -1,0 +1,20 @@
+[Unit]
+Description=MQTT queue-2 listener (LoadData)
+After=network.target mosquitto.service rabbitmq-server.service postgresql.service
+Wants=mosquitto.service rabbitmq-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=sudo
+WorkingDirectory=/home/ubuntu/django_project
+Environment=DJANGO_SETTINGS_MODULE=warehouse.settings
+EnvironmentFile=-/home/ubuntu/django_project/warehouse/.env
+ExecStart=/home/ubuntu/django_project/virtualwarehouse/bin/celery -A warehouse worker --hostname=root.queue2@%%h --queues=queue2 --concurrency=1 --prefetch-multiplier=1 --loglevel=INFO
+Restart=always
+RestartSec=10
+TimeoutStopSec=60
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
