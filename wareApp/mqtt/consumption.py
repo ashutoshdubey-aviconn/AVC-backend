@@ -16,6 +16,7 @@ from wareApp.models import (
     SiteBaseline,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.cooldown import recovery_request_allowed
 from wareApp.mqtt.sync_status import mark_recovery_requested, mark_sync_healthy
 
 logger = logging.getLogger(__name__)
@@ -423,6 +424,16 @@ def handle_consumption_message(
                     observed_at,
                 )
             elif hourly_entries.exists():
+                if not recovery_request_allowed(location_id, "aisle", aisle_group_id):
+                    # The gap was already requested inside the cooldown window;
+                    # keep dropping the packet (agreed behaviour) without
+                    # re-publishing or rewriting the sync status.
+                    logger.debug(
+                        "Queue1 consumption recovery already requested: site=%s aisle_group=%s",
+                        location_id,
+                        aisle_group_id,
+                    )
+                    return
                 last_hourly_entry = hourly_entries.order_by(
                     "-reading_to", "-id"
                 ).first()

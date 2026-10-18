@@ -3,6 +3,7 @@ from datetime import datetime
 
 from wareApp.models import Email_History, FirePumpAlarm
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_mail_fire_alarm_user
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,13 @@ def _parse_fire_alarm_message(message):
 def _send_fire_alarm_email(
     site, user_email, device_name, alarm_type, power_status, email_for
 ):
-    send_mail_fire_alarm_user(user_email, alarm_type, device_name, power_status)
+    notify(
+        send_mail_fire_alarm_user,
+        user_email,
+        alarm_type,
+        str(device_name),
+        power_status,
+    )
     Email_History.objects.create(
         fire_site=site,
         deviceName=device_name,

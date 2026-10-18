@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.db.models import F
+from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from wareApp import tasks
@@ -67,6 +68,7 @@ class SupplyTimeHandlerTests(SimpleTestCase):
         )
 
     def test_requests_recovery_when_previous_hour_is_missing(self):
+        cache.clear()
         current_hour = Mock()
         current_hour.update.return_value = 0
         previous_hour = Mock()

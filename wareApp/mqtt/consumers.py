@@ -6,6 +6,7 @@ from wareApp.mqtt.routing import (
     QUEUE_ONE_MESSAGE_TYPES,
     QUEUE_ONE_SUBSCRIPTIONS,
     QUEUE_TWO_SUBSCRIPTIONS,
+    processing_queue_for_site,
     subscribe,
 )
 from wareApp.mqtt.topics import TopicParseError, parse_gateway_topic
@@ -48,7 +49,9 @@ def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
         )
         return False
 
-    task.apply_async(args=(site_id, gateway_id, message), queue="queue1_processing")
+    task.apply_async(
+        args=(site_id, gateway_id, message), queue=processing_queue_for_site(site_id)
+    )
     logger.debug(
         "Queued %s%s for site %s from gateway %s",
         topic.message_type,
