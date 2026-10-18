@@ -14,6 +14,7 @@ That second start is gone: the listener task is enqueued exactly once by the
 | `mqtt-site-worker@N` | `mqtt.site.N` | 1 | Used when `MQTT_SITE_PARTITIONS>0`; enable `@0` .. `@N-1` |
 | `mqtt-processing-queue2` | `queue2_processing` | 1 | LoadData persistence (unchanged logic) |
 | `mqtt-notifications` | `notifications` | 2 | Alarm emails, sent after the DB commit |
+| `recovery-status-sweep.timer` | — | — | Every 5 min: timeouts / failed requests, late / missing aisles |
 
 ## Enabling site partitions
 
@@ -36,3 +37,14 @@ site's packets are never split across two queues.
 | `MQTT_ASYNC_NOTIFICATIONS` | `True` | Send alarm emails via the `notifications` queue |
 | `REDIS_URL` | empty | Shared cache (config cache, cooldowns, sync-status cache); LocMem if empty |
 | `EMAIL_TIMEOUT` | `10` | SMTP timeout in seconds |
+| `MQTT_RECOVERY_MAX_ATTEMPTS` | `3` | Requests per gap before the status becomes `failed` |
+| `MQTT_RECOVERY_FAILED_RETRY_SECONDS` | `21600` | After this, a gap packet may start a fresh request |
+| `MQTT_SYNC_LATE_SECONDS` / `MQTT_SYNC_MISSING_SECONDS` | `4200` / `7800` | Sweep thresholds for `late` / `missing` |
+
+## Recovery status rollout
+
+1. `python manage.py migrate` (0092 alarm index, 0093 recovery status fields).
+2. `sudo cp deploy/systemd/recovery-status-sweep.* /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now recovery-status-sweep.timer`
+3. Admin: *Aisle sync recovery statuses* and *Recovery monitors* show the
+   current state and the request/response history; both have a "retry" action
+   for failed requests.

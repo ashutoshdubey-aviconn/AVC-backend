@@ -215,6 +215,19 @@ MQTT_BROKER_PORT = config("MQTT_BROKER_PORT", default=1883, cast=int)
 MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS = config(
     "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", default=600, cast=int
 )
+# Recovery status (see wareApp/mqtt/services/recovery_status.py).
+# A request that gets no complete answer is retried after each cooldown; after
+# MQTT_RECOVERY_MAX_ATTEMPTS it is marked failed, and a new gap packet may start
+# a fresh request once MQTT_RECOVERY_FAILED_RETRY_SECONDS have passed.
+MQTT_RECOVERY_MAX_ATTEMPTS = config("MQTT_RECOVERY_MAX_ATTEMPTS", default=3, cast=int)
+MQTT_RECOVERY_FAILED_RETRY_SECONDS = config(
+    "MQTT_RECOVERY_FAILED_RETRY_SECONDS", default=6 * 60 * 60, cast=int
+)
+# recovery_status_sweep: aisle with no consumption for this long -> late / missing.
+MQTT_SYNC_LATE_SECONDS = config("MQTT_SYNC_LATE_SECONDS", default=70 * 60, cast=int)
+MQTT_SYNC_MISSING_SECONDS = config(
+    "MQTT_SYNC_MISSING_SECONDS", default=130 * 60, cast=int
+)
 # Send alarm emails through the ``notifications`` queue after commit instead
 # of inline in the MQTT processing worker.
 MQTT_ASYNC_NOTIFICATIONS = config("MQTT_ASYNC_NOTIFICATIONS", default=True, cast=bool)

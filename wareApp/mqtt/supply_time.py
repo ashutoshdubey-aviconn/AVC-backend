@@ -6,6 +6,12 @@ from django.db.models import F, Sum
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.services.cooldown import recovery_request_allowed
+from wareApp.mqtt.services.recovery_status import (
+    LOAD_RUNTIME,
+    RecoveryScope,
+    RecoveryStatusService,
+)
+from wareApp.mqtt.sync_status import mark_source_healthy
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +126,7 @@ def handle_supply_time_message(
                 source_run_time,
                 hour_start,
             )
+            mark_source_healthy(site, home_gateway_id, source, hour_start)
             return
 
         last_runtime_entry = run_time.order_by("-reading_from", "-id").first()
@@ -144,6 +151,7 @@ def handle_supply_time_message(
                 source_run_time,
                 hour_start,
             )
+            mark_source_healthy(site, home_gateway_id, source, hour_start)
             return
 
         if not recovery_request_allowed(location_id, "source", source):
@@ -161,15 +169,26 @@ def handle_supply_time_message(
             f"Power_source : {source}, Missed_consumption_time_in_secs : {loss_time}, "
             f"Last_synced_hour : {last_runtime_entry.reading_from:%Y-%m-%d %H:%M:%S.%f}"
         )
+        decision = RecoveryStatusService(site, home_gateway_id).request_recovery(
+            RecoveryScope.source(source),
+            LOAD_RUNTIME,
+            last_runtime_entry.reading_from,
+            hour_start,
+            recovery_topic,
+            recovery_message,
+        )
+        if not decision.publish:
+            return
         if publish_recovery:
             publish_recovery(recovery_topic, recovery_message)
         else:
             client.publish(recovery_topic, recovery_message, qos=0, retain=False)
         logger.warning(
-            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s",
+            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s attempt=%s",
             location_id,
             home_gateway_id,
             source,
+            decision.monitor.attempt,
         )
     except Exception:
         logger.exception(

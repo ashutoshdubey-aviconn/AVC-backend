@@ -1,12 +1,18 @@
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import transaction
 
 from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.payloads import split_paired_lists
+from wareApp.mqtt.services.recovery_status import (
+    DAILY_CONSUMPTION,
+    RecoveryScope,
+    RecoverySlot,
+    RecoveryStatusService,
+)
 from wareApp.mqtt.slot_writes import upsert_slots
 
 logger = logging.getLogger(__name__)
@@ -69,6 +75,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
         slots = {}
+        status_slots = []
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
@@ -82,13 +89,19 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                     location_id, aisle_group_id, observed_at
                 )
                 saving = baseline_value - consumption
+            status_slots.append(RecoverySlot(observed_at, recovery_value == "ERROR404"))
             slots[observed_at.date()] = {
                 "unit_consumption": consumption,
                 "daily_baseline_value": baseline_value,
                 "energy_saved": saving,
             }
 
+        scope = RecoveryScope.aisle(aisle_group)
+        status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
+            monitor = status.record_response(
+                scope, DAILY_CONSUMPTION, status_slots, message, slot_length=timedelta(days=1)
+            )
             updated, created, skipped = upsert_slots(
                 DailySiteReading.objects.filter(
                     associated_Site=site,
@@ -111,6 +124,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                     rows[0].unit_consumption < values["unit_consumption"]
                 ),
             )
+            status.record_applied(monitor, scope, status_slots)
         logger.info(
             "Queue1 daily recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s skipped=%s",
             location_id,

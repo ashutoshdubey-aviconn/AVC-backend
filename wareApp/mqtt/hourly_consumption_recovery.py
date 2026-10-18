@@ -8,7 +8,12 @@ from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.slot_writes import upsert_slots
-from wareApp.mqtt.sync_status import mark_recovered, mark_recovery_received
+from wareApp.mqtt.services.recovery_status import (
+    HOURLY_CONSUMPTION,
+    RecoveryScope,
+    RecoverySlot,
+    RecoveryStatusService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +46,26 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             raise ValueError(f"Missing aisle group for leg {aisle_group_id}")
 
         slots = {}
+        status_slots = []
         for recovery_hour, recovery_value in zip(recovery_hours, recovery_values):
             observed_at = datetime.strptime(recovery_hour, "%Y-%m-%d %H:%M:%S.%f")
             hour_start = observed_at.replace(minute=0, second=0, microsecond=0)
             hour_end = observed_at.replace(minute=59, second=59, microsecond=0)
             # ERROR404: the gateway has no data for that hour; stored as 0.
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
+            status_slots.append(RecoverySlot(hour_start, recovery_value == "ERROR404"))
             slots[(hour_start, hour_end)] = {
                 "unit_consumption": consumption,
                 "hourly_baseline_value": 0.0,
                 "energy_saved": 0.0,
             }
 
+        scope = RecoveryScope.aisle(aisle_group)
+        status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
-            mark_recovery_received(site, home_gateway_id, aisle_group)
+            monitor = status.record_response(
+                scope, HOURLY_CONSUMPTION, status_slots, message
+            )
             updated, created, _ = upsert_slots(
                 HourlySiteReading.objects.filter(
                     associated_Site=site,
@@ -74,11 +85,9 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                     **values,
                 ),
             )
-            mark_recovered(
-                site, home_gateway_id, aisle_group, recovered_slots=len(recovery_values)
-            )
+            status.record_applied(monitor, scope, status_slots)
         logger.info(
-            "Queue1 hourly recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s",
+            "Queue1 hourly recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s monitor_status=%s",
             location_id,
             home_gateway_id,
             aisle_group_id,
@@ -86,6 +95,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             len(slots),
             updated,
             created,
+            monitor.status,
         )
     except Exception:
         logger.exception(

@@ -1,0 +1,10 @@
+[Unit]
+Description=Advance time-based recovery/sync status transitions
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/django_project
+Environment=DJANGO_SETTINGS_MODULE=warehouse.settings
+EnvironmentFile=-/home/ubuntu/django_project/warehouse/.env
+ExecStart=/home/ubuntu/django_project/virtualwarehouse/bin/python manage.py recovery_status_sweep
