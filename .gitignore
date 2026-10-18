@@ -48,3 +48,7 @@ Thumbs.db
 # Coverage
 .coverage
 htmlcov/
+# Database dumps and data backups (can be GBs; never commit)
+backups/
+monitoring/backups/
+*.dump
