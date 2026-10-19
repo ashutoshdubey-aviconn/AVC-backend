@@ -133,12 +133,17 @@ bash deploy/test_server_migrate.sh --apply
 
 # 4d. new units
 sudo cp deploy/systemd/mqtt-*.service deploy/systemd/recovery-status-sweep.* /etc/systemd/system/
+sudo cp deploy/logrotate/celerylogs1 /etc/logrotate.d/celerylogs1   # celerylogs2 already rotated
 sudo systemctl daemon-reload
 sudo systemctl enable --now mqtt-processing-queue1 mqtt-processing-queue2 mqtt-notifications
 sudo systemctl enable --now mqtt-listener-queue1 mqtt-listener-queue2
 sudo systemctl enable --now recovery-status-sweep.timer
 sudo systemctl restart gunicorn celerybeat      # admin/API and beat pick up the new code
 ```
+
+Logs: queue-1 units (listener, processing, notifications, sweep) append to
+`celerylogs1/celery_logs_of_server.log`, queue-2 units to `celerylogs2/celery_logs_of_server.log`
+(as the legacy units did).
 
 The listener is started once by the `worker_ready` signal; check that `queue1` and
 `queue2` stay at 0–1 messages after the restart.
