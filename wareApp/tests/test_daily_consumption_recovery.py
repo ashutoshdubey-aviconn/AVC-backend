@@ -37,7 +37,7 @@ class DailyConsumptionRecoveryTests(SimpleTestCase):
         site = SimpleNamespace(id=156)
 
         with patch("wareApp.tasks.site_config.site", return_value=site), patch(
-            "wareApp.tasks.handle_daily_consumption_recovery_message"
+            "wareApp.mqtt.handlers.handle_daily_consumption_recovery_message"
         ) as handle:
             tasks.process_daily_consumption_recovery_message.run(
                 156, "gateway-01", self.message

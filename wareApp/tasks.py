@@ -10,22 +10,11 @@ from paho.mqtt.client import MQTT_ERR_SUCCESS
 from wareApp.load_data import handle_load_data_message
 from wareApp.models import Site
 from wareApp.mqtt.consumers import run_mqtt_client1, run_mqtt_client2
-from wareApp.mqtt.consumption import handle_consumption_message
-from wareApp.mqtt.daily_consumption_recovery import (
-    handle_daily_consumption_recovery_message,
-)
-from wareApp.mqtt.fire_alarm import handle_fire_alarm_message
-from wareApp.mqtt.hourly_consumption_recovery import (
-    handle_hourly_consumption_recovery_message,
-)
-from wareApp.mqtt.load import handle_load_message
-from wareApp.mqtt.load_runtime_recovery import handle_load_runtime_recovery_message
+from wareApp.mqtt.registry import handler_for
 from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
 from wareApp.mqtt.services import idempotency
 from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.failures import run_with_db_retry
-from wareApp.mqtt.services.publisher import publish_after_commit
-from wareApp.mqtt.supply_time import handle_supply_time_message
 from warehouse.celery import app
 
 logger = logging.getLogger(__name__)
@@ -150,14 +139,6 @@ def start_queue_two_mqtt_client(sender, **kwargs):
     )
 
 
-def _publish_supply_time_recovery(topic, message):
-    publish_after_commit(topic, message)
-
-
-def _publish_consumption_recovery(topic, message):
-    publish_after_commit(topic, message)
-
-
 @app.task(
     queue="notifications",
     autoretry_for=(Exception,),
@@ -207,30 +188,50 @@ def _with_database_connection_cleanup(task_handler):
     return wrapped
 
 
-def _process_once(family):
-    """Skip a packet that was already processed (see services/idempotency.py)."""
+def _dispatch(message_type, message_subtype, site_id, gateway_id, message):
+    """Run one queue-1 packet through its handler and return the outcome text."""
+    handler = handler_for(message_type, message_subtype)
+    if handler is None:
+        logger.warning(
+            "Ignoring queued packet without a handler: type=%s subtype=%s site=%s gateway=%s",
+            message_type,
+            message_subtype,
+            site_id,
+            gateway_id,
+        )
+        return f"skipped: no handler for {message_type}/{message_subtype}"
 
-    def decorator(task_handler):
-        @wraps(task_handler)
-        def wrapped(site_id, gateway_id, message):
-            key = idempotency.claim(family, site_id, gateway_id, message)
-            if key is None:
-                logger.info(
-                    "Skipped duplicate %s packet: site=%s gateway=%s",
-                    family,
-                    site_id,
-                    gateway_id,
-                )
-                return f"skipped: duplicate {family} packet (already processed)"
-            try:
-                return task_handler(site_id, gateway_id, message)
-            except BaseException:
-                idempotency.release(key)
-                raise
+    key = None
+    if handler.dedupe:
+        key = idempotency.claim(handler.name, site_id, gateway_id, message)
+        if key is None:
+            logger.info(
+                "Skipped duplicate %s packet: site=%s gateway=%s",
+                handler.name,
+                site_id,
+                gateway_id,
+            )
+            return f"skipped: duplicate {handler.name} packet (already processed)"
+    try:
+        return _run_handler(handler, site_id, gateway_id, message)
+    except BaseException:
+        if key is not None:
+            idempotency.release(key)
+        raise
 
-        return wrapped
 
-    return decorator
+@_with_database_connection_cleanup
+def _run_handler(handler, site_id, gateway_id, message):
+    site = _site_for_queued_message(site_id, gateway_id, handler.name)
+    if site is None:
+        return f"skipped: unknown site {site_id}"
+    return handler.handle(site, site_id, gateway_id, message)
+
+
+@app.task(queue="queue1_processing")
+def process_mqtt_message(message_type, message_subtype, site_id, gateway_id, message):
+    """Process one queue-1 gateway packet (all types; see mqtt/registry.py)."""
+    return _dispatch(message_type, message_subtype, site_id, gateway_id, message)
 
 
 @app.task(queue="queue2_processing")
@@ -250,85 +251,38 @@ def process_load_data_message(site_id, gateway_id, message):
     )
 
 
+# Per-type tasks queued by listeners deployed before process_mqtt_message.
+# Kept registered so packets already waiting in RabbitMQ are still processed.
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_supply_time_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "SupplyTime")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_supply_time_message(
-        None,
-        site,
-        site_id,
-        gateway_id,
-        message,
-        publish_recovery=_publish_supply_time_recovery,
-    )
+    return _dispatch("SupplyTime", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_load_runtime_recovery_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "loadRuntime recovery")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
+    return _dispatch("recovery", "loadRuntime", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_daily_consumption_recovery_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "dailyConsumption recovery")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)
+    return _dispatch("recovery", "dailyConsumption", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "hourlyConsumption recovery")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_hourly_consumption_recovery_message(site, site_id, gateway_id, message)
+    return _dispatch("recovery", "hourlyConsumption", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_fire_alarm_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "FIREALARM")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_fire_alarm_message(site, site_id, gateway_id, message)
+    return _dispatch("FIREALARM", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_process_once("consumption")
-@_with_database_connection_cleanup
 def process_consumption_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "consumption")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_consumption_message(
-        site,
-        site_id,
-        gateway_id,
-        message,
-        publish_recovery=_publish_consumption_recovery,
-    )
+    return _dispatch("consumption", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
-@_with_database_connection_cleanup
 def process_load_message(site_id, gateway_id, message):
-    site = _site_for_queued_message(site_id, gateway_id, "load message")
-    if site is None:
-        return f"skipped: unknown site {site_id}"
-
-    return handle_load_message(site, site_id, gateway_id, message)
+    return _dispatch("load", None, site_id, gateway_id, message)

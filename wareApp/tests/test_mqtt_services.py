@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from wareApp import tasks
+from wareApp.mqtt import handlers
 from wareApp.mqtt import consumers
 from wareApp.mqtt.routing import processing_queue_for_site
 from wareApp.mqtt.services import notifications
@@ -31,11 +32,11 @@ class PartitionRoutingTests(SimpleTestCase):
         topic = parse_gateway_topic(
             "/Acclivate/iOmniControl/198/gw-198/in/consumption/state"
         )
-        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             consumers._queue_one_message_for_processing(198, "gw-198", "payload", topic)
 
         enqueue.assert_called_once_with(
-            args=(198, "gw-198", "payload"), queue="mqtt.site.2"
+            args=("consumption", "state", 198, "gw-198", "payload"), queue="mqtt.site.2"
         )
 
 
@@ -93,9 +94,9 @@ class PublishAfterCommitTests(TestCase):
         publisher.publish.assert_called_once_with("/topic", "payload", qos=1)
 
     def test_task_publish_helpers_use_the_persistent_publisher(self):
-        with patch("wareApp.tasks.publish_after_commit") as publish:
-            tasks._publish_consumption_recovery("/t", "m")
-            tasks._publish_supply_time_recovery("/t2", "m2")
+        with patch("wareApp.mqtt.handlers.publish_after_commit") as publish:
+            handlers.publish_recovery_request("/t", "m")
+            handlers.publish_recovery_request("/t2", "m2")
         self.assertEqual(publish.call_count, 2)
 
 
@@ -211,7 +212,7 @@ class IdempotencyTests(SimpleTestCase):
     def test_duplicate_consumption_packet_is_processed_once(self):
         site = SimpleNamespace(id=156)
         with patch("wareApp.tasks.site_config.site", return_value=site), patch(
-            "wareApp.tasks.handle_consumption_message"
+            "wareApp.mqtt.handlers.handle_consumption_message"
         ) as handle:
             tasks.process_consumption_message.run(156, "gw-1", "payload-A")
             tasks.process_consumption_message.run(156, "gw-1", "payload-A")
@@ -224,7 +225,7 @@ class IdempotencyTests(SimpleTestCase):
 
         site = SimpleNamespace(id=156)
         with patch("wareApp.tasks.site_config.site", return_value=site), patch(
-            "wareApp.tasks.handle_consumption_message",
+            "wareApp.mqtt.handlers.handle_consumption_message",
             side_effect=[OperationalError("down")] * 4 + [None],
         ) as handle, patch("wareApp.mqtt.services.failures.time.sleep"):
             with self.assertRaises(OperationalError):
