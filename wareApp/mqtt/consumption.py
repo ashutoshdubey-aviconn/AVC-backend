@@ -188,17 +188,37 @@ def _consumption_recovery_request(location_id, gateway_id, aisle_group_id, last_
 class _BaselineMemo:
     """Baseline of the packet's aisle and day (see services/baseline.py)."""
 
-    def __init__(self, site, aisle_group, day):
+    def __init__(self, site, aisle_group, day, home_gateway_id=None):
         self._memo = BaselineMemo(site, aisle_group)
         self._day = day
+        self._home_gateway_id = home_gateway_id
+
+    def _values(self):
+        values = self._memo.for_day(self._day)
+        if self._memo.missing_days:
+            self._warn_missing()
+        return values
+
+    def _warn_missing(self):
+        site, aisle = self._memo.site, self._memo.aisle_group
+        # Once per aisle per hour instead of on every packet.
+        if cache.add(f"baseline-missing-log:{site.id}:{aisle.attached_leg_id}", 1, 3600):
+            logger.warning(
+                "Queue1 consumption baseline missing (saving not calculated): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s day=%s",
+                site.id,
+                self._home_gateway_id,
+                aisle.attached_leg_id,
+                getattr(aisle, "aisleGroupName", ""),
+                self._day,
+            )
 
     @property
     def hourly(self):
-        return self._memo.for_day(self._day)[0]
+        return self._values()[0]
 
     @property
     def daily(self):
-        return self._memo.for_day(self._day)[1]
+        return self._values()[1]
 
 
 def _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at):
@@ -288,7 +308,7 @@ def handle_consumption_message(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
         daily_record = None
-        baselines = _BaselineMemo(site, aisle_group, observed_at.date())
+        baselines = _BaselineMemo(site, aisle_group, observed_at.date(), home_gateway_id)
 
         if not current_hour_entries.update(
             unit_consumption=values["current_hour_consumption"]

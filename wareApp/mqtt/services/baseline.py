@@ -60,7 +60,8 @@ def hourly_baseline(site, aisle_group, day):
     leg_id = aisle_group.attached_leg_id
     row = baseline_row(site.id, leg_id, day)
     if row is None:
-        logger.warning("No baseline configured for site %s, leg %s", site.id, leg_id)
+        # Callers log one line with gateway/aisle context (see BaselineMemo.missing_days).
+        logger.debug("No baseline configured for site %s, leg %s, day %s", site.id, leg_id, day)
         return 0.0, 0.0
     daily_value, working_hours = row
     hours = effective_hours(site, aisle_group, working_hours)
@@ -79,10 +80,13 @@ class BaselineMemo:
         self.site = site
         self.aisle_group = aisle_group
         self._days = {}
+        self.missing_days = []
 
     def for_day(self, day):
         if not getattr(self.aisle_group, "is_active", False):
             return 0.0, 0.0
         if day not in self._days:
             self._days[day] = hourly_baseline(self.site, self.aisle_group, day)
+            if baseline_row(self.site.id, self.aisle_group.attached_leg_id, day) is None:
+                self.missing_days.append(day)
         return self._days[day]

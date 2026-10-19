@@ -64,4 +64,5 @@ class RootMqttLoadDataTests(SimpleTestCase):
         enqueue.assert_called_once_with(
             args=(156, "gateway-01", message.payload.decode("utf-8")),
             queue="queue2_processing",
+            delivery_mode=1,
         )
