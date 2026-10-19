@@ -134,6 +134,11 @@ class NotificationTests(TestCase):
 class FailureHandlingTests(TestCase):
     def setUp(self):
         cache.clear()
+        # The real call closes the test transaction's connection on PostgreSQL
+        # (autocommit is off inside TestCase), breaking the following tests.
+        patcher = patch("wareApp.mqtt.services.failures.close_old_connections")
+        self.close_old_connections = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_transient_database_error_is_retried_in_place(self):
         from django.db import OperationalError
@@ -150,6 +155,7 @@ class FailureHandlingTests(TestCase):
 
         self.assertEqual(run_with_db_retry(flaky, sleep=lambda _: None), "done")
         self.assertEqual(len(calls), 3)
+        self.assertEqual(self.close_old_connections.call_count, 2)
 
     def test_retry_gives_up_after_the_last_delay(self):
         from django.db import OperationalError

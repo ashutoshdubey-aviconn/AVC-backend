@@ -48,6 +48,24 @@ class DgFuelGraphApiTests(TestCase):
             },
             created=self.timestamp,
         )
+        # The graph APIs read normalized alerts (DGFuelAlertsData), which the
+        # DG fuel collector derives from the raw DGAlertsData payloads above.
+        DGFuelAlertsData.objects.create(
+            site=self.site,
+            vehicle_number=self.site.partner_dg_fuel_id,
+            alert_name="refuel",
+            fuel_consumption=12.5,
+            epoch_time="1788422400",
+            created=self.timestamp,
+        )
+        DGFuelAlertsData.objects.create(
+            site=self.site,
+            vehicle_number=self.site.partner_dg_fuel_id,
+            alert_name="theft",
+            fuel_consumption=2.25,
+            epoch_time="1788426000",
+            created=self.timestamp,
+        )
 
     def make_fuel_row(self, created, fuel_consumption):
         epoch_ms = int(created.timestamp() * 1000)
@@ -94,6 +112,11 @@ class DgFuelGraphApiTests(TestCase):
 
         def exists(self):
             return bool(self)
+
+    @staticmethod
+    def _fake_manager(rows):
+        """Stand-in for ``Model.objects.using(alias)`` (views read via ``_dg_fuel_queryset``)."""
+        return SimpleNamespace(filter=lambda *args, **kwargs: rows)
 
     def make_json_request(self, path, payload, remote_addr):
         request = APIRequestFactory().post(path, payload, format="json")
@@ -167,6 +190,14 @@ class DgFuelGraphApiTests(TestCase):
             },
             created=self.timestamp,
         )
+        DGFuelAlertsData.objects.create(
+            site=site,
+            vehicle_number=site.partner_dg_fuel_id,
+            alert_name="refuel",
+            fuel_consumption=40.82,
+            epoch_time=str(refuel_seconds),
+            created=self.timestamp,
+        )
 
         with patch(
             "wareApp.views.DgFuelConsumptionDataApi_new._loconav_subscription_expired",
@@ -213,7 +244,8 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
 
@@ -289,7 +321,8 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
 
@@ -369,13 +402,14 @@ class DgFuelGraphApiTests(TestCase):
         self.assertEqual(response.data["dg_unit_data"]["data"][0]["y"], 4.25)
         self.assertEqual(response.data["dg_fuel_consumed"]["data"][0]["y"], 2.5)
 
-    def test_dg_unit_graph_is_anchored_to_selected_day_start(self):
+    def test_dg_unit_graph_is_placed_at_session_end(self):
         site = Site.objects.create(
             site_name="DG graph day anchor site",
             partner_dg_fuel_id="DG-DAY-01",
             partner_dg_provider="roadcast",
         )
-        selected_day_start = int(datetime(2026, 9, 4, 0, 0).timestamp() * 1000)
+        # DG sessions are plotted at their end time; fuel +1 min, unit/litre +3 min.
+        session_end_ms = int(datetime(2026, 9, 4, 23, 59, 59).timestamp() * 1000)
         fake_rows = self._FakeValuesQuerySet(
             [
                 {
@@ -385,6 +419,7 @@ class DgFuelGraphApiTests(TestCase):
                     "fetch_fuel_data": False,
                     "created": datetime(2026, 9, 4, 23, 59, 59),
                     "dg_start_date": datetime(2026, 9, 4, 0, 0),
+                    "dg_end_date": datetime(2026, 9, 4, 23, 59, 59),
                 }
             ]
         )
@@ -399,18 +434,19 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ):
             response = DgFuelConsumptionDataApiUsingLoconavAPI_new.as_view()(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.data["dg_unit_data"]["data"],
-            [{"x": selected_day_start, "y": 4.25}],
+            [{"x": session_end_ms, "y": 4.25}],
         )
         self.assertEqual(
             response.data["dg_fuel_data"]["data"],
-            [{"x": selected_day_start, "y": 2.5}],
+            [{"x": session_end_ms + 60_000, "y": 2.5}],
         )
         self.assertEqual(response.data["provider_status"], "OK")
 
@@ -443,7 +479,8 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
                 request
@@ -460,7 +497,8 @@ class DgFuelGraphApiTests(TestCase):
             partner_dg_fuel_id="DG-CUSTOM-ZERO",
             partner_dg_provider="roadcast",
         )
-        expected_x = int(datetime(2026, 9, 4, 0, 0).timestamp() * 1000)
+        # DG sessions are plotted at their end time; fuel +1 min, unit/litre +3 min.
+        session_end_ms = int(datetime(2026, 9, 4, 23, 59, 59).timestamp() * 1000)
         fake_rows = self._FakeValuesQuerySet(
             [
                 {
@@ -470,6 +508,7 @@ class DgFuelGraphApiTests(TestCase):
                     "fetch_fuel_data": False,
                     "created": datetime(2026, 9, 4, 23, 59, 59),
                     "dg_start_date": datetime(2026, 9, 4, 0, 0),
+                    "dg_end_date": datetime(2026, 9, 4, 23, 59, 59),
                 }
             ]
         )
@@ -484,7 +523,8 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
                 request
@@ -492,20 +532,21 @@ class DgFuelGraphApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.data["dg_unit_data"]["data"], [{"x": expected_x, "y": 3.63}]
+            response.data["dg_unit_data"]["data"], [{"x": session_end_ms, "y": 3.63}]
         )
         self.assertEqual(
-            response.data["dg_fuel_data"]["data"], [{"x": expected_x, "y": 0.0}]
+            response.data["dg_fuel_data"]["data"], [{"x": session_end_ms + 60_000, "y": 0.0}]
         )
         self.assertEqual(response.data["dg_unit_per_litre_data"]["data"], [])
 
-    def test_custom_range_shows_valid_fuel_with_day_start_timestamp(self):
+    def test_custom_range_shows_valid_fuel_at_session_end(self):
         site = Site.objects.create(
             site_name="DG custom range valid fuel site",
             partner_dg_fuel_id="DG-CUSTOM-VALID",
             partner_dg_provider="roadcast",
         )
-        expected_x = int(datetime(2026, 9, 4, 0, 0).timestamp() * 1000)
+        # DG sessions are plotted at their end time; fuel +1 min, unit/litre +3 min.
+        session_end_ms = int(datetime(2026, 9, 4, 23, 59, 59).timestamp() * 1000)
         fake_rows = self._FakeValuesQuerySet(
             [
                 {
@@ -515,13 +556,14 @@ class DgFuelGraphApiTests(TestCase):
                     "fetch_fuel_data": False,
                     "created": datetime(2026, 9, 4, 23, 59, 59),
                     "dg_start_date": datetime(2026, 9, 4, 0, 0),
+                    "dg_end_date": datetime(2026, 9, 4, 23, 59, 59),
                 }
             ]
         )
         fuel_rows = self._FakeValuesQuerySet(
             [
                 SimpleNamespace(
-                    epoch_time="1757030400",
+                    epoch_time=str(int(datetime(2026, 9, 4, 8, 0).timestamp())),
                     fuel_consumption=50.0,
                     created=datetime(2026, 9, 4, 8, 0),
                 )
@@ -538,9 +580,11 @@ class DgFuelGraphApiTests(TestCase):
             "wareApp.views.DgFuelConsumptionDataApi_new._roadcast_subscription_expired",
             return_value=False,
         ), patch(
-            "wareApp.views.DgUnitConsumption.objects.filter", return_value=fake_rows
+            "wareApp.views.DgUnitConsumption.objects.using",
+            return_value=self._fake_manager(fake_rows),
         ), patch(
-            "wareApp.views.DgFuelConsumptionData.objects.filter", return_value=fuel_rows
+            "wareApp.views.DgFuelConsumptionData.objects.using",
+            return_value=self._fake_manager(fuel_rows),
         ):
             response = DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.as_view()(
                 request
@@ -548,16 +592,24 @@ class DgFuelGraphApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.data["dg_unit_data"]["data"], [{"x": expected_x, "y": 230.14}]
+            response.data["dg_unit_data"]["data"], [{"x": session_end_ms, "y": 230.14}]
         )
         self.assertEqual(
-            response.data["dg_fuel_data"]["data"], [{"x": expected_x, "y": 76.29}]
+            response.data["dg_fuel_data"]["data"], [{"x": session_end_ms + 60_000, "y": 76.29}]
         )
         self.assertEqual(
             response.data["dg_unit_per_litre_data"]["data"],
-            [{"x": expected_x, "y": round(230.14 / 76.29, 2)}],
+            [{"x": session_end_ms + 180_000, "y": round(230.14 / 76.29, 2)}],
         )
-        self.assertEqual(response.data["data"], [{"x": 1757030400000, "y": 50.0}])
+        # Past day: the reading is framed by day-start and day-end boundary points.
+        self.assertEqual(
+            response.data["data"],
+            [
+                {"x": int(datetime(2026, 9, 4, 0, 0).timestamp() * 1000), "y": 50.0},
+                {"x": int(datetime(2026, 9, 4, 8, 0).timestamp() * 1000), "y": 50.0},
+                {"x": int(datetime(2026, 9, 4, 23, 59, 59).timestamp() * 1000), "y": 50.0},
+            ],
+        )
 
     def test_custom_range_alert_epochs_are_normalized_to_milliseconds(self):
         site = Site.objects.create(
@@ -723,7 +775,7 @@ class DgFuelGraphApiTests(TestCase):
             {
                 "x": int(
                     datetime.combine(
-                        today, datetime.max.replace(microsecond=0)
+                        today, datetime.max.time().replace(microsecond=0)
                     ).timestamp()
                     * 1000
                 ),

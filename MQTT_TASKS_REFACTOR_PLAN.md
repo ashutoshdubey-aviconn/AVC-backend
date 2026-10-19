@@ -525,10 +525,11 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 | M7 part 2: unique constraints + `acks_late` | on hold: report only for now (decision 2026-10-19); see 5.1 | — |
 | M8 ingestion daemon (paho 2.x, manual ack) | next | — |
 | Code shape part 1: `MqttEnvelope`, `KeyValuePayload` (replaces 4 parser copies), handler registry | done | (this commit) |
-| Code shape part 2: `MessageHandler` classes, single `process_mqtt_message(envelope)` | next | — |
+| Code shape part 2: `MessageHandler` classes, single `process_mqtt_message(envelope)` | after test-server run | — |
+| Test-server readiness: all tests green (SQLite + PostgreSQL), `0095`, rollout runbook | done | (this commit) |
 
-Test suite (SQLite, `ENV=CI`): 243 tests; the only failures are 18 pre-existing
-DG-fuel tests that need PostgreSQL (`fuel_data_source` column).
+`python run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
+also pass on PostgreSQL. Rollout: `deploy/TEST_SERVER_ROLLOUT.md`.
 
 ### 5.1 Duplicate report on the local `warehouse_server` copy (2026-10-19)
 
