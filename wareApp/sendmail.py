@@ -1,3 +1,4 @@
+import logging
 import smtplib
 import ssl
 import os
@@ -10,6 +11,8 @@ from warehouse import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
 from wareApp.models import OTP, User, Site
+
+logger = logging.getLogger(__name__)
 
 # ---------------- SMTP CONFIG (reads from Django settings) ---------------- #
 SMTP_HOST =  "smtp.gmail.com"
@@ -74,10 +77,10 @@ def _send_smtp_email(subject, html_message, to, cc=None, bcc=None, from_email=No
                 if SMTP_USER and SMTP_PASS:
                     server.login(SMTP_USER, SMTP_PASS)
                 server.sendmail(from_addr, recipients, msg.as_string())
-        print(f"✅ Email sent: {subject}")
+        logger.info("Email sent: subject=%r to=%s", subject, recipients)
         return True
     except Exception as e:  # pragma: no cover
-        print(f"❌ Failed to send email: {e}")
+        logger.error("Email failed: subject=%r to=%s error=%s: %s", subject, recipients, type(e).__name__, e)
         return False
 
 
@@ -391,9 +394,9 @@ def send_mail_fire_equipments_system(device):
 
 
 def send_mail_for_pf_fluctuation(data):
-    site = Site.objects.get(id=data['site_id'])
-    print(data)
-    # Original script only printed; keeping behavior. Implement mailing here if needed.
+    # Original script only printed; no PF email is sent (unchanged behaviour).
+    logger.warning("PF fluctuation alarm, email not implemented: %s", data)
+    return "not sent: PF fluctuation email is not implemented"
 
 
 def send_alarm_for_high_voltage(data):

@@ -153,7 +153,12 @@ def send_notification(function_name, args):
         return
     from wareApp import sendmail
 
-    getattr(sendmail, function_name)(*args)
+    result = getattr(sendmail, function_name)(*args)
+    if result is True:
+        return f"{function_name}: email sent"
+    if result is False:
+        return f"{function_name}: email FAILED (see 'Email failed' log line)"
+    return f"{function_name}: {result}"
 
 
 def _site_for_queued_message(site_id, gateway_id, message_type):
