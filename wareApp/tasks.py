@@ -86,9 +86,25 @@ def _is_listener_worker(hostname, worker_queue):
     return worker_name == worker_queue or worker_name.endswith(f".{worker_queue}")
 
 
+def _consumed_queues(sender):
+    """Queues this worker was started with (``-Q``), or None if unknown."""
+    try:
+        consume_from = sender.app.amqp.queues.consume_from
+    except AttributeError:
+        return None
+    return set(consume_from) if consume_from else None
+
+
 def _start_mqtt_client_for_worker(sender, worker_queue, task_name, description):
     hostname = str(getattr(sender, "hostname", ""))
-    if not _is_listener_worker(hostname, worker_queue):
+    # Only the worker that consumes the listener queue starts the listener. The
+    # hostname check alone also matched processing workers named e.g.
+    # "processing.queue1", which queued a second listener task.
+    consumed = _consumed_queues(sender)
+    if consumed is not None:
+        if worker_queue not in consumed:
+            return
+    elif not _is_listener_worker(hostname, worker_queue):
         return
 
     with _mqtt_start_lock:

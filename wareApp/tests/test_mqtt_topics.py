@@ -189,6 +189,34 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         send_task.assert_not_called()
 
+    def test_processing_worker_with_listener_like_hostname_does_not_start_listener(self):
+        worker_app = SimpleNamespace(
+            amqp=SimpleNamespace(queues=SimpleNamespace(consume_from={"queue1_processing": None}))
+        )
+        sender = SimpleNamespace(hostname="processing.queue1@test-server", app=worker_app)
+
+        with patch("wareApp.tasks.app.send_task") as send_task:
+            tasks.start_queue_one_mqtt_client(sender)
+
+        send_task.assert_not_called()
+
+    def test_worker_consuming_listener_queue_starts_listener(self):
+        worker_app = SimpleNamespace(
+            amqp=SimpleNamespace(queues=SimpleNamespace(consume_from={"queue2": None}))
+        )
+        sender = SimpleNamespace(hostname="anything@test-server", app=worker_app)
+        inspector = Mock()
+        inspector.active.return_value = {}
+        inspector.reserved.return_value = {}
+
+        with (
+            patch("wareApp.tasks.app.control.inspect", return_value=inspector),
+            patch("wareApp.tasks.app.send_task") as send_task,
+        ):
+            tasks.start_queue_two_mqtt_client(sender)
+
+        send_task.assert_called_once_with("wareApp.tasks.mqtt_client2", queue="queue2")
+
     def test_celery_declares_isolated_mqtt_queues(self):
         queue_names = {queue.name for queue in app.conf.task_queues}
 
