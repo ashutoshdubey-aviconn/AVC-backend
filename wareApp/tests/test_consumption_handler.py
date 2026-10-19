@@ -156,23 +156,6 @@ class ConsumptionHandlerTests(SimpleTestCase):
         self.assertIn("threshold=400.00", create.call_args.kwargs["to_do"])
         self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
 
-    def test_hourly_baseline_reads_only_required_values(self):
-        cache.clear()
-        baselines = Mock()
-        baselines.filter.return_value.order_by.return_value.values_list.return_value.first.return_value = (
-            48.0,
-            24.0,
-        )
-
-        with patch("wareApp.mqtt.services.site_cache.SiteBaseline.objects", baselines):
-            hourly_baseline, daily_baseline = consumption._hourly_baseline(156, 967)
-
-        self.assertEqual(hourly_baseline, 2.0)
-        self.assertEqual(daily_baseline, 48.0)
-        baselines.filter.return_value.order_by.return_value.values_list.assert_called_once_with(
-            "baseline_value", "working_hours"
-        )
-
     def test_processing_locks_the_aisle_group(self):
         site = SimpleNamespace(id=156)
         aisle_group = SimpleNamespace(

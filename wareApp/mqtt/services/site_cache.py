@@ -31,6 +31,10 @@ def _baseline_key(site_id, leg_id):
     return f"cfg:baseline:{int(site_id)}:{leg_id}"
 
 
+def _baselines_key(site_id, leg_id):
+    return f"cfg:baselines:{int(site_id)}:{leg_id}"
+
+
 def site(site_id):
     """Return the Site (with its customer) or raise ``Site.DoesNotExist``."""
     key = _site_key(site_id)
@@ -74,6 +78,28 @@ def latest_baseline(site_id, leg_id):
     return None if baseline is None else tuple(baseline)
 
 
+def baselines(site_id, leg_id):
+    """All baseline rows of a site/leg as ``(from, to, value, working_hours)``.
+
+    Ordered newest first (latest ``baseline_to``, then highest id), so the
+    first row covering a day is the one ``services/baseline.py`` uses.
+    """
+    key = _baselines_key(site_id, leg_id)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    rows = [
+        tuple(row)
+        for row in SiteBaseline.objects.filter(
+            associated_site_id=int(site_id), leg_id=str(leg_id)
+        )
+        .order_by("-baseline_to", "-id")
+        .values_list("baseline_from", "baseline_to", "baseline_value", "working_hours")
+    ]
+    cache.set(key, rows, CONFIG_CACHE_TTL)
+    return rows
+
+
 @receiver([post_save, post_delete], sender=Site)
 def _drop_site(sender, instance, **kwargs):
     cache.delete(_site_key(instance.pk))
@@ -83,3 +109,4 @@ def _drop_site(sender, instance, **kwargs):
 def _drop_baseline(sender, instance, **kwargs):
     if instance.associated_site_id_id is not None and instance.leg_id is not None:
         cache.delete(_baseline_key(instance.associated_site_id_id, instance.leg_id))
+        cache.delete(_baselines_key(instance.associated_site_id_id, instance.leg_id))

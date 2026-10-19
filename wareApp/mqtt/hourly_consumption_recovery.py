@@ -7,6 +7,7 @@ from django.db import transaction
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import hour_ranges
+from wareApp.mqtt.services.baseline import BaselineMemo
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.slot_writes import upsert_slots
@@ -49,6 +50,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
 
         slots = {}
         status_slots = []
+        baselines = BaselineMemo(site, aisle_group)
         for recovery_hour, recovery_value in zip(recovery_hours, recovery_values):
             observed_at = datetime.strptime(recovery_hour, "%Y-%m-%d %H:%M:%S.%f")
             hour_start = observed_at.replace(minute=0, second=0, microsecond=0)
@@ -56,10 +58,12 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             # ERROR404: the gateway has no data for that hour; stored as 0.
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
             status_slots.append(RecoverySlot(hour_start, recovery_value == "ERROR404"))
+            hourly_baseline, _ = baselines.for_day(hour_start.date())
             slots[(hour_start, hour_end)] = {
                 "unit_consumption": consumption,
-                "hourly_baseline_value": 0.0,
-                "energy_saved": 0.0,
+                "hourly_baseline_value": hourly_baseline,
+                # Same rule as live packets: saving only for active aisles.
+                "energy_saved": (hourly_baseline - consumption) if aisle_group.is_active else 0.0,
             }
 
         scope = RecoveryScope.aisle(aisle_group)
