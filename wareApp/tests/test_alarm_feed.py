@@ -61,6 +61,12 @@ class AlarmFeedTests(TestCase):
         self.assertEqual(pf["home_gateway_id"], "avc_site_gw_1")
         self.assertIn("power factor 0.86/0.6/0.65", pf["issue"])
 
+    def test_alarms_without_time_sort_last(self):
+        NewAlarmsNotifications.objects.create(site_id=self.site, alarm_type=0, alarm_priority=0, created=None)
+        rows = active_alarms([self.site.id])
+        self.assertEqual(len(rows), 3)
+        self.assertIsNone(rows[-1]["last_seen"])
+
     def test_inactive_alarms_are_left_out(self):
         AlarmNotifications.objects.update(is_active=False)
         NewAlarmsNotifications.objects.update(is_active=False)

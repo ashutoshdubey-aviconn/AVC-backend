@@ -12,6 +12,7 @@ independent of the number of customers or stored alarm rows.
 """
 
 from collections import defaultdict
+from datetime import datetime
 
 from django.db.models import Count, Max, Min, Sum
 
@@ -27,7 +28,11 @@ from wareApp.models import (
 PRIORITY_LABELS = {0: "High", 1: "Medium", 2: "Low"}
 
 CONSUMPTION_TYPES = dict(AlarmNotifications._meta.get_field("Alarm_type").flatchoices)
-POWER_TYPES = dict(NewAlarmsNotifications._meta.get_field("alarm_type").flatchoices)
+POWER_TYPES = {
+    **dict(NewAlarmsNotifications._meta.get_field("alarm_type").flatchoices),
+    # Stored by wareApp/dg_fuel/sessions.py but missing from the model choices.
+    9: "DG Running Without Load",
+}
 
 
 def _fmt(value):
@@ -163,7 +168,10 @@ def active_alarms(site_ids):
             )
         )
 
-    rows.sort(key=lambda r: r["last_seen"] or r["created_time"], reverse=True)
+    # Some old power alarm rows have no time; they sort last.
+    rows.sort(
+        key=lambda r: r["last_seen"] or r["created_time"] or datetime.min, reverse=True
+    )
     return rows
 
 
