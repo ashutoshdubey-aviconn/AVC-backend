@@ -16,6 +16,8 @@ connected infrastructure.
 | Consumption | Duplicate packets skipped (6 h window). |
 | Alarm email | Sent from the `notifications` queue after the DB commit. |
 | DG fuel | `detect_refuel/theft_from_alerts` now also read reports without a `data` wrapper. |
+| Settings | `warehouse/settings.py` reorganised; no credentials in code (`main` DB, Roadcast now from `.env`); `SECRET_KEY` required with `ENV=PROD`; `DEBUG`, SSL/cookie flags, `ALLOWED_HOSTS`, CORS configurable; `EMAIL_USE_TLS`/`EMAIL_PORT` typed; log folders created on start. Effective values on test are unchanged. |
+| Dependencies | Security updates: Django 5.2.18, DRF 3.17.2, urllib3 2.8.0, requests 2.33.0, sqlparse 0.6.0, idna 3.15, PyNaCl 1.6.2 (+ cffi 2.0.0). `pip-audit` clean for app packages. |
 | Migrations | Repo `0073` … `0095`; on test applied via `deploy/test_server_migrate.sh` (see 1). |
 
 Unchanged: `wareApp/load_data/` logic (queue 2), `dg_fuel/`, `fetch_fuel_data.py`, `celerybeat`.
@@ -88,14 +90,30 @@ df -h /     # the dump of ~10 GB of tables needs room; 13 GB was free
 
 ```bash
 cd /home/ubuntu/django_project
+source virtualwarehouse/bin/activate   # same environment name locally and on test
 tar xzf /tmp/fov2.tar.gz          # overwrites tracked files; keeps .env, venv, logs
+virtualwarehouse/bin/pip install --upgrade pip setuptools   # venv tooling also had advisories
 virtualwarehouse/bin/pip install -r requirements.txt
 virtualwarehouse/bin/python manage.py check
 bash deploy/test_server_migrate.sh          # dry run: read the steps
 ```
 
-Optional, recommended: add `REDIS_URL=redis://127.0.0.1:6379/1` to `warehouse/.env`
-(shared cooldowns, duplicate check and sync-status cache across processes).
+Add to `warehouse/.env` (settings no longer contain credentials):
+
+| Variable | Needed for |
+| --- | --- |
+| `ROADCAST_PULL_USERNAME`, `ROADCAST_PULL_PASSWORD` | Roadcast pull API in the DG graph (skipped, with a warning, when unset) |
+| `MAIN_DB_PASSWORD` (+ optional `MAIN_DB_HOST/NAME/USER/PORT`) | `main` DB alias, used only by `roadcast_monthly_refuel_report.py` |
+| `REDIS_URL=redis://127.0.0.1:6379/1` | recommended: shared cooldowns, duplicate check and sync-status cache |
+
+`SECRET_KEY`, `EMAIL_*` and `ALLOWED_HOSTS` are already in the test `.env` and are now
+read from it (`EMAIL_USE_TLS`/`EMAIL_PORT` as bool/int). Move the old settings copies
+out of the package, they hold credentials and are no longer in the repo:
+
+```bash
+mkdir -p ~/settings-snapshots && mv warehouse/settings_bck.py warehouse/settings_main_server.py \
+  warehouse/settings_test_sserver.py warehouse/settings.py_before_full_optimization ~/settings-snapshots/
+```
 
 ## 4. Switch the MQTT services
 
@@ -153,24 +171,31 @@ journalctl -u mqtt-listener-queue1 -n 50 --no-pager          # "Queue1 MQTT conn
 journalctl -u mqtt-processing-queue1 -f                      # tasks succeeding
 ```
 
-Admin (`/admin/`): **MQTT dead letters**, **Aisle sync recovery statuses**, **Recovery monitors**.
+Admin (`/avcadmin/`): **MQTT dead letters**, **Aisle sync recovery statuses**, **Recovery monitors**.
 
 ## 6. Real-traffic test checklist
 
+On the test server the gateways receive nothing the server publishes, so **sync /
+recovery requests never get an answer: skip every recovery check** (marked "skip").
+Side effect to expect: once an aisle misses an hour, the agreed rule (request
+recovery, do not store the packet) drops its later consumption packets too, because
+the gap is never filled. Run the consumption checks on aisles with continuous data.
+
 | # | Check | Expected |
 | --- | --- | --- |
-| 1 | New hourly consumption packet | `HourlySiteReading` row for that hour; daily total grows once |
+| 1 | New hourly consumption packet (aisle without a gap) | `HourlySiteReading` row for that hour; daily total grows once |
 | 2 | Same packet sent twice | Second one logged `Skipped duplicate consumption packet` |
-| 3 | Gap (skip an hour) | Exactly one `sync/consumption` request within 10 min; sync status `recovery_requested`, monitor `requested` |
-| 4 | Gateway recovery reply | Rows written; monitor `applied` → `verified`; sync status `recovered` |
-| 5 | No reply | After the request timeout the sweep marks it `timeout`; after 3 attempts the status is `failed` |
-| 6 | SupplyTime / loadRuntime recovery | `SupplyLoadTimeShare` rows; runtime status rows with `power_source` |
-| 7 | `load` packet over threshold | Alarm row + email from the `notifications` worker |
-| 8 | FIREALARM packet | `FirePumpAlarm` updated; email sent |
-| 9 | Corrupt payload | One **MQTT dead letter** row (not one per packet) |
-| 10 | `sudo systemctl restart postgresql` during traffic | Workers log retries, then continue; no dead letters for that window |
-| 11 | Restart `mqtt-listener-queue1` | Reconnects; with persistence.conf, packets sent meanwhile are delivered |
-| 12 | LoadData (queue 2) | Unchanged behaviour; `queue2_processing` keeps up |
+| 3 | Gap → recovery request / reply / timeout | skip (requests do not reach the gateway) |
+| 4 | Gap packet handling | Packet not stored; one `recovery requested` log per gap per 10 min (not per packet) |
+| 5 | SupplyTime packet | `SupplyLoadTimeShare` row; recovery part skipped |
+| 6 | `load` packet over threshold | Alarm row + email from the `notifications` worker |
+| 7 | FIREALARM packet | `FirePumpAlarm` updated; email sent |
+| 8 | Corrupt payload | One **MQTT dead letter** row (not one per packet) |
+| 9 | `sudo systemctl restart postgresql` during traffic | Workers log retries, then continue; no dead letters for that window |
+| 10 | Restart `mqtt-listener-queue1` | Reconnects; with broker persistence on, packets sent meanwhile are delivered |
+| 11 | LoadData (queue 2) | Unchanged behaviour; `queue2_processing` keeps up |
+| 12 | Admin and API | `/avcadmin/` loads; dashboard APIs answer as before |
+| 13 | DG fuel | Graph APIs return data; Roadcast pull works once `ROADCAST_PULL_*` is set |
 
 Useful query:
 
