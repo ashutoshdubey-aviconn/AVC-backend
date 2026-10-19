@@ -5,6 +5,7 @@ from django.db.models import F, Sum
 
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.cooldown import recovery_request_allowed
 from wareApp.mqtt.services.recovery_status import (
@@ -18,22 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_supply_time_message(message):
-    payload = message.strip()
-    if payload.startswith("b'") and payload.endswith("'"):
-        payload = payload[2:-1]
-
-    fields = {}
-    for field in payload.split(","):
-        key, separator, value = field.partition(":")
-        if not separator:
-            raise ValueError(f"Invalid SupplyTime field: {field!r}")
-        fields[key.strip().lower().replace("_", "").replace("-", "")] = value.strip()
-
-    def value_for(*keys):
-        for key in keys:
-            if key in fields:
-                return fields[key]
-        raise ValueError(f"Missing SupplyTime field: {keys[0]}")
+    value_for = KeyValuePayload.parse(message, "SupplyTime").get
 
     try:
         source = int(value_for("source", "supplysource"))

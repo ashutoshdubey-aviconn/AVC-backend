@@ -8,6 +8,7 @@ from wareApp.models import (
     SiteLoadPower,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import (
@@ -20,24 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_load_message(message):
-    payload = message.decode("utf-8") if isinstance(message, bytes) else str(message)
-    payload = payload.strip()
-    if payload.startswith("b'") and payload.endswith("'"):
-        payload = payload[2:-1]
-    fields = {}
-    for field in payload.split(","):
-        key, separator, value = field.partition(":")
-        if not separator:
-            raise ValueError(f"Invalid load field: {field!r}")
-        fields[key.strip().lower().replace("_", "").replace("-", "")] = (
-            value.strip().strip("'")
-        )
-
-    def value_for(*keys):
-        for key in keys:
-            if key in fields:
-                return fields[key]
-        raise ValueError(f"Missing load field: {keys[0]}")
+    fields = KeyValuePayload.parse(message, "load", strip_value_quotes=True)
+    value_for = fields.get
 
     values = {
         "load_power": float(value_for("loadpower", "totalload")),

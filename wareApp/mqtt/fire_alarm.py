@@ -3,6 +3,7 @@ from datetime import datetime
 
 from wareApp.models import Email_History, FirePumpAlarm
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_mail_fire_alarm_user
@@ -11,22 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_fire_alarm_message(message):
-    payload = message.decode("utf-8") if isinstance(message, bytes) else str(message)
-    payload = payload.strip()
-    if payload.startswith("b'") and payload.endswith("'"):
-        payload = payload[2:-1]
-    fields = {}
-    for field in payload.split(","):
-        key, separator, value = field.partition(":")
-        if not separator:
-            raise ValueError(f"Invalid fire alarm field: {field!r}")
-        fields[key.strip().lower().replace("_", "")] = value.strip()
-
-    def value_for(key):
-        try:
-            return fields[key]
-        except KeyError as error:
-            raise ValueError(f"Missing fire alarm field: {key}") from error
+    value_for = KeyValuePayload.parse(message, "fire alarm").get
 
     return (
         int(value_for("meternumber")),
