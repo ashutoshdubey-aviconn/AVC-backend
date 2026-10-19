@@ -12,9 +12,10 @@ independent of the number of customers or stored alarm rows.
 """
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from django.db.models import Count, Max, Min, Sum
+from django.conf import settings
+from django.db.models import Count, Max, Min, Q, Sum
 
 from wareApp.models import (
     AisleSyncRecoveryStatus,
@@ -54,9 +55,21 @@ def _power_issue(row):
     return POWER_TYPES.get(alarm_type, "")
 
 
+def _cutoff():
+    """Oldest last-seen time shown (ALARM_FEED_MAX_AGE_DAYS; 0 = no limit)."""
+    days = getattr(settings, "ALARM_FEED_MAX_AGE_DAYS", 30)
+    return datetime.now() - timedelta(days=days) if days else None
+
+
 def active_alarms(site_ids):
-    """List of issue rows (dicts) for the given sites, newest activity first."""
+    """List of issue rows (dicts) for the given sites, newest activity first.
+
+    Issues whose latest occurrence is older than ALARM_FEED_MAX_AGE_DAYS are
+    left out; the filter applies to the whole issue, so "since" still shows
+    when it really started.
+    """
     site_ids = list(site_ids)
+    cutoff = _cutoff()
     if not site_ids:
         return []
     sites = {
@@ -82,6 +95,9 @@ def active_alarms(site_ids):
             occurrences=Sum("occurrences"),
             priority=Max("Alarm_priority"),
             latest_id=Max("id"),
+        )
+        .filter(
+            Q(last_created__gte=cutoff) | Q(last_seen__gte=cutoff) if cutoff else Q()
         )
     )
     latest = {
@@ -139,6 +155,7 @@ def active_alarms(site_ids):
             priority=Min("alarm_priority"),
             latest_id=Max("id"),
         )
+        .filter(Q(last_seen__gte=cutoff) if cutoff else Q())
     )
     latest = {
         alarm.id: alarm

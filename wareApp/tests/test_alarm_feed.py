@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from wareApp.alarm_feed import active_alarms
@@ -16,6 +16,7 @@ from wareApp.models import (
 )
 
 
+@override_settings(ALARM_FEED_MAX_AGE_DAYS=0)
 class AlarmFeedTests(TestCase):
     def setUp(self):
         cache.clear()
@@ -124,3 +125,30 @@ class MeterIssueRepeatTests(TestCase):
         self.assertEqual(alarm.occurrences, 2)
         self.assertIsNotNone(alarm.last_seen)
         notify.assert_called_once()  # e-mailed once, not on the repeat
+
+
+class AlarmFeedWindowTests(TestCase):
+    def test_only_issues_seen_within_the_window_are_listed(self):
+        cache.clear()
+        site = Site.objects.create(site_name="Window site", is_live=True)
+        now = datetime.now()
+        # Stale: last seen 40 days ago.
+        NewAlarmsNotifications.objects.create(
+            site_id=site, alarm_type=0, alarm_priority=0, power_source="Mains Supply",
+            created=now - timedelta(days=40),
+        )
+        # Long-running but still active: started 60 days ago, seen today.
+        for days in (60, 0):
+            NewAlarmsNotifications.objects.create(
+                site_id=site, alarm_type=2, alarm_priority=1, power_source="Mains Supply",
+                created=now - timedelta(days=days),
+            )
+
+        with override_settings(ALARM_FEED_MAX_AGE_DAYS=30):
+            rows = active_alarms([site.id])
+        self.assertEqual([r["alarm_type"] for r in rows], [2])
+        self.assertEqual(rows[0]["created_time"].date(), (now - timedelta(days=60)).date())
+        self.assertEqual(rows[0]["occurrences"], 2)
+
+        with override_settings(ALARM_FEED_MAX_AGE_DAYS=0):
+            self.assertEqual(len(active_alarms([site.id])), 2)
