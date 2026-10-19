@@ -20,7 +20,7 @@ from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.notifications import notify
-from wareApp.mqtt.services import site_cache as site_config
+from wareApp.mqtt.services.baseline import BaselineMemo
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
     release_recovery_request,
@@ -152,25 +152,6 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         aisle_group_name,
         occurred_at,
     )
-
-
-def _hourly_baseline(location_id, aisle_group_id):
-    baseline = site_config.latest_baseline(location_id, aisle_group_id)
-    if baseline is None:
-        logger.warning(
-            "No baseline configured for site %s, leg %s", location_id, aisle_group_id
-        )
-        return 0.0, 0.0
-
-    baseline_value, working_hours = baseline
-    if not working_hours:
-        logger.warning(
-            "No working hours configured for baseline at site %s, leg %s",
-            location_id,
-            aisle_group_id,
-        )
-        return 0.0, baseline_value
-    return baseline_value / working_hours, baseline_value
 
 
 def _record_daily_consumption_alarm(
@@ -323,27 +304,19 @@ def _consumption_recovery_request(location_id, gateway_id, aisle_group_id, last_
 
 
 class _BaselineMemo:
-    """Look the aisle baseline up at most once per packet (and only if active)."""
+    """Baseline of the packet's aisle and day (see services/baseline.py)."""
 
-    def __init__(self, location_id, aisle_group_id, is_active):
-        self._args = (location_id, aisle_group_id)
-        self._is_active = is_active
-        self._values = None
-
-    def _load(self):
-        if self._values is None:
-            self._values = (
-                _hourly_baseline(*self._args) if self._is_active else (0.0, 0.0)
-            )
-        return self._values
+    def __init__(self, site, aisle_group, day):
+        self._memo = BaselineMemo(site, aisle_group)
+        self._day = day
 
     @property
     def hourly(self):
-        return self._load()[0]
+        return self._memo.for_day(self._day)[0]
 
     @property
     def daily(self):
-        return self._load()[1]
+        return self._memo.for_day(self._day)[1]
 
 
 def _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at):
@@ -433,7 +406,7 @@ def handle_consumption_message(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
         daily_record = None
-        baselines = _BaselineMemo(location_id, aisle_group_id, aisle_group.is_active)
+        baselines = _BaselineMemo(site, aisle_group, observed_at.date())
 
         if not current_hour_entries.update(
             unit_consumption=values["current_hour_consumption"]

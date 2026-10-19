@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 
 from django.db import transaction
 
-from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
+from wareApp.models import AisleGroup, DailySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import day_ranges
+from wareApp.mqtt.services.baseline import baseline_row
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
@@ -35,25 +36,9 @@ def _parse_daily_recovery_message(message):
 
 
 def _baseline_for_day(location_id, aisle_group_id, observed_at):
-    baseline = SiteBaseline.objects.filter(
-        associated_site_id=int(location_id),
-        leg_id=str(aisle_group_id),
-        baseline_from__lte=observed_at,
-        baseline_to__gte=observed_at,
-    ).first()
-    if baseline:
-        return baseline.baseline_value
-
-    baseline = (
-        SiteBaseline.objects.filter(
-            associated_site_id=int(location_id), leg_id=str(aisle_group_id)
-        )
-        .order_by("-baseline_to", "-id")
-        .first()
-    )
-    if baseline:
-        return baseline.baseline_value
-    return None
+    """Daily baseline for the day (dated row first, else latest), or None."""
+    row = baseline_row(location_id, aisle_group_id, observed_at.date())
+    return None if row is None else row[0]
 
 
 def handle_daily_consumption_recovery_message(site, location_id, gateway_id, message):
