@@ -20,6 +20,7 @@ ALLOWED_NOTIFICATIONS = frozenset(
         "send_alarm_for_low_voltage",
         "send_mail_for_pf_fluctuation",
         "send_mail_fire_alarm_user",
+        "send_alarm_email",
     }
 )
 

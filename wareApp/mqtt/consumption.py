@@ -19,6 +19,7 @@ from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
+from wareApp.mqtt.services.notifications import notify
 from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
@@ -30,6 +31,7 @@ from wareApp.mqtt.services.recovery_status import (
     RecoveryStatusService,
 )
 from wareApp.mqtt.sync_status import mark_sync_healthy
+from wareApp.sendmail import send_alarm_email
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +132,17 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         created_time=occurred_at,
         to_do=f"Gateway {gateway_id}: lower meter reading reported.",
     )
+    notify(
+        send_alarm_email,
+        "Meter Reading Issue",
+        site.id,
+        [
+            ["Gateway", gateway_id, False],
+            ["Leg / meter", meter_id, False],
+            ["Aisle group", aisle_group_name, False],
+            ["Issue", "New meter reading is smaller than the previous one", True],
+        ],
+    )
 
     logger.warning(
         "Meter reading issue stored: site=%s home_gateway_id=%s meter_id=%s aisle_group_name=%s occurred_at=%s",
@@ -191,6 +204,18 @@ def _record_daily_consumption_alarm(
             f"{description}: consumption={daily_reading.unit_consumption:.2f}, "
             f"threshold={threshold:.2f}."
         ),
+    )
+    notify(
+        send_alarm_email,
+        f"{description} Alarm",
+        site.id,
+        [
+            ["Aisle group", getattr(aisle_group, "aisleGroupName", ""), False],
+            ["Leg", meter_id, False],
+            ["Date", str(daily_reading.reading_for), False],
+            ["Consumption (kWh)", f"{daily_reading.unit_consumption:.2f}", True],
+            ["Threshold (kWh)", f"{threshold:.2f}", False],
+        ],
     )
 
 
@@ -257,6 +282,18 @@ def _consumption_alarms(site, aisle_group, daily_reading):
             Alarm_type=8,
             Alarm_priority=1,
             created_time=current_date,
+        )
+        notify(
+            send_alarm_email,
+            "Low Consumption Alarm",
+            site.id,
+            [
+                ["Aisle group", getattr(aisle_group, "aisleGroupName", ""), False],
+                ["Leg", str(aisle_group.attached_leg_id), False],
+                ["Date", str(daily_reading.reading_for), False],
+                ["Consumption (kWh)", f"{current_consumption:.2f}", True],
+                ["Minimum (7-day average less threshold)", f"{minimum:.2f}", False],
+            ],
         )
 
 

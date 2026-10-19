@@ -60,8 +60,11 @@ class ConsumptionHandlerTests(SimpleTestCase):
             "wareApp.mqtt.consumption.cache.add", return_value=True
         ) as cache_add, patch(
             "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create:
+        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
             consumption._notify_meter_reading_issue(site, 156, "gateway-01", message)
+
+        notify.assert_called_once()
+        self.assertEqual(notify.call_args.args[1:3], ("Meter Reading Issue", 156))
 
         aisle_groups.assert_called_once_with(site=site, attached_leg_id="967")
         cache_add.assert_called_once_with(
@@ -117,12 +120,13 @@ class ConsumptionHandlerTests(SimpleTestCase):
             return_value=existing,
         ), patch(
             "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create:
+        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
             consumption._consumption_alarms(site, aisle_group, daily_reading)
 
         self.assertEqual(create.call_args.kwargs["Alarm_type"], 7)
         self.assertEqual(create.call_args.kwargs["object_id"], 967)
         self.assertIn("threshold=250.00", create.call_args.kwargs["to_do"])
+        self.assertEqual(notify.call_args.args[1], "High consumption Alarm")
 
     def test_daily_consumption_records_bypass_instead_of_high_consumption(self):
         site = SimpleNamespace(
@@ -145,11 +149,12 @@ class ConsumptionHandlerTests(SimpleTestCase):
             return_value=existing,
         ), patch(
             "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create:
+        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
             consumption._consumption_alarms(site, aisle_group, daily_reading)
 
         self.assertEqual(create.call_args.kwargs["Alarm_type"], 11)
         self.assertIn("threshold=400.00", create.call_args.kwargs["to_do"])
+        self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
 
     def test_hourly_baseline_reads_only_required_values(self):
         cache.clear()

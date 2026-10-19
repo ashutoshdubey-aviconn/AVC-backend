@@ -25,7 +25,16 @@ DEFAULT_FROM = "no.reply@aviconncorp.com"
 # ------------------------------------------------------------------------ #
 
 
-def _send_smtp_email(subject, html_message, to, cc=None, bcc=None, from_email=None):
+def _alarm_override_recipients():
+    """Addresses that replace every alarm email's recipients (test servers), or []."""
+    from django.conf import settings as django_settings
+
+    return list(getattr(django_settings, "ALARM_EMAIL_OVERRIDE_TO", []) or [])
+
+
+def _send_smtp_email(
+    subject, html_message, to, cc=None, bcc=None, from_email=None, is_alarm=True
+):
     """Send an HTML email via smtplib using values from Django settings.
 
     Args:
@@ -38,14 +47,31 @@ def _send_smtp_email(subject, html_message, to, cc=None, bcc=None, from_email=No
     Returns:
         bool: True on success, False otherwise
     """
-    if not to:
-        return False
     if isinstance(to, str):
         to = [to]
+    to = [address for address in (to or []) if address]
     if cc is None:
         cc = []
     if bcc is None:
         bcc = []
+
+    override = _alarm_override_recipients() if is_alarm else []
+    if override:
+        # Test server: every alarm email goes only to the override address(es);
+        # the intended recipients are shown at the top of the email and logged.
+        intended = list(dict.fromkeys(to + cc + bcc))
+        logger.info(
+            "Alarm email redirected: subject=%r intended=%s to=%s", subject, intended, override
+        )
+        html_message = (
+            '<p style="background:#fff3cd;padding:8px;font-family:Arial,sans-serif;">'
+            f"TEST REDIRECT. Intended recipients: {', '.join(intended) or 'none'}</p>"
+            + html_message
+        )
+        to, cc, bcc = override, [], []
+    if not to:
+        logger.warning("Email not sent, no recipients: subject=%r", subject)
+        return False
 
     from_addr = from_email or DEFAULT_FROM or SMTP_USER
 
@@ -371,7 +397,7 @@ def emailcheck(id, username, email):
 
     subject_mail = "Password Change Request for Your Smart Meter Account"
     to = [email]
-    _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    _send_smtp_email(subject_mail, html_message, to, from_email=from_mail, is_alarm=False)
     return otp
 
 
@@ -394,9 +420,55 @@ def send_mail_fire_equipments_system(device):
 
 
 def send_mail_for_pf_fluctuation(data):
-    # Original script only printed; no PF email is sent (unchanged behaviour).
-    logger.warning("PF fluctuation alarm, email not implemented: %s", data)
-    return "not sent: PF fluctuation email is not implemented"
+    def row(phase):
+        value = data[f"{phase}_pf"]
+        threshold = data[f"{phase}_pf_threshold"]
+        return (
+            f"{phase.upper()}-Phase PF",
+            f"{value:.2f} (threshold {threshold:.2f})",
+            value < threshold,
+        )
+
+    return send_alarm_email(
+        "PF Fluctuation Alarm",
+        data["site_id"],
+        [("Power source", data.get("power_source"), False), row("r"), row("y"), row("b")],
+    )
+
+
+def send_alarm_email(alarm_name, site_id, details):
+    """Generic alarm email: ``details`` is a list of (label, value, highlight).
+
+    Recipients: ALARM_EMAIL_OVERRIDE_TO when set (test servers), otherwise
+    ALARM_EMAIL_DEFAULT_TO; with neither configured nothing is sent.
+    """
+    from django.conf import settings as django_settings
+
+    site = Site.objects.filter(id=site_id).first()
+    site_name = site.site_name if site else f"site {site_id}"
+    rows = "".join(
+        f'<p style="{"color:red;" if highlight else ""}"><strong>{label}: </strong>{value}</p>'
+        for label, value, highlight in details
+    )
+    html_message = f"""
+        <html><head><title>{alarm_name}</title></head>
+        <body style="font-family:Arial,sans-serif;background:#f0f0f0;color:#333;">
+        {_tpl_header(alarm_name)}
+        <div class="container" style="background:#fff;border:1px solid #ccc;border-radius:5px;padding:20px;margin:20px;">
+            <p>Dear Customer,</p>
+            <p>Our monitoring system has raised the following alarm.</p>
+            <p><strong>Site Name: </strong>{site_name}</p>
+            <p><strong>Alarm Name: </strong>{alarm_name}</p>
+            <p><strong>Time: </strong>{_now_str()}</p>
+            {rows}
+            <p>Thank you for your attention to this matter. Please feel free to contact us.</p>
+            {_tpl_footer()}
+        </div>
+        </body>
+        </html>
+    """
+    to = list(getattr(django_settings, "ALARM_EMAIL_DEFAULT_TO", []) or [])
+    return _send_smtp_email(f"{alarm_name} - {site_name}", html_message, to)
 
 
 def send_alarm_for_high_voltage(data):
