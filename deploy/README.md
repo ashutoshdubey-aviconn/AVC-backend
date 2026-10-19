@@ -61,3 +61,5 @@ site's packets are never split across two queues.
   1 s, 2 s); all other failures are stored in **MQTT dead letters** (admin),
   once per gateway/error per 10 minutes, instead of only being logged.
 * Run `python manage.py migrate` for 0094 (`MqttDeadLetter`).
+
+Rollout steps for the test server: see `TEST_SERVER_ROLLOUT.md`.

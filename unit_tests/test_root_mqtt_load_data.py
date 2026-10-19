@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
@@ -14,13 +14,19 @@ class FakeMqttClient:
         self.on_connect = None
         self.on_message = None
 
-    def subscribe(self, topic):
+    def subscribe(self, topic, qos=0):
         self.subscriptions.append(topic)
 
     def connect(self, *_args):
         return 0
 
-    def loop_forever(self):
+    def connect_async(self, *_args):
+        return 0
+
+    def reconnect_delay_set(self, **_kwargs):
+        pass
+
+    def loop_forever(self, **_kwargs):
         self.on_connect(self, None, None, 0)
         if self.message is not None:
             self.on_message(self, None, self.message)
@@ -40,26 +46,22 @@ class RootMqttLoadDataTests(SimpleTestCase):
         self.assertEqual(queue_one_client.subscriptions, list(QUEUE_ONE_SUBSCRIPTIONS))
         self.assertEqual(queue_two_client.subscriptions, list(QUEUE_TWO_SUBSCRIPTIONS))
 
-    def test_root_queue_two_delegates_load_data_to_optimized_handler(self):
+    def test_root_queue_two_queues_load_data_for_processing(self):
         message = SimpleNamespace(
             topic="/Acclivate/iOmniControl/156/gateway-01/in/LoadData/state",
             payload=b"Load_Power:12.5,Leg_Id:967,Meter_Number:M-1,Time:2026-10-08 12:00:00,Epoch:1791450600000",
         )
         queue_two_client = FakeMqttClient(message)
-        site = SimpleNamespace(id=156)
 
+        # The root listener delegates to wareApp.mqtt.consumers, which hands the
+        # packet to the queue2 processing task instead of handling it inline.
         with (
             patch("tasks.mqtt.Client", return_value=queue_two_client),
-            patch("tasks.Site.objects.get", return_value=site),
-            patch("tasks.handle_load_data_message") as handle_load_data_message,
+            patch("wareApp.tasks.process_load_data_message.apply_async") as enqueue,
         ):
             root_tasks.mqtt_client2.run()
 
-        handle_load_data_message.assert_called_once_with(
-            queue_two_client,
-            site,
-            156,
-            "gateway-01",
-            message.payload.decode("utf-8"),
-            ["LoadData"],
+        enqueue.assert_called_once_with(
+            args=(156, "gateway-01", message.payload.decode("utf-8")),
+            queue="queue2_processing",
         )

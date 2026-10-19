@@ -375,7 +375,8 @@ def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any
     alerts = alerts_json.get("data") or {}
     if isinstance(alerts, dict):
         alerts = alerts.get("alerts") or alerts
-    if not isinstance(alerts, dict):
+    if not isinstance(alerts, dict) or not alerts:
+        # Reports without a "data" wrapper carry the alerts at the top level.
         alerts = alerts_json.get("alerts") or {}
     refuel = alerts.get("REFUELING_ALERT") or []
     for r in refuel:
@@ -394,7 +395,8 @@ def detect_theft_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]
     alerts = alerts_json.get("data") or {}
     if isinstance(alerts, dict):
         alerts = alerts.get("alerts") or alerts
-    if not isinstance(alerts, dict):
+    if not isinstance(alerts, dict) or not alerts:
+        # Reports without a "data" wrapper carry the alerts at the top level.
         alerts = alerts_json.get("alerts") or {}
     theft = alerts.get("POSSIBLE_FUEL_THEFT_ALERT") or []
     for t in theft:
