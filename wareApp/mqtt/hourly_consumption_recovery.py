@@ -6,7 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
-from wareApp.mqtt.log_format import hour_ranges
+from wareApp.mqtt.log_format import day_ranges, hour_ranges
 from wareApp.mqtt.services.baseline import BaselineMemo
 from wareApp.mqtt.services.consumption_alarms import evaluate_days
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
@@ -98,6 +98,16 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             logger.info(
                 "Queue1 hourly recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
                 location_id, aisle_group_id, aisle_group.aisleGroupName, "; ".join(alarms),
+            )
+        if baselines.missing_days:
+            logger.warning(
+                "Queue1 hourly recovery baseline missing (stored with baseline 0): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s days=%s [%s]",
+                location_id,
+                home_gateway_id,
+                aisle_group_id,
+                aisle_group.aisleGroupName,
+                len(baselines.missing_days),
+                day_ranges(baselines.missing_days),
             )
         error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(

@@ -395,7 +395,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("consumption", "state", 999999, "gateway-01", "payload"), queue="queue1_processing"
+            args=("consumption", "state", 999999, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_two_defers_load_data_processing_without_a_site_query(self):
@@ -411,7 +411,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue2_processing"
+            args=(156, "gateway-01", "payload"), queue="queue2_processing", delivery_mode=1
         )
 
     def test_queue_one_processing_task_cleans_connections(self):
@@ -499,7 +499,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("consumption", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("consumption", "state", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_supply_time_for_processing(self):
@@ -515,7 +515,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("SupplyTime", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("SupplyTime", "state", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_fire_alarm_for_processing(self):
@@ -531,7 +531,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("FIREALARM", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("FIREALARM", "state", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_load_for_processing(self):
@@ -547,7 +547,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("load", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("load", "state", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_hourly_consumption_recovery_for_processing(self):
@@ -568,7 +568,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("recovery", "hourlyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "hourlyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_load_runtime_recovery_for_processing(self):
@@ -586,7 +586,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("recovery", "loadRuntime", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "loadRuntime", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_queues_daily_consumption_recovery_for_processing(self):
@@ -604,7 +604,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=("recovery", "dailyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "dailyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing", delivery_mode=1
         )
 
     def test_queue_one_ignores_sync_without_a_processing_handler(self):

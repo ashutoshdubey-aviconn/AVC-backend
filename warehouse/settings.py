@@ -285,6 +285,9 @@ MQTT_SYNC_LATE_SECONDS = config("MQTT_SYNC_LATE_SECONDS", default=70 * 60, cast=
 MQTT_SYNC_MISSING_SECONDS = config(
     "MQTT_SYNC_MISSING_SECONDS", default=130 * 60, cast=int
 )
+# Publish MQTT packet tasks as non-persistent RabbitMQ messages (no disk write
+# per packet); see wareApp/mqtt/consumers.py. Set False to persist them.
+MQTT_TRANSIENT_MESSAGES = config("MQTT_TRANSIENT_MESSAGES", default=True, cast=bool)
 # Send alarm emails through the ``notifications`` queue after commit instead
 # of inline in the MQTT processing worker.
 MQTT_ASYNC_NOTIFICATIONS = config("MQTT_ASYNC_NOTIFICATIONS", default=True, cast=bool)

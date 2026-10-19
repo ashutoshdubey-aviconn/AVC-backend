@@ -141,7 +141,7 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     leg_id = aisle_group.attached_leg_id
     info = baseline_info(site.id, leg_id, day)
     if info is None:
-        logger.info("Consumption alarms skipped, no baseline: site=%s leg=%s date=%s", site.id, leg_id, day)
+        logger.debug("Consumption alarms skipped, no baseline: site=%s leg=%s date=%s", site.id, leg_id, day)
         return []
     baseline, working_hours, baseline_from = info
     if baseline_from and day < baseline_from:

@@ -17,6 +17,21 @@ from wareApp.mqtt.topics import TopicParseError
 logger = logging.getLogger(__name__)
 
 
+def _publish_options(queue):
+    """apply_async options for an MQTT packet task.
+
+    With MQTT_TRANSIENT_MESSAGES (default) packets are published with
+    delivery_mode=1: RabbitMQ keeps them in memory instead of writing every
+    packet to disk. Packets still queued when RabbitMQ itself restarts are
+    lost; missed hours are re-requested by recovery. Alarm e-mails
+    (notifications queue) stay persistent.
+    """
+    options = {"queue": queue}
+    if getattr(settings, "MQTT_TRANSIENT_MESSAGES", True):
+        options["delivery_mode"] = 1
+    return options
+
+
 def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
     """``topic`` is anything with ``message_type`` / ``message_subtype`` (an envelope)."""
     if not is_handled(topic.message_type, topic.message_subtype):
@@ -34,7 +49,7 @@ def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
 
     tasks.process_mqtt_message.apply_async(
         args=(topic.message_type, topic.message_subtype, site_id, gateway_id, message),
-        queue=processing_queue_for_site(site_id),
+        **_publish_options(processing_queue_for_site(site_id)),
     )
     logger.debug(
         "Queued %s%s for site %s from gateway %s",
@@ -111,7 +126,7 @@ def run_mqtt_client2():
 
             tasks.process_load_data_message.apply_async(
                 args=envelope.task_args,
-                queue="queue2_processing",
+                **_publish_options("queue2_processing"),
             )
             logger.debug(
                 "Queued LoadData for site %s from gateway %s",
