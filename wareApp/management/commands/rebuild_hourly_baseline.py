@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from wareApp.models import AisleGroup, HourlySiteReading, Site
+from wareApp.mqtt.services import site_cache
 from wareApp.mqtt.services.baseline import BaselineMemo
 
 BATCH = 2000
@@ -45,7 +46,15 @@ class Command(BaseCommand):
                 str(aisle.attached_leg_id): aisle
                 for aisle in AisleGroup.objects.filter(site=site_obj)
             }
-            memos = {leg: BaselineMemo(site_obj, aisle) for leg, aisle in aisles.items()}
+            # Legs without any baseline row are left alone (nothing to fill).
+            no_baseline = sorted(
+                leg for leg in aisles if not site_cache.baselines(site_obj.id, leg)
+            )
+            memos = {
+                leg: BaselineMemo(site_obj, aisle)
+                for leg, aisle in aisles.items()
+                if leg not in no_baseline
+            }
             rows = HourlySiteReading.objects.filter(
                 associated_Site=site_obj, reading_from__gte=start, reading_from__lt=end
             )
@@ -73,6 +82,10 @@ class Command(BaseCommand):
 
             total_rows += seen
             total_changed += len(changed)
+            if no_baseline and seen:
+                self.stdout.write(
+                    f"site {site_obj.id}: skipped legs without a baseline: {', '.join(no_baseline)}"
+                )
             if not changed:
                 continue
             legs = ", ".join(
