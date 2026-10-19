@@ -11,6 +11,8 @@ WorkingDirectory=/home/ubuntu/django_project
 Environment=DJANGO_SETTINGS_MODULE=warehouse.settings
 EnvironmentFile=-/home/ubuntu/django_project/warehouse/.env
 ExecStart=/home/ubuntu/django_project/virtualwarehouse/bin/celery -A warehouse worker --hostname=root.queue2@%%h --queues=queue2 --concurrency=1 --prefetch-multiplier=1 --loglevel=INFO
+StandardOutput=append:/home/ubuntu/django_project/celerylogs2/celery_logs_of_server.log
+StandardError=append:/home/ubuntu/django_project/celerylogs2/celery_logs_of_server.log
 Restart=always
 RestartSec=10
 TimeoutStopSec=60
