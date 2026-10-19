@@ -77,7 +77,7 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
                 home_gateway_id,
                 meter_number,
             )
-            return
+            return f"skipped: no fire pump record for meter {meter_number}"
 
         initial_r_volt = fire_pump_record.r_volt
         initial_y_volt = fire_pump_record.y_volt
@@ -215,6 +215,10 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
                 power_status,
                 email_for=1,
             )
+        return (
+            f"stored: fire pump meter {meter_number} r={r_volt} y={y_volt} b={b_volt} "
+            f"power_status={power_status}"
+        )
     except TRANSIENT_DB_ERRORS:
         raise
     except Exception as error:
@@ -224,3 +228,4 @@ def handle_fire_alarm_message(site, location_id, gateway_id, message):
             home_gateway_id,
         )
         record_dead_letter("FIREALARM", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

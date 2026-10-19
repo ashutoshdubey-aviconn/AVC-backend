@@ -5,6 +5,7 @@ from django.db.models import F, Sum
 
 from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.cooldown import recovery_request_allowed
@@ -114,7 +115,7 @@ def handle_supply_time_message(
                 hour_start,
             )
             mark_source_healthy(site, home_gateway_id, source, hour_start)
-            return
+            return f"stored: source {source} hour {hour_start:%Y-%m-%d %H:00} runtime +{source_run_time}"
 
         last_runtime_entry = run_time.order_by("-reading_from", "-id").first()
         _update_monthly_share_if_due(
@@ -139,15 +140,17 @@ def handle_supply_time_message(
                 hour_start,
             )
             mark_source_healthy(site, home_gateway_id, source, hour_start)
-            return
+            return f"stored: source {source} new hour {hour_start:%Y-%m-%d %H:00} runtime {source_run_time}"
 
         if not recovery_request_allowed(location_id, "source", source):
-            logger.debug(
-                "Queue1 SupplyTime recovery already requested: site=%s source=%s",
+            logger.info(
+                "Queue1 SupplyTime skipped, gap recovery already requested (cooldown): site=%s home_gateway_id=%s source=%s hour=%s",
                 location_id,
+                home_gateway_id,
                 source,
+                hour_start,
             )
-            return
+            return f"skipped: source {source} has a gap, recovery already requested (cooldown)"
         loss_time = (datetime.now() - last_runtime_entry.reading_from).total_seconds()
         recovery_topic = (
             f"/Acclivate/iOmniControl/{location_id}/{gateway_id}/in/sync/loadTime/state"
@@ -164,18 +167,36 @@ def handle_supply_time_message(
             recovery_topic,
             recovery_message,
         )
+        gap = missing_hours(decision.monitor.missing_from, decision.monitor.missing_to)
         if not decision.publish:
-            return
+            logger.warning(
+                "Queue1 SupplyTime skipped, recovery failed for gap: site=%s home_gateway_id=%s source=%s missing=%s attempts=%s",
+                location_id,
+                home_gateway_id,
+                source,
+                gap,
+                decision.monitor.attempt,
+            )
+            return (
+                f"skipped: source {source} gap {gap}, recovery failed after "
+                f"{decision.monitor.attempt} attempts"
+            )
         if publish_recovery:
             publish_recovery(recovery_topic, recovery_message)
         else:
             client.publish(recovery_topic, recovery_message, qos=0, retain=False)
         logger.warning(
-            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s attempt=%s",
+            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s missing=%s last_stored_hour=%s attempt=%s",
             location_id,
             home_gateway_id,
             source,
+            gap,
+            last_runtime_entry.reading_from,
             decision.monitor.attempt,
+        )
+        return (
+            f"skipped: source {source} gap {gap}, recovery requested "
+            f"(attempt {decision.monitor.attempt})"
         )
     except TRANSIENT_DB_ERRORS:
         raise
@@ -186,3 +207,4 @@ def handle_supply_time_message(
             home_gateway_id,
         )
         record_dead_letter("SupplyTime", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

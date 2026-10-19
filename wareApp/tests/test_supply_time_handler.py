@@ -82,7 +82,12 @@ class SupplyTimeHandlerTests(SimpleTestCase):
 
         status_service = Mock()
         status_service.return_value.request_recovery.return_value = SimpleNamespace(
-            publish=True, monitor=SimpleNamespace(attempt=1)
+            publish=True,
+            monitor=SimpleNamespace(
+                attempt=1,
+                missing_from=datetime(2026, 10, 1, 9),
+                missing_to=datetime(2026, 10, 1, 19),
+            ),
         )
         with patch(
             "wareApp.mqtt.supply_time.SupplyLoadTimeShare.objects.filter",
@@ -90,10 +95,11 @@ class SupplyTimeHandlerTests(SimpleTestCase):
         ), patch("wareApp.mqtt.supply_time._update_monthly_share_if_due"), patch(
             "wareApp.mqtt.supply_time.RecoveryStatusService", status_service
         ):
-            supply_time.handle_supply_time_message(
+            outcome = supply_time.handle_supply_time_message(
                 client, SimpleNamespace(), 156, "gateway-01", self.message
             )
 
+        self.assertIn("gap 2026-10-01 09:00→18:00 (10 h), recovery requested", outcome)
         client.publish.assert_called_once()
         self.assertEqual(
             client.publish.call_args.args[0],

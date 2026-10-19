@@ -6,6 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, DailySiteReading, SiteBaseline
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import day_ranges
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
@@ -52,14 +53,7 @@ def _baseline_for_day(location_id, aisle_group_id, observed_at):
     )
     if baseline:
         return baseline.baseline_value
-
-    logger.warning(
-        "Queue1 daily recovery baseline missing: site=%s aisle_group=%s date=%s",
-        location_id,
-        aisle_group_id,
-        observed_at.date(),
-    )
-    return 0.0
+    return None
 
 
 def handle_daily_consumption_recovery_message(site, location_id, gateway_id, message):
@@ -77,6 +71,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
 
         slots = {}
         status_slots = []
+        baseline_missing = []
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
@@ -89,6 +84,9 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 baseline_value = _baseline_for_day(
                     location_id, aisle_group_id, observed_at
                 )
+                if baseline_value is None:
+                    baseline_missing.append(observed_at.date())
+                    baseline_value = 0.0
                 saving = baseline_value - consumption
             status_slots.append(RecoverySlot(observed_at, recovery_value == "ERROR404"))
             slots[observed_at.date()] = {
@@ -103,7 +101,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
             monitor = status.record_response(
                 scope, DAILY_CONSUMPTION, status_slots, message, slot_length=timedelta(days=1)
             )
-            updated, created, skipped = upsert_slots(
+            written = upsert_slots(
                 DailySiteReading.objects.filter(
                     associated_Site=site,
                     leg_id=aisle_group_id,
@@ -126,16 +124,39 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        if baseline_missing:
+            logger.warning(
+                "Queue1 daily recovery baseline missing (stored with baseline 0): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s days=%s [%s]",
+                location_id,
+                home_gateway_id,
+                aisle_group_id,
+                aisle_group.aisleGroupName,
+                len(baseline_missing),
+                day_ranges(baseline_missing),
+            )
+        error_days = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
-            "Queue1 daily recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s skipped=%s",
+            "Queue1 daily recovery bulk write: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s "
+            "received=%s d [%s] created=%s [%s] updated=%s [%s] "
+            "skipped=%s [%s] (stored value already >= recovered) error404=%s [%s]",
             location_id,
             home_gateway_id,
             aisle_group_id,
             aisle_group.aisleGroupName,
             len(slots),
-            updated,
-            created,
-            skipped,
+            day_ranges(list(slots)),
+            len(written.created),
+            day_ranges(written.created),
+            len(written.updated),
+            day_ranges(written.updated),
+            len(written.skipped),
+            day_ranges(written.skipped),
+            len(error_days),
+            day_ranges(error_days),
+        )
+        return (
+            f"daily recovery: {len(slots)} d received, created={len(written.created)} "
+            f"updated={len(written.updated)} skipped={len(written.skipped)} (already >= recovered)"
         )
     except TRANSIENT_DB_ERRORS:
         raise
@@ -146,3 +167,4 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
             home_gateway_id,
         )
         record_dead_letter("recovery/dailyConsumption", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"
