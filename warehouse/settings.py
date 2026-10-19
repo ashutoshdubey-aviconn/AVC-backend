@@ -179,10 +179,14 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="")
 # Never let a slow SMTP server block an MQTT processing worker indefinitely.
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
 # Alarm emails (wareApp/sendmail.py). OVERRIDE_TO (comma list) replaces the
-# recipients of every alarm email, for test servers. DEFAULT_TO receives the
-# alarm types that have no recipient of their own (consumption, meter, PF, DG);
-# when both are empty those alarms are only stored, not emailed.
-ALARM_EMAIL_OVERRIDE_TO = config("ALARM_EMAIL_OVERRIDE_TO", default="", cast=_host_list)
+# recipients of every alarm email. While the alarm emails are being tested it
+# defaults to the tester's office address on every server; set
+# ALARM_EMAIL_OVERRIDE_TO= (empty) in .env to send to the real recipients.
+# DEFAULT_TO receives the alarm types that have no recipient of their own
+# (consumption, meter, PF, DG) once the override is off.
+ALARM_EMAIL_OVERRIDE_TO = config(
+    "ALARM_EMAIL_OVERRIDE_TO", default="ashutosh.dubey@aviconncorp.com", cast=_host_list
+)
 ALARM_EMAIL_DEFAULT_TO = config("ALARM_EMAIL_DEFAULT_TO", default="", cast=_host_list)
 
 # --- DG fuel providers -----------------------------------------------------------

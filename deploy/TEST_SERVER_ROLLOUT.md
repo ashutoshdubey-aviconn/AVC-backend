@@ -105,6 +105,7 @@ Add to `warehouse/.env` (settings no longer contain credentials):
 | `ROADCAST_PULL_USERNAME`, `ROADCAST_PULL_PASSWORD` | Roadcast pull API in the DG graph (skipped, with a warning, when unset) |
 | `MAIN_DB_PASSWORD` (+ optional `MAIN_DB_HOST/NAME/USER/PORT`) | `main` DB alias, used only by `roadcast_monthly_refuel_report.py` |
 | `REDIS_URL=redis://127.0.0.1:6379/1` | recommended: shared cooldowns, duplicate check and sync-status cache |
+| `ALARM_EMAIL_OVERRIDE_TO` | every alarm email goes only here; defaults to ashutosh.dubey@aviconncorp.com while alarm emails are in testing. Set it empty to send to the real recipients (then `ALARM_EMAIL_DEFAULT_TO` for PF/consumption/meter/DG alarms). |
 
 `SECRET_KEY`, `EMAIL_*` and `ALLOWED_HOSTS` are already in the test `.env` and are now
 read from it (`EMAIL_USE_TLS`/`EMAIL_PORT` as bool/int). Move the old settings copies
