@@ -152,3 +152,14 @@ class AlarmFeedWindowTests(TestCase):
 
         with override_settings(ALARM_FEED_MAX_AGE_DAYS=0):
             self.assertEqual(len(active_alarms([site.id])), 2)
+
+
+@override_settings(ALARM_FEED_MAX_AGE_DAYS=0)
+class SnapshotAlarmCountTests(AlarmFeedTests):
+    def test_snapshot_counts_the_same_issues_as_the_list(self):
+        admin = User.objects.create(username="AVCadmin3", UserType=1)
+        client = APIClient()
+        client.force_authenticate(admin)
+        response = client.post("/api/snapshot/", {"user_id": admin.id}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["alarms"], 2)  # 4 meter rows + 3 PF rows = 2 issues
