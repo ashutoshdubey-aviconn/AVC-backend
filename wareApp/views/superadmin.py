@@ -3,12 +3,13 @@
 from collections import defaultdict
 from datetime import datetime
 
-from django.db.models import Case, CharField, Count, Q, Sum, Value, When
+from django.db.models import Count, Q, Sum
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from wareApp.alarm_feed import active_alarms
 from wareApp.models import AlarmNotifications, DailySiteReading, Site, User
 from wareApp.utility import logger
 
@@ -225,67 +226,54 @@ class SuperAdminSnapShot(APIView):
 
 
 class SuperUserAllAlarmsPriorityBasedOnCustomersList(APIView):
-    def post(self, request):
-        data = request.data
-        logger.debug("%s %s", "request data : ", data)
-        user_id = data.get("id")
-        all_customers = User.objects.filter(UserType=4)
-        response_data = []
-        for customer in all_customers:
-            logger.debug("%s %s", "customers :", customer)
-            customer_data = {}
-            all_sites = Site.objects.filter(customer=customer, is_live=True)
-            logger.debug("%s %s", "all_sites :", all_sites)
-            all_sites_id = [i.id for i in all_sites]
-            logger.debug("%s %s", "all_sites_id :", all_sites_id)
-            alarms = (
-                AlarmNotifications.objects.values(
-                    "Alarm_priority", "site_id__site_name"
-                )
-                .filter(site_id__in=all_sites_id, is_active=True)
-                .annotate(alarm_count=Count("id"))
-            )
+    """Active-issue counts per customer, priority and site (one per issue, not per row)."""
 
-            logger.debug("%s %s", "alarm : ", alarms)
-            customer_data["customer_id"] = customer.id
-            customer_data["customer_name"] = customer.username
-            customer_data["alarm_list"] = alarms
-            response_data.append(alarms)
+    def post(self, request):
+        customers = list(User.objects.filter(UserType=4).order_by("id"))
+        live_sites = Site.objects.filter(customer__in=customers, is_live=True)
+        counts = defaultdict(lambda: defaultdict(int))
+        for row in active_alarms(live_sites.values_list("id", flat=True)):
+            counts[row["customer_id"]][
+                (row["Alarm_priority"], row["site_id__site_name"])
+            ] += 1
+        response_data = [
+            [
+                {
+                    "Alarm_priority": priority,
+                    "site_id__site_name": site_name,
+                    "alarm_count": count,
+                }
+                for (priority, site_name), count in sorted(
+                    counts.get(customer.id, {}).items(),
+                    key=lambda item: (str(item[0][1]), item[0][0]),
+                )
+            ]
+            for customer in customers
+        ]
         return Response({"data": response_data})
 
 
 class SuperUserAllAlarmsTypeBasedOnCustomersList(APIView):
+    """Active alarms of every live site, one row per issue (see wareApp/alarm_feed.py)."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         if request.user.UserType != 1:
             raise PermissionDenied("Only Super_Admin users can view alarms.")
 
-        data = request.data
-        logger.debug("%s %s", "data : ", data)
-        user_id = data.get("user_id")
-        all_customers = User.objects.filter(UserType=4)
-        response_data = []
-        for customer in all_customers:
-            customer_data = {}
-            all_sites = Site.objects.filter(customer=customer, is_live=True)
-            logger.debug("%s", all_sites)
-            all_sites_id = [i.id for i in all_sites]
-            choices = dict(AlarmNotifications._meta.get_field("Alarm_type").flatchoices)
-            whens = [When(Alarm_type=k, then=Value(v)) for k, v in choices.items()]
-            alarms = (
-                AlarmNotifications.objects.filter(
-                    site_id__in=all_sites_id, is_active=True
-                )
-                .annotate(
-                    alarm_count=Count("id"),
-                    alarm=Case(*whens, output_field=CharField()),
-                )
-                .values("alarm", "Alarm_priority", "site_id__site_name", "created_time")
-            )
-            if alarms:
-                customer_data["customer_id"] = customer.id
-                customer_data["customer_name"] = customer.username
-                customer_data["alarm_list"] = alarms
-                response_data.append(customer_data)
+        customers = list(User.objects.filter(UserType=4).order_by("id"))
+        live_sites = Site.objects.filter(customer__in=customers, is_live=True)
+        by_customer = defaultdict(list)
+        for row in active_alarms(live_sites.values_list("id", flat=True)):
+            by_customer[row["customer_id"]].append(row)
+        response_data = [
+            {
+                "customer_id": customer.id,
+                "customer_name": customer.username,
+                "alarm_list": by_customer[customer.id],
+            }
+            for customer in customers
+            if by_customer.get(customer.id)
+        ]
         return Response({"data": response_data})

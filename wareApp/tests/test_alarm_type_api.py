@@ -28,7 +28,12 @@ class AlarmTypeApiAuthorizationTests(SimpleTestCase):
         request = self.factory.post("/alarmTypeApi/", {}, format="json")
         force_authenticate(request, user=Mock(UserType=1, is_authenticated=True))
 
-        with patch("wareApp.views.User.objects.filter", return_value=[]):
+        with patch(
+            "wareApp.views.User.objects.filter",
+            return_value=Mock(order_by=Mock(return_value=[])),
+        ), patch("wareApp.views.superadmin.Site.objects.filter"), patch(
+            "wareApp.views.superadmin.active_alarms", return_value=[]
+        ):
             response = self.view(request)
 
         self.assertEqual(response.status_code, 200)

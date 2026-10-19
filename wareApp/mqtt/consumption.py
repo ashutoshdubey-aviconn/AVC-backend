@@ -121,6 +121,27 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         )
         return
 
+    day_start = datetime.combine(occurred_at.date(), datetime.min.time())
+    # The same issue already raised today: count it on that alarm instead of
+    # storing (and e-mailing) another row every cooldown window.
+    repeated = AlarmNotifications.objects.filter(
+        site_id=site,
+        object_id=int(meter_id),
+        Alarm_type=10,
+        is_active=True,
+        created_time__gte=day_start,
+    ).update(last_seen=occurred_at, occurrences=F("occurrences") + 1)
+    if repeated:
+        logger.warning(
+            "Meter reading issue repeated (active alarm updated): site=%s home_gateway_id=%s meter_id=%s aisle_group_name=%s occurred_at=%s",
+            location_id,
+            gateway_id,
+            meter_id,
+            aisle_group_name,
+            occurred_at,
+        )
+        return
+
     AlarmNotifications.objects.create(
         created_by=None,
         user_level=2,
@@ -131,6 +152,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         Alarm_type=10,
         Alarm_priority=1,
         created_time=occurred_at,
+        last_seen=occurred_at,
         to_do=f"Gateway {gateway_id}: lower meter reading reported.",
     )
     notify(
@@ -160,7 +182,9 @@ def _consumption_alarms(site, aisle_group, daily_reading):
     return evaluate_daily_alarms(site, aisle_group, daily_reading)
 
 
-def _consumption_recovery_request(location_id, gateway_id, aisle_group_id, last_hourly_entry):
+def _consumption_recovery_request(
+    location_id, gateway_id, aisle_group_id, last_hourly_entry
+):
     """Build the gateway sync command for a consumption gap, or None."""
     if not last_hourly_entry.reading_to:
         logger.warning(
@@ -202,7 +226,9 @@ class _BaselineMemo:
     def _warn_missing(self):
         site, aisle = self._memo.site, self._memo.aisle_group
         # Once per aisle per hour instead of on every packet.
-        if cache.add(f"baseline-missing-log:{site.id}:{aisle.attached_leg_id}", 1, 3600):
+        if cache.add(
+            f"baseline-missing-log:{site.id}:{aisle.attached_leg_id}", 1, 3600
+        ):
             logger.warning(
                 "Queue1 consumption baseline missing (saving not calculated): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s day=%s",
                 site.id,
@@ -264,9 +290,7 @@ def handle_consumption_message(
             _notify_meter_reading_issue(site, location_id, home_gateway_id, message)
             return "skipped: gateway diagnostic (meter reading issue stored)"
 
-        values = _cap_warehouse_saving_values(
-            site, _parse_consumption_message(message)
-        )
+        values = _cap_warehouse_saving_values(site, _parse_consumption_message(message))
         observed_at = values["observed_date"].replace(
             hour=values["observed_hour"], minute=0, second=0, microsecond=0
         )
@@ -308,7 +332,9 @@ def handle_consumption_message(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
         daily_record = None
-        baselines = _BaselineMemo(site, aisle_group, observed_at.date(), home_gateway_id)
+        baselines = _BaselineMemo(
+            site, aisle_group, observed_at.date(), home_gateway_id
+        )
 
         if not current_hour_entries.update(
             unit_consumption=values["current_hour_consumption"]
@@ -344,7 +370,9 @@ def handle_consumption_message(
                     previous_entries.update(**previous_updates)
 
                 if daily_record:
-                    _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at)
+                    _resync_daily_with_hourly(
+                        site, aisle_group, daily_record, observed_at
+                    )
 
                 HourlySiteReading.objects.create(
                     associated_Site=site,
