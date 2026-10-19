@@ -10,6 +10,8 @@ from django.conf import settings
 from django.db import connections
 from django.utils import timezone as dj_timezone
 
+from wareApp.mqtt.services.notifications import notify
+from wareApp.sendmail import send_alarm_email
 from wareApp.dg_fuel.normalization import as_float
 from wareApp.fuel_providers import (
     detect_suspicious_fuel,
@@ -544,6 +546,16 @@ def attempt_fetch_for_unit(
                 alarm_priority=0,
                 created=dj_timezone.now(),
             )
+            notify(
+                send_alarm_email,
+                "DG Running Without Load",
+                site.id,
+                [
+                    ["DG unit consumption (kWh)", str(unit.unit_consumption), True],
+                    ["DG fuel used (L)", str(unit.dg_fuel_consumption), False],
+                    ["Vehicle / device", str(vehicle_number), False],
+                ],
+            )
 
         try:
             tank_capacity = site.dg_fuel_tank_capacity
@@ -562,6 +574,16 @@ def attempt_fetch_for_unit(
                     alarm_priority=1,
                     created=dj_timezone.now(),
                     fuel_level=unit.dg_fuel_consumption,
+                )
+                notify(
+                    send_alarm_email,
+                    "Fuel Drain / Suspicious Fuel Alarm",
+                    site.id,
+                    [
+                        ["DG fuel used (L)", str(unit.dg_fuel_consumption), True],
+                        ["Tank capacity (L)", str(tank_capacity), False],
+                        ["Vehicle / device", str(vehicle_number), False],
+                    ],
                 )
         except Exception:
             pass
