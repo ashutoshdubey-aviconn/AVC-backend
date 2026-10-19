@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from wareApp import tasks
+from wareApp.mqtt import handlers
 from wareApp.mqtt import supply_time
 
 
@@ -179,7 +180,7 @@ class SupplyTimeHandlerTests(SimpleTestCase):
         site = SimpleNamespace(id=156)
 
         with patch("wareApp.tasks.site_config.site", return_value=site), patch(
-            "wareApp.tasks.handle_supply_time_message"
+            "wareApp.mqtt.handlers.handle_supply_time_message"
         ) as handle:
             tasks.process_supply_time_message.run(156, "gateway-01", self.message)
 
@@ -189,5 +190,5 @@ class SupplyTimeHandlerTests(SimpleTestCase):
             156,
             "gateway-01",
             self.message,
-            publish_recovery=tasks._publish_supply_time_recovery,
+            publish_recovery=handlers.publish_recovery_request,
         )

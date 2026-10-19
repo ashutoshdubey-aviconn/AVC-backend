@@ -3,7 +3,7 @@ import logging
 import paho.mqtt.client as mqtt
 from django.conf import settings
 
-from wareApp.mqtt.registry import processing_task_for
+from wareApp.mqtt.registry import is_handled
 from wareApp.mqtt.routing import (
     QUEUE_ONE_MESSAGE_TYPES,
     QUEUE_ONE_SUBSCRIPTIONS,
@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
     """``topic`` is anything with ``message_type`` / ``message_subtype`` (an envelope)."""
-    task = processing_task_for(topic.message_type, topic.message_subtype)
-    if task is None:
+    if not is_handled(topic.message_type, topic.message_subtype):
         logger.info(
             "Ignoring queue1 message without a processing handler: type=%s subtype=%s "
             "site=%s gateway=%s",
@@ -31,8 +30,11 @@ def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
         )
         return False
 
-    task.apply_async(
-        args=(site_id, gateway_id, message), queue=processing_queue_for_site(site_id)
+    from wareApp import tasks
+
+    tasks.process_mqtt_message.apply_async(
+        args=(topic.message_type, topic.message_subtype, site_id, gateway_id, message),
+        queue=processing_queue_for_site(site_id),
     )
     logger.debug(
         "Queued %s%s for site %s from gateway %s",

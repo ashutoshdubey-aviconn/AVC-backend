@@ -7,6 +7,7 @@ from kombu.exceptions import OperationalError
 from paho.mqtt.client import MQTT_ERR_CONN_LOST, MQTT_ERR_SUCCESS
 
 from wareApp import tasks
+from wareApp.mqtt import handlers
 from wareApp.load_data import handler as load_data_handler
 from wareApp.management.commands.simulate_mqtt_gateway_traffic import (
     Command as SimulatorCommand,
@@ -390,11 +391,11 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/999999/gateway-01/in/consumption/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(999999, "gateway-01", "payload"), queue="queue1_processing"
+            args=("consumption", "state", 999999, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_two_defers_load_data_processing_without_a_site_query(self):
@@ -418,7 +419,7 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         with (
             patch("wareApp.tasks.site_config.site", return_value=site),
-            patch("wareApp.tasks.handle_supply_time_message") as handle_message,
+            patch("wareApp.mqtt.handlers.handle_supply_time_message") as handle_message,
             patch("wareApp.tasks.close_old_connections") as close_connections,
         ):
             tasks.process_supply_time_message.run(156, "gateway-01", "payload")
@@ -430,7 +431,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             156,
             "gateway-01",
             "payload",
-            publish_recovery=tasks._publish_supply_time_recovery,
+            publish_recovery=handlers.publish_recovery_request,
         )
 
     def test_queue_two_rejects_malformed_topics_without_enqueueing(self):
@@ -494,11 +495,11 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/consumption/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("consumption", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_supply_time_for_processing(self):
@@ -510,11 +511,11 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/SupplyTime/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_supply_time_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("SupplyTime", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_fire_alarm_for_processing(self):
@@ -526,11 +527,11 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/FIREALARM/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_fire_alarm_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("FIREALARM", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_load_for_processing(self):
@@ -542,11 +543,11 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/load/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_load_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("load", "state", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_hourly_consumption_recovery_for_processing(self):
@@ -562,12 +563,12 @@ class GatewayTopicParserTests(SimpleTestCase):
             payload=b"payload",
         )
         with patch(
-            "wareApp.tasks.process_hourly_consumption_recovery_message.apply_async"
+            "wareApp.tasks.process_mqtt_message.apply_async"
         ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "hourlyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_load_runtime_recovery_for_processing(self):
@@ -580,12 +581,12 @@ class GatewayTopicParserTests(SimpleTestCase):
             payload=b"payload",
         )
         with patch(
-            "wareApp.tasks.process_load_runtime_recovery_message.apply_async"
+            "wareApp.tasks.process_mqtt_message.apply_async"
         ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "loadRuntime", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_queues_daily_consumption_recovery_for_processing(self):
@@ -598,12 +599,12 @@ class GatewayTopicParserTests(SimpleTestCase):
             payload=b"payload",
         )
         with patch(
-            "wareApp.tasks.process_daily_consumption_recovery_message.apply_async"
+            "wareApp.tasks.process_mqtt_message.apply_async"
         ) as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_called_once_with(
-            args=(156, "gateway-01", "payload"), queue="queue1_processing"
+            args=("recovery", "dailyConsumption", 156, "gateway-01", "payload"), queue="queue1_processing"
         )
 
     def test_queue_one_ignores_sync_without_a_processing_handler(self):
@@ -615,7 +616,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             topic="/Acclivate/iOmniControl/156/gateway-01/in/sync/state",
             payload=b"payload",
         )
-        with patch("wareApp.tasks.process_consumption_message.apply_async") as enqueue:
+        with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:
             client.on_message(client, None, message)
 
         enqueue.assert_not_called()
@@ -630,7 +631,7 @@ class GatewayTopicParserTests(SimpleTestCase):
             payload=b"payload",
         )
         with patch(
-            "wareApp.tasks.process_daily_consumption_recovery_message.apply_async"
+            "wareApp.tasks.process_mqtt_message.apply_async"
         ) as enqueue:
             client.on_message(client, None, message)
 

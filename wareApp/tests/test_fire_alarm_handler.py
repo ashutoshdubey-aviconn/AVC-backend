@@ -65,7 +65,7 @@ class FireAlarmHandlerTests(SimpleTestCase):
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)
         with patch("wareApp.tasks.site_config.site", return_value=site), patch(
-            "wareApp.tasks.handle_fire_alarm_message"
+            "wareApp.mqtt.handlers.handle_fire_alarm_message"
         ) as handle:
             tasks.process_fire_alarm_message.run(156, "gateway-01", str(self.message))
 
