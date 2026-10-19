@@ -265,7 +265,7 @@ class DgFuelGraphApiTests(TestCase):
         )
         self.make_unit_row(site, aisle, datetime(2026, 9, 4, 23, 59, 59), 3.63, 2.5)
 
-        with patch("wareApp.views.fetch_roadcast_pull_api") as mock_pull_api:
+        with patch("wareApp.views.dg_fuel.fetch_roadcast_pull_api") as mock_pull_api:
             mock_pull_api.return_value = {
                 "data": [],
                 "error": [
@@ -349,7 +349,7 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
-            "wareApp.views.fetch_loconav_report",
+            "wareApp.views.dg_fuel.fetch_loconav_report",
             return_value={"message": "Subscription expired for this vehicle"},
         ):
             response = self.api_post(
@@ -388,7 +388,7 @@ class DgFuelGraphApiTests(TestCase):
         )
 
         with patch(
-            "wareApp.views.fetch_loconav_report",
+            "wareApp.views.dg_fuel.fetch_loconav_report",
             return_value={"status": "offline", "message": "vehicle unavailable"},
         ):
             response = self.api_post(
