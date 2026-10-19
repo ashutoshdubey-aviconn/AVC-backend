@@ -198,6 +198,9 @@ ALARM_EMAIL_OVERRIDE_TO = config(
     "ALARM_EMAIL_OVERRIDE_TO", default="ashutosh.dubey@aviconncorp.com", cast=_host_list
 )
 ALARM_EMAIL_DEFAULT_TO = config("ALARM_EMAIL_DEFAULT_TO", default="", cast=_host_list)
+# Alarm lists (wareApp/alarm_feed.py): only issues seen within this many days
+# are shown; 0 shows every active issue.
+ALARM_FEED_MAX_AGE_DAYS = config("ALARM_FEED_MAX_AGE_DAYS", default=30, cast=int)
 # Consumption alarms (wareApp/mqtt/services/consumption_alarms.py).
 ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT = config(
     "ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT", default=75, cast=float
