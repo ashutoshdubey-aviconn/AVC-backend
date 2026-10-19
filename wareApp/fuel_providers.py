@@ -4,6 +4,8 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+from django.conf import settings
+
 from wareApp.dg_fuel.providers import parse_roadcast_report
 
 LOG = logging.getLogger(__name__)
@@ -112,7 +114,12 @@ def fetch_roadcast_fuel(
 
 def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
     url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api"
-    params = {"username": "Aviconn", "password": "Abc@1234"}
+    username = getattr(settings, "ROADCAST_PULL_USERNAME", "")
+    password = getattr(settings, "ROADCAST_PULL_PASSWORD", "")
+    if not username or not password:
+        LOG.warning("fetch_roadcast_pull_api: ROADCAST_PULL_USERNAME/PASSWORD not configured")
+        return None
+    params = {"username": username, "password": password}
     response = _try_request(url, params=params, timeout=8, retries=2)
     if response is None or response.status_code != 200:
         return None
