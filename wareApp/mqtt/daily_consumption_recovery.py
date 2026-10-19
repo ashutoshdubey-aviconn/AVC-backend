@@ -8,6 +8,7 @@ from wareApp.models import AisleGroup, DailySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import day_ranges
 from wareApp.mqtt.services.baseline import baseline_row
+from wareApp.mqtt.services.consumption_alarms import evaluate_days
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
@@ -109,6 +110,12 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        alarms = evaluate_days(site, aisle_group, list(written.created) + list(written.updated))
+        if alarms:
+            logger.info(
+                "Queue1 daily recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
+                location_id, aisle_group_id, aisle_group.aisleGroupName, "; ".join(alarms),
+            )
         if baseline_missing:
             logger.warning(
                 "Queue1 daily recovery baseline missing (stored with baseline 0): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s days=%s [%s]",

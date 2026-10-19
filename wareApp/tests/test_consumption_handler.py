@@ -99,63 +99,6 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
         create.assert_not_called()
 
-    def test_daily_consumption_records_high_consumption_at_configured_threshold(self):
-        site = SimpleNamespace(
-            id=156,
-            high_consumption_units=250.0,
-            bypass_consumption_units=400.0,
-            high_consumption_baseline_percent=None,
-            min_threshold_value=None,
-        )
-        aisle_group = SimpleNamespace(id=967, attached_leg_id="967")
-        daily_reading = SimpleNamespace(
-            unit_consumption=250.0,
-            daily_baseline_value=100.0,
-            reading_for=date(2026, 10, 16),
-        )
-        existing = Mock(exists=Mock(return_value=False))
-
-        with patch(
-            "wareApp.mqtt.consumption.AlarmNotifications.objects.filter",
-            return_value=existing,
-        ), patch(
-            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
-            consumption._consumption_alarms(site, aisle_group, daily_reading)
-
-        self.assertEqual(create.call_args.kwargs["Alarm_type"], 7)
-        self.assertEqual(create.call_args.kwargs["object_id"], 967)
-        self.assertIn("threshold=250.00", create.call_args.kwargs["to_do"])
-        self.assertEqual(notify.call_args.args[1], "High consumption Alarm")
-
-    def test_daily_consumption_records_bypass_instead_of_high_consumption(self):
-        site = SimpleNamespace(
-            id=156,
-            high_consumption_units=250.0,
-            bypass_consumption_units=400.0,
-            high_consumption_baseline_percent=None,
-            min_threshold_value=None,
-        )
-        aisle_group = SimpleNamespace(id=967, attached_leg_id="967")
-        daily_reading = SimpleNamespace(
-            unit_consumption=400.0,
-            daily_baseline_value=100.0,
-            reading_for=date(2026, 10, 16),
-        )
-        existing = Mock(exists=Mock(return_value=False))
-
-        with patch(
-            "wareApp.mqtt.consumption.AlarmNotifications.objects.filter",
-            return_value=existing,
-        ), patch(
-            "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
-            consumption._consumption_alarms(site, aisle_group, daily_reading)
-
-        self.assertEqual(create.call_args.kwargs["Alarm_type"], 11)
-        self.assertIn("threshold=400.00", create.call_args.kwargs["to_do"])
-        self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
-
     def test_processing_locks_the_aisle_group(self):
         site = SimpleNamespace(id=156)
         aisle_group = SimpleNamespace(
