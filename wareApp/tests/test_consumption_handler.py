@@ -60,7 +60,10 @@ class ConsumptionHandlerTests(SimpleTestCase):
             "wareApp.mqtt.consumption.cache.add", return_value=True
         ) as cache_add, patch(
             "wareApp.mqtt.consumption.AlarmNotifications.objects.create"
-        ) as create, patch("wareApp.mqtt.consumption.notify") as notify:
+        ) as create, patch("wareApp.mqtt.consumption.notify") as notify, patch(
+            "wareApp.mqtt.consumption.AlarmNotifications.objects.filter",
+            return_value=Mock(update=Mock(return_value=0)),
+        ):
             consumption._notify_meter_reading_issue(site, 156, "gateway-01", message)
 
         notify.assert_called_once()

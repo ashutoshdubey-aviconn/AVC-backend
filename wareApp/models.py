@@ -636,6 +636,10 @@ class AlarmNotifications(models.Model):
     off_time = models.DateTimeField(default=timezone.now)
     cloud_time = models.DateTimeField(auto_now=False, auto_now_add=True)
     is_active = models.BooleanField(default=True)
+    # A repeat of an issue that is already active today updates these
+    # instead of adding another row (see mqtt/consumption.py).
+    last_seen = models.DateTimeField(blank=True, null=True)
+    occurrences = models.PositiveIntegerField(default=1)
 
     class Meta:
         indexes = [
