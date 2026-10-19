@@ -175,27 +175,33 @@ Admin (`/avcadmin/`): **MQTT dead letters**, **Aisle sync recovery statuses**, *
 
 ## 6. Real-traffic test checklist
 
-On the test server the gateways receive nothing the server publishes, so **sync /
-recovery requests never get an answer: skip every recovery check** (marked "skip").
-Side effect to expect: once an aisle misses an hour, the agreed rule (request
-recovery, do not store the packet) drops its later consumption packets too, because
-the gap is never filled. Run the consumption checks on aisles with continuous data.
+Requests published **by the test server** do not reach the gateways, but gateways still
+answer the recovery requests sent by **main**, and those replies arrive on test. So:
+
+* test the **recovery replies** (writing rows, status, history) with that traffic;
+* do not expect test's own requests to be answered or verified from a reply to them.
+
+A reply that matches an open request on test is linked to it; any other reply is stored
+as its own `RecoveryMonitor` row ("unsolicited") and its rows are written the same way.
+Once a reply fills an aisle's gap, its consumption packets are stored again.
 
 | # | Check | Expected |
 | --- | --- | --- |
 | 1 | New hourly consumption packet (aisle without a gap) | `HourlySiteReading` row for that hour; daily total grows once |
 | 2 | Same packet sent twice | Second one logged `Skipped duplicate consumption packet` |
-| 3 | Gap → recovery request / reply / timeout | skip (requests do not reach the gateway) |
-| 4 | Gap packet handling | Packet not stored; one `recovery requested` log per gap per 10 min (not per packet) |
-| 5 | SupplyTime packet | `SupplyLoadTimeShare` row; recovery part skipped |
-| 6 | `load` packet over threshold | Alarm row + email from the `notifications` worker |
-| 7 | FIREALARM packet | `FirePumpAlarm` updated; email sent |
-| 8 | Corrupt payload | One **MQTT dead letter** row (not one per packet) |
-| 9 | `sudo systemctl restart postgresql` during traffic | Workers log retries, then continue; no dead letters for that window |
-| 10 | Restart `mqtt-listener-queue1` | Reconnects; with broker persistence on, packets sent meanwhile are delivered |
-| 11 | LoadData (queue 2) | Unchanged behaviour; `queue2_processing` keeps up |
-| 12 | Admin and API | `/avcadmin/` loads; dashboard APIs answer as before |
-| 13 | DG fuel | Graph APIs return data; Roadcast pull works once `ROADCAST_PULL_*` is set |
+| 3 | Gap packet | Packet not stored; one `recovery requested` log and one `RecoveryMonitor` `requested` row per gap per 10 min (not per packet); sync status `recovery_requested` |
+| 4 | `hourlyConsumption` reply (from main's request) | Hourly rows written / `ERROR404` slots set to 0; monitor `response_received` → `applied` → `verified` when the gap is covered; sync status `recovered`, or `missing` with the remaining slot count |
+| 5 | `dailyConsumption` reply | `DailySiteReading` rows written; history row only (the hourly reply decides the status) |
+| 6 | `loadRuntime` reply / SupplyTime packet | `SupplyLoadTimeShare` rows; runtime status rows carry `power_source` |
+| 7 | Test's own request never answered | After the timeout the sweep marks it `timeout`; after 3 attempts `failed` (expected on test) |
+| 8 | `load` packet over threshold | Alarm row + email from the `notifications` worker |
+| 9 | FIREALARM packet | `FirePumpAlarm` updated; email sent |
+| 10 | Corrupt payload | One **MQTT dead letter** row (not one per packet) |
+| 11 | `sudo systemctl restart postgresql` during traffic | Workers log retries, then continue; no dead letters for that window |
+| 12 | Restart `mqtt-listener-queue1` | Reconnects; with broker persistence on, packets sent meanwhile are delivered |
+| 13 | LoadData (queue 2) | Unchanged behaviour; `queue2_processing` keeps up |
+| 14 | Admin and API | `/avcadmin/` loads; dashboard APIs answer as before |
+| 15 | DG fuel | Graph APIs return data; Roadcast pull works once `ROADCAST_PULL_*` is set |
 
 Useful query:
 
