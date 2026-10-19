@@ -522,9 +522,29 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 | M5 recovery status completion | done | `94f79cd` |
 | M6 delivery guarantees, dead letters | done | `41601d0` |
 | M7 part 1: consumption de-duplication, duplicate report | done | `1dc4a69` |
-| M7 part 2: unique constraints + `acks_late` | waiting on `report_reading_duplicates` output from main and the merge rule | — |
+| M7 part 2: unique constraints + `acks_late` | on hold: report only for now (decision 2026-10-19); see 5.1 | — |
 | M8 ingestion daemon (paho 2.x, manual ack) | next | — |
-| Code shape (envelope, payload parser, handler classes) | next | — |
+| Code shape part 1: `MqttEnvelope`, `KeyValuePayload` (replaces 4 parser copies), handler registry | done | (this commit) |
+| Code shape part 2: `MessageHandler` classes, single `process_mqtt_message(envelope)` | next | — |
 
-Test suite (SQLite, `ENV=CI`): 233 tests; the only failures are 18 pre-existing
+Test suite (SQLite, `ENV=CI`): 243 tests; the only failures are 18 pre-existing
 DG-fuel tests that need PostgreSQL (`fuel_data_source` column).
+
+### 5.1 Duplicate report on the local `warehouse_server` copy (2026-10-19)
+
+`report_reading_duplicates` plus a read-only breakdown, run on the local PostgreSQL copy
+(hourly data up to 2026-07-07, so main will show more):
+
+| Table | Duplicated keys | Extra rows | Same value in every row | Values differ | Duplicate slots |
+| --- | --- | --- | --- | --- | --- |
+| `HourlySiteReading` | 43,203 | 43,219 of 9.9 M | 38,798 | 4,405 | 2023-08 .. 2026-05 (most in 2025-09..2026-03) |
+| `DailySiteReading` | 5 | 5 | 0 | 5 (one row is 0 each time) | site 36, 2026-05-28..30 |
+| `SupplyLoadTimeShare` | 9,349 | 18,611 of 0.5 M | 9,344 | 5 | mostly 2020-07..10; last 2025-09 |
+
+Hourly rows that differ are mostly rounding (median spread 0.004 kWh; the newer row is
+the 2-decimal recovery value). In 2,328 of 4,405 the newest row is also the largest; in
+115 the newest row is 0. One hourly key has a NULL site/leg/slot.
+
+Decision: no cleanup yet. Merge-rule options for later: keep newest row (matches how
+recovery overwrites today) or keep the largest value. Re-run the report on main first.
+

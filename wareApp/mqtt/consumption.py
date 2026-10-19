@@ -16,6 +16,7 @@ from wareApp.models import (
     SensorAisleUnitConsumption,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services import site_cache as site_config
 from wareApp.mqtt.services.cooldown import (
@@ -40,18 +41,7 @@ METER_READING_ISSUE_PATTERN = re.compile(
 
 
 def _parse_consumption_message(message):
-    fields = {}
-    for field in str(message).split(","):
-        key, separator, value = field.partition(":")
-        if not separator:
-            raise ValueError(f"Invalid consumption field: {field!r}")
-        fields[key.strip().lower().replace("_", "").replace("-", "")] = value.strip()
-
-    def value_for(*keys):
-        for key in keys:
-            if key in fields:
-                return fields[key]
-        raise ValueError(f"Missing consumption field: {keys[0]}")
+    value_for = KeyValuePayload.parse(message, "consumption").get
 
     message_time = value_for("time", "messagetime").split()
     if len(message_time) != 2:
