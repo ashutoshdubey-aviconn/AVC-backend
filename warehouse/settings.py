@@ -200,9 +200,17 @@ if REDIS_URL:
 else:
     # Per-process cache. Cooldowns and config caching still work with the
     # site-partitioned workers (a site always lands on the same worker), but a
-    # shared Redis cache is recommended on servers.
+    # shared Redis cache is recommended on servers. The default limit of 300
+    # keys is far too small: one duplicate-check key per consumption packet and
+    # one cooldown key per gap made it evict live cooldowns (repeated recovery
+    # requests on the test server).
     CACHES = {
-        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "OPTIONS": {
+                "MAX_ENTRIES": config("LOCMEM_CACHE_MAX_ENTRIES", default=200_000, cast=int)
+            },
+        }
     }
 
 # --- Celery ---------------------------------------------------------------------
