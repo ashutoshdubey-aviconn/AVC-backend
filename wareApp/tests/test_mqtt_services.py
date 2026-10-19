@@ -238,3 +238,21 @@ class IdempotencyTests(SimpleTestCase):
 
         self.assertIsNotNone(idempotency.claim("SupplyTime", 1, "gw", "same"))
         self.assertIsNotNone(idempotency.claim("SupplyTime", 1, "gw", "same"))
+
+
+class LocalCacheSizeTests(SimpleTestCase):
+    def test_cooldowns_survive_more_keys_than_the_django_default(self):
+        from django.conf import settings
+
+        if settings.CACHES["default"]["BACKEND"].endswith("LocMemCache"):
+            self.assertGreaterEqual(
+                settings.CACHES["default"]["OPTIONS"]["MAX_ENTRIES"], 100_000
+            )
+        cache.clear()
+        for index in range(1000):
+            cache.set(f"filler:{index}", 1, 600)
+        self.assertTrue(recovery_request_allowed(94, "aisle", 490))
+        for index in range(1000, 2000):
+            cache.set(f"filler:{index}", 1, 600)
+        self.assertFalse(recovery_request_allowed(94, "aisle", 490))
+        cache.clear()
