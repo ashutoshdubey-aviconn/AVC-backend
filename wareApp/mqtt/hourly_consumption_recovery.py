@@ -8,6 +8,7 @@ from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import hour_ranges
 from wareApp.mqtt.services.baseline import BaselineMemo
+from wareApp.mqtt.services.consumption_alarms import evaluate_days
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.slot_writes import upsert_slots
@@ -92,6 +93,12 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        alarms = evaluate_days(site, aisle_group, [start.date() for start, _ in slots])
+        if alarms:
+            logger.info(
+                "Queue1 hourly recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
+                location_id, aisle_group_id, aisle_group.aisleGroupName, "; ".join(alarms),
+            )
         error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
             "Queue1 hourly recovery bulk write: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s "

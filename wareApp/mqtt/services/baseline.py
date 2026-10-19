@@ -28,15 +28,21 @@ def is_emergency_supply(aisle_group_name):
     return bool(aisle_group_name and EL_TOKEN.search(aisle_group_name))
 
 
-def baseline_row(site_id, leg_id, day):
-    """``(daily_value, working_hours)`` for ``day``, or None when not configured."""
+def baseline_info(site_id, leg_id, day):
+    """``(daily_value, working_hours, baseline_from)`` for ``day``, or None."""
     rows = site_cache.baselines(site_id, leg_id)
     for baseline_from, baseline_to, value, working_hours in rows:
         if baseline_from and baseline_from <= day and (baseline_to is None or day <= baseline_to):
-            return value, working_hours
+            return value, working_hours, baseline_from
     if rows:
-        return rows[0][2], rows[0][3]
+        return rows[0][2], rows[0][3], rows[0][0]
     return None
+
+
+def baseline_row(site_id, leg_id, day):
+    """``(daily_value, working_hours)`` for ``day``, or None when not configured."""
+    info = baseline_info(site_id, leg_id, day)
+    return None if info is None else info[:2]
 
 
 def effective_hours(site, aisle_group, legacy_working_hours):

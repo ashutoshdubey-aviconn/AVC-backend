@@ -21,6 +21,7 @@ from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.notifications import notify
 from wareApp.mqtt.services.baseline import BaselineMemo
+from wareApp.mqtt.services.consumption_alarms import evaluate_daily_alarms
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
     release_recovery_request,
@@ -154,128 +155,9 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     )
 
 
-def _record_daily_consumption_alarm(
-    site, aisle_group, daily_reading, alarm_type, threshold, description
-):
-    if AlarmNotifications.objects.filter(
-        site_id=site,
-        aisle_group=aisle_group,
-        Alarm_type=alarm_type,
-        created_time__gte=datetime.combine(daily_reading.reading_for, datetime.min.time()),
-        created_time__lt=datetime.combine(
-            daily_reading.reading_for + timedelta(days=1), datetime.min.time()
-        ),
-        is_active=True,
-    ).exists():
-        return
-
-    meter_id = str(aisle_group.attached_leg_id or "")
-    object_id = int(meter_id) if meter_id.isdigit() else None
-    AlarmNotifications.objects.create(
-        created_by=None,
-        user_level=2,
-        site_id=site,
-        object_type=4,
-        object_id=object_id,
-        aisle_group=aisle_group,
-        Alarm_type=alarm_type,
-        Alarm_priority=1,
-        created_time=datetime.combine(daily_reading.reading_for, datetime.min.time()),
-        to_do=(
-            f"{description}: consumption={daily_reading.unit_consumption:.2f}, "
-            f"threshold={threshold:.2f}."
-        ),
-    )
-    notify(
-        send_alarm_email,
-        f"{description} Alarm",
-        site.id,
-        [
-            ["Aisle group", getattr(aisle_group, "aisleGroupName", ""), False],
-            ["Leg", meter_id, False],
-            ["Date", str(daily_reading.reading_for), False],
-            ["Consumption (kWh)", f"{daily_reading.unit_consumption:.2f}", True],
-            ["Threshold (kWh)", f"{threshold:.2f}", False],
-        ],
-    )
-
-
 def _consumption_alarms(site, aisle_group, daily_reading):
-    current_consumption = daily_reading.unit_consumption
-    daily_baseline = daily_reading.daily_baseline_value
-    high_threshold = getattr(site, "high_consumption_units", None)
-    bypass_threshold = getattr(site, "bypass_consumption_units", None)
-
-    if high_threshold is None:
-        baseline_percent = getattr(site, "high_consumption_baseline_percent", None)
-        if baseline_percent is not None and daily_baseline:
-            high_threshold = daily_baseline * baseline_percent / 100
-
-    if bypass_threshold is not None and current_consumption >= bypass_threshold:
-        _record_daily_consumption_alarm(
-            site,
-            aisle_group,
-            daily_reading,
-            alarm_type=11,
-            threshold=bypass_threshold,
-            description="Bypassed",
-        )
-        return
-
-    if high_threshold is not None and current_consumption >= high_threshold:
-        _record_daily_consumption_alarm(
-            site,
-            aisle_group,
-            daily_reading,
-            alarm_type=7,
-            threshold=high_threshold,
-            description="High consumption",
-        )
-        return
-
-    if site.min_threshold_value is None:
-        logger.warning(
-            "Skipping legacy low-consumption alarm for site %s without a threshold",
-            site.id,
-        )
-        return
-
-    current_date = datetime.combine(daily_reading.reading_for, datetime.min.time())
-    daily_readings = DailySiteReading.objects.filter(
-        associated_Site=site.id,
-        leg_id=aisle_group.attached_leg_id,
-        reading_for__gte=(current_date - timedelta(days=7)).date(),
-    )
-    average_consumption = (
-        daily_readings.aggregate(total=Sum("unit_consumption"))["total"] or 0
-    ) / 7
-    minimum = round(
-        average_consumption - (average_consumption * site.min_threshold_value) / 100,
-        2,
-    )
-    if current_consumption < minimum:
-        AlarmNotifications.objects.create(
-            created_by=None,
-            user_level=2,
-            site_id=site,
-            object_type=0,
-            aisle_group=aisle_group,
-            Alarm_type=8,
-            Alarm_priority=1,
-            created_time=current_date,
-        )
-        notify(
-            send_alarm_email,
-            "Low Consumption Alarm",
-            site.id,
-            [
-                ["Aisle group", getattr(aisle_group, "aisleGroupName", ""), False],
-                ["Leg", str(aisle_group.attached_leg_id), False],
-                ["Date", str(daily_reading.reading_for), False],
-                ["Consumption (kWh)", f"{current_consumption:.2f}", True],
-                ["Minimum (7-day average less threshold)", f"{minimum:.2f}", False],
-            ],
-        )
+    """Day-end alarms (see services/consumption_alarms.py)."""
+    return evaluate_daily_alarms(site, aisle_group, daily_reading)
 
 
 def _consumption_recovery_request(location_id, gateway_id, aisle_group_id, last_hourly_entry):
