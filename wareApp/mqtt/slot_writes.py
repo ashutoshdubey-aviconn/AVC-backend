@@ -8,8 +8,17 @@ inside the caller's transaction (a single commit).
 """
 
 from collections import defaultdict
+from typing import NamedTuple
 
 BULK_BATCH_SIZE = 500
+
+
+class SlotWriteResult(NamedTuple):
+    """Slot keys per outcome (used for counts and for the log line)."""
+
+    updated: list
+    created: list
+    skipped: list
 
 
 def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_update=None):
@@ -23,7 +32,8 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
     ``should_update`` optional ``should_update(existing_rows, values)`` guard;
                       when it returns False the slot is left untouched.
 
-    Returns ``(updated, created, skipped)`` slot counts.
+    Returns a ``SlotWriteResult`` with the slot keys that were updated,
+    created and skipped.
     """
     model = queryset.model
     existing = defaultdict(list)
@@ -31,24 +41,24 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
         existing[key_of(row)].append(row)
 
     to_update, to_create = [], []
-    updated = created = skipped = 0
+    updated, created, skipped = [], [], []
     for key, values in slots.items():
         rows = existing.get(key)
         if not rows:
             to_create.append(build_row(key, values))
-            created += 1
+            created.append(key)
             continue
         if should_update is not None and not should_update(rows, values):
-            skipped += 1
+            skipped.append(key)
             continue
         for row in rows:
             for field, value in values.items():
                 setattr(row, field, value)
             to_update.append(row)
-        updated += 1
+        updated.append(key)
 
     if to_update:
         model.objects.bulk_update(to_update, update_fields, batch_size=BULK_BATCH_SIZE)
     if to_create:
         model.objects.bulk_create(to_create, batch_size=BULK_BATCH_SIZE)
-    return updated, created, skipped
+    return SlotWriteResult(updated, created, skipped)

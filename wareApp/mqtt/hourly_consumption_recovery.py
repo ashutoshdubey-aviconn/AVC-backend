@@ -6,6 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import hour_ranges
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.slot_writes import upsert_slots
@@ -67,7 +68,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             monitor = status.record_response(
                 scope, HOURLY_CONSUMPTION, status_slots, message
             )
-            updated, created, _ = upsert_slots(
+            written = upsert_slots(
                 HourlySiteReading.objects.filter(
                     associated_Site=site,
                     leg_id=aisle_group_id,
@@ -87,16 +88,27 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
-            "Queue1 hourly recovery applied: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s slots=%s updated=%s created=%s monitor_status=%s",
+            "Queue1 hourly recovery bulk write: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s "
+            "received=%s h [%s] created=%s [%s] updated=%s [%s] error404=%s [%s] monitor_status=%s",
             location_id,
             home_gateway_id,
             aisle_group_id,
             aisle_group.aisleGroupName,
             len(slots),
-            updated,
-            created,
+            hour_ranges([start for start, _ in slots]),
+            len(written.created),
+            hour_ranges([start for start, _ in written.created]),
+            len(written.updated),
+            hour_ranges([start for start, _ in written.updated]),
+            len(error_hours),
+            hour_ranges(error_hours),
             monitor.status,
+        )
+        return (
+            f"hourly recovery: {len(slots)} h received, created={len(written.created)} "
+            f"updated={len(written.updated)} error404={len(error_hours)} status={monitor.status}"
         )
     except TRANSIENT_DB_ERRORS:
         raise
@@ -107,3 +119,4 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             home_gateway_id,
         )
         record_dead_letter("recovery/hourlyConsumption", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

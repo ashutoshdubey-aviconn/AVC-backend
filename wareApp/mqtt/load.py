@@ -254,7 +254,10 @@ def handle_load_message(site, location_id, gateway_id, message):
                 values["status"],
                 update_values["Updated_on"],
             )
-            return
+            return (
+                f"stored: load source {values['power_source']} meter {values['meter_number']} "
+                f"updated load={values['load_power']} status={values['status']}"
+            )
         SiteLoadPower.objects.create(
             **update_values,
             min_load=values["load_power"],
@@ -272,6 +275,10 @@ def handle_load_message(site, location_id, gateway_id, message):
             values["status"],
             update_values["Updated_on"],
         )
+        return (
+            f"stored: load source {values['power_source']} meter {values['meter_number']} "
+            f"created load={values['load_power']} status={values['status']}"
+        )
     except TRANSIENT_DB_ERRORS:
         raise
     except Exception as error:
@@ -281,3 +288,4 @@ def handle_load_message(site, location_id, gateway_id, message):
             home_gateway_id,
         )
         record_dead_letter("load", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

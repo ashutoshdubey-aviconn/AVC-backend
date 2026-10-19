@@ -221,7 +221,7 @@ def _process_once(family):
                     site_id,
                     gateway_id,
                 )
-                return None
+                return f"skipped: duplicate {family} packet (already processed)"
             try:
                 return task_handler(site_id, gateway_id, message)
             except BaseException:
@@ -238,9 +238,9 @@ def _process_once(family):
 def process_load_data_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "LoadData")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_load_data_message(
+    return handle_load_data_message(
         None,
         site,
         site_id,
@@ -255,9 +255,9 @@ def process_load_data_message(site_id, gateway_id, message):
 def process_supply_time_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "SupplyTime")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_supply_time_message(
+    return handle_supply_time_message(
         None,
         site,
         site_id,
@@ -272,9 +272,9 @@ def process_supply_time_message(site_id, gateway_id, message):
 def process_load_runtime_recovery_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "loadRuntime recovery")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
+    return handle_load_runtime_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
@@ -282,9 +282,9 @@ def process_load_runtime_recovery_message(site_id, gateway_id, message):
 def process_daily_consumption_recovery_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "dailyConsumption recovery")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)
+    return handle_daily_consumption_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
@@ -292,9 +292,9 @@ def process_daily_consumption_recovery_message(site_id, gateway_id, message):
 def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "hourlyConsumption recovery")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_hourly_consumption_recovery_message(site, site_id, gateway_id, message)
+    return handle_hourly_consumption_recovery_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
@@ -302,9 +302,9 @@ def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
 def process_fire_alarm_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "FIREALARM")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_fire_alarm_message(site, site_id, gateway_id, message)
+    return handle_fire_alarm_message(site, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
@@ -313,9 +313,9 @@ def process_fire_alarm_message(site_id, gateway_id, message):
 def process_consumption_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "consumption")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_consumption_message(
+    return handle_consumption_message(
         site,
         site_id,
         gateway_id,
@@ -329,6 +329,6 @@ def process_consumption_message(site_id, gateway_id, message):
 def process_load_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "load message")
     if site is None:
-        return
+        return f"skipped: unknown site {site_id}"
 
-    handle_load_message(site, site_id, gateway_id, message)
+    return handle_load_message(site, site_id, gateway_id, message)

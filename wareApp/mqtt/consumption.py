@@ -16,6 +16,7 @@ from wareApp.models import (
     SensorAisleUnitConsumption,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services import site_cache as site_config
@@ -349,7 +350,7 @@ def handle_consumption_message(
                 message,
             )
             _notify_meter_reading_issue(site, location_id, home_gateway_id, message)
-            return
+            return "skipped: gateway diagnostic (meter reading issue stored)"
 
         values = _cap_warehouse_saving_values(
             site, _parse_consumption_message(message)
@@ -458,12 +459,18 @@ def handle_consumption_message(
                     # This gap was already requested inside the cooldown window:
                     # keep dropping the packet (agreed behaviour) without another
                     # query, publish or sync-status write.
-                    logger.debug(
-                        "Queue1 consumption recovery already requested: site=%s aisle_group=%s",
+                    logger.info(
+                        "Queue1 consumption skipped, gap recovery already requested (cooldown): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s observed_at=%s",
                         location_id,
+                        home_gateway_id,
                         aisle_group_id,
+                        aisle_group.aisleGroupName,
+                        observed_at,
                     )
-                    return
+                    return (
+                        f"skipped: leg {aisle_group_id} has a gap, recovery already "
+                        "requested (cooldown)"
+                    )
                 # One indexed query (backward scan, LIMIT 1) replaces the former
                 # exists() + order_by("-reading_to") pair.
                 last_hourly_entry = hourly_entries.order_by(
@@ -485,18 +492,43 @@ def handle_consumption_message(
                             topic,
                             request_message,
                         )
+                        gap = missing_hours(
+                            decision.monitor.missing_from, decision.monitor.missing_to
+                        )
                         if decision.publish:
                             publish_recovery(topic, request_message)
                             logger.warning(
-                                "Queue1 consumption recovery requested: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s observed_at=%s attempt=%s",
+                                "Queue1 consumption recovery requested: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s missing=%s last_stored_hour=%s observed_at=%s attempt=%s",
                                 location_id,
                                 home_gateway_id,
                                 aisle_group_id,
                                 aisle_group.aisleGroupName,
+                                gap,
+                                last_hourly_entry.reading_from,
                                 observed_at,
                                 decision.monitor.attempt,
                             )
-                    return
+                            return (
+                                f"skipped: leg {aisle_group_id} gap {gap}, recovery "
+                                f"requested (attempt {decision.monitor.attempt})"
+                            )
+                        logger.warning(
+                            "Queue1 consumption skipped, recovery failed for gap: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s missing=%s attempts=%s",
+                            location_id,
+                            home_gateway_id,
+                            aisle_group_id,
+                            aisle_group.aisleGroupName,
+                            gap,
+                            decision.monitor.attempt,
+                        )
+                        return (
+                            f"skipped: leg {aisle_group_id} gap {gap}, recovery failed "
+                            f"after {decision.monitor.attempt} attempts"
+                        )
+                    return (
+                        f"skipped: leg {aisle_group_id} gap, no recovery request "
+                        "(previous reading incomplete)"
+                    )
 
                 # First ever reading for this aisle: no gap, so give back the
                 # cooldown slot claimed above.
@@ -533,7 +565,10 @@ def handle_consumption_message(
                     observed_at,
                 )
                 mark_sync_healthy(site, home_gateway_id, aisle_group, observed_at)
-                return
+                return (
+                    f"stored: leg {aisle_group_id} first hourly+daily reading "
+                    f"{observed_at:%Y-%m-%d %H:00}"
+                )
 
         else:
             logger.info(
@@ -588,6 +623,10 @@ def handle_consumption_message(
             observed_at.date(),
         )
         mark_sync_healthy(site, home_gateway_id, aisle_group, observed_at)
+        return (
+            f"stored: leg {aisle_group_id} hour {observed_at:%Y-%m-%d %H:00} "
+            f"total={values['current_hour_consumption']}"
+        )
     except TRANSIENT_DB_ERRORS:
         raise
     except Exception as error:
@@ -597,3 +636,4 @@ def handle_consumption_message(
             home_gateway_id,
         )
         record_dead_letter("consumption", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

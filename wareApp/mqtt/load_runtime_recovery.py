@@ -6,6 +6,7 @@ from django.db import transaction
 
 from wareApp.models import SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import hour_ranges
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
@@ -52,7 +53,7 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
         status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
             monitor = status.record_response(scope, LOAD_RUNTIME, status_slots, message)
-            updated, created, _ = upsert_slots(
+            written = upsert_slots(
                 SupplyLoadTimeShare.objects.filter(
                     site=site, power_source=source, reading_from__in=list(slots)
                 ),
@@ -68,14 +69,27 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
-            "Queue1 runtime recovery applied: site=%s home_gateway_id=%s source=%s slots=%s updated=%s created=%s",
+            "Queue1 runtime recovery bulk write: site=%s home_gateway_id=%s source=%s "
+            "received=%s h [%s] created=%s [%s] updated=%s [%s] error404=%s [%s] monitor_status=%s",
             location_id,
             home_gateway_id,
             source,
             len(slots),
-            updated,
-            created,
+            hour_ranges(list(slots)),
+            len(written.created),
+            hour_ranges(written.created),
+            len(written.updated),
+            hour_ranges(written.updated),
+            len(error_hours),
+            hour_ranges(error_hours),
+            monitor.status,
+        )
+        return (
+            f"runtime recovery source={source}: {len(slots)} h received, "
+            f"created={len(written.created)} updated={len(written.updated)} "
+            f"error404={len(error_hours)} status={monitor.status}"
         )
     except TRANSIENT_DB_ERRORS:
         raise
@@ -86,3 +100,4 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
             home_gateway_id,
         )
         record_dead_letter("recovery/loadRuntime", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"
