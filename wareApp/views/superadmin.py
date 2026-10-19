@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from wareApp.alarm_feed import active_alarms
-from wareApp.models import AlarmNotifications, DailySiteReading, Site, User
+from wareApp.models import DailySiteReading, Site, User
 from wareApp.utility import logger
 
 
@@ -152,9 +152,8 @@ class SuperAdminSnapShot(APIView):
         logger.debug("%s %s", "all_live_sites :", all_live_sites)
         all_live_sites_id = [i.id for i in all_live_sites]
         logger.debug("%s %s", "all live sites : ", all_live_sites_id)
-        all_alarms = AlarmNotifications.objects.filter(
-            site_id__in=all_live_sites_id, is_active=True
-        ).count()
+        # Same issues as the alarm list (alarmTypeApi): one per issue, both alarm tables.
+        all_alarms = len(active_alarms(all_live_sites_id))
         logger.debug("%s", all_alarms)
         counter = 0
         total_percentage_saved = 0
