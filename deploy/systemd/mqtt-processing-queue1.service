@@ -9,6 +9,8 @@ User=ubuntu
 Group=sudo
 WorkingDirectory=/home/ubuntu/django_project
 Environment=DJANGO_SETTINGS_MODULE=warehouse.settings
+# Commits do not wait for the WAL flush (see warehouse/settings.py).
+Environment=DB_SYNCHRONOUS_COMMIT=off
 EnvironmentFile=-/home/ubuntu/django_project/warehouse/.env
 ExecStart=/home/ubuntu/django_project/virtualwarehouse/bin/celery -A warehouse worker --hostname=processing.queue1@%%h --queues=queue1_processing --concurrency=1 --prefetch-multiplier=1 --loglevel=INFO
 StandardOutput=append:/home/ubuntu/django_project/celerylogs1/celery_logs_of_server.log

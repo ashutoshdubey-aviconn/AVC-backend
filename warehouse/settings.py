@@ -125,6 +125,16 @@ if env in {"Local", "PROD"}:
             "CONN_HEALTH_CHECKS": True,
         },
     }
+    # Set only in the MQTT processing units (deploy/systemd/), not in .env:
+    # DB_SYNCHRONOUS_COMMIT=off lets their commits return before the WAL is
+    # flushed to disk. A PostgreSQL crash can lose the last fraction of a
+    # second of commits (no corruption); missed hours are re-requested by the
+    # recovery mechanism. The web app keeps the default (on).
+    DB_SYNCHRONOUS_COMMIT = config("DB_SYNCHRONOUS_COMMIT", default="")
+    if DB_SYNCHRONOUS_COMMIT:
+        DATABASES["default"]["OPTIONS"] = {
+            "options": f"-c synchronous_commit={DB_SYNCHRONOUS_COMMIT}"
+        }
     # Main-server database, read by roadcast_monthly_refuel_report.py on the
     # test server. Only configured when its password is in the environment.
     MAIN_DB_PASSWORD = config("MAIN_DB_PASSWORD", default="")
