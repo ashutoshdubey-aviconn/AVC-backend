@@ -527,6 +527,7 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 | Code shape part 1: `MqttEnvelope`, `KeyValuePayload` (replaces 4 parser copies), handler registry | done | (this commit) |
 | Code shape part 2: `MessageHandler` classes, single `process_mqtt_message` task (per-type tasks kept as wrappers) | done, running on test | `8ba3ffc` |
 | Test-server deploy (bridge migrations, new units, cache and listener fixes, readable logs) | done 2026-10-19 | `7ea6bd5`..`c84fe3c` |
+| Phase C: hourly baseline (EL 24 h, NL hours or legacy working_hours, dated baseline row) for live + recovery; `rebuild_hourly_baseline` backfill (34,538 rows on test, 2026-09-20..10-20; old values in table `fov2_hourly_baseline_backup_20261020`) | done 2026-10-20 | `bb7335f` |
 | Test-server readiness: all tests green (SQLite + PostgreSQL), `0095`, rollout runbook | done | (this commit) |
 
 `python run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
