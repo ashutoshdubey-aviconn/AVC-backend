@@ -28,6 +28,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from wareApp.models import HourlySiteReading, RecoveryMonitor, SupplyLoadTimeShare
+from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.sync_status import upsert_status
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,16 @@ class RecoveryScope:
     @classmethod
     def source(cls, power_source):
         return cls(power_source=int(power_source))
+
+    @property
+    def label(self):
+        """``leg_id=735 aisle_group_name=HB_RA`` or ``source=1`` for log lines."""
+        if self.aisle_group is None:
+            return f"source={self.power_source}"
+        return (
+            f"leg_id={self.leg_id} "
+            f"aisle_group_name={getattr(self.aisle_group, 'aisleGroupName', '')}"
+        )
 
     @property
     def leg_id(self):
@@ -146,10 +157,12 @@ class RecoveryStatusService:
                     recovery_monitor=monitor,
                 )
                 logger.warning(
-                    "Recovery failed: site=%s gateway=%s scope=%s attempts=%s",
+                    "Recovery failed, no more requests for %s: site=%s home_gateway_id=%s %s missing=%s attempts=%s",
+                    self.failed_retry_after(),
                     self.site.pk,
                     self.home_gateway_id,
-                    scope.leg_id or f"source {scope.power_source}",
+                    scope.label,
+                    missing_hours(monitor.missing_from, monitor.missing_to),
                     monitor.attempt,
                 )
                 return RecoveryDecision(publish=False, monitor=monitor)
