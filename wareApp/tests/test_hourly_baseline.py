@@ -83,9 +83,16 @@ class RecoveredHoursGetABaselineTests(TestCase):
             "2026-10-01 10:00:00.000000,; Unit_consumptions : 0.5,ERROR404,;"
             " GW_total_cumulative : 100"
         )
-        hourly_consumption_recovery.handle_hourly_consumption_recovery_message(
-            self.site, self.site.id, "gw-1", message
-        )
+        with self.assertLogs("wareApp.mqtt.hourly_consumption_recovery", level="INFO") as logs:
+            hourly_consumption_recovery.handle_hourly_consumption_recovery_message(
+                self.site, self.site.id, "gw-1", message
+            )
+        bulk = [line for line in logs.output if "BULK CREATE HourlySiteReading" in line]
+        self.assertEqual(len(bulk), 1)
+        for part in (f"site={self.site.id}", "home_gateway_id=gw-1", "aisle_group_name=RPC-EL",
+                     f"leg_id={leg}", "rows=2", "period=[2026-10-01 09:00→10:00 (2 h)]", "duration="):
+            self.assertIn(part, bulk[0])
+        self.assertFalse(any("BULK UPDATE" in line for line in logs.output))  # nothing existed yet
 
         rows = {
             row.reading_from.hour: row

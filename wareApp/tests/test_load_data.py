@@ -83,7 +83,9 @@ class LoadDataTests(SimpleTestCase):
             )
 
         save_raw.assert_called_once()
-        roll_up.assert_called_once_with(site, datetime(2026, 9, 30, 12, 34, 56))
+        roll_up.assert_called_once_with(
+            site, datetime(2026, 9, 30, 12, 34, 56), home_gateway_id="gw-1"
+        )
 
     def test_scheduler_skips_repeat_packets_in_the_same_minute(self):
         site = SimpleNamespace(id=1)
@@ -151,7 +153,7 @@ class LoadDataTests(SimpleTestCase):
         second_started = Event()
         release_first = Event()
 
-        def roll_up(site, _observed_at, roll_up_daily=True):
+        def roll_up(site, _observed_at, roll_up_daily=True, **_kwargs):
             if site.id == first_site.id:
                 first_started.set()
                 release_first.wait(timeout=1)
@@ -187,7 +189,7 @@ class LoadDataTests(SimpleTestCase):
         second_started = Event()
         release_first = Event()
 
-        def roll_up(_site, observed_at, roll_up_daily=True):
+        def roll_up(_site, observed_at, roll_up_daily=True, **_kwargs):
             if observed_at.minute == 34:
                 first_started.set()
                 release_first.wait(timeout=1)
@@ -454,7 +456,7 @@ class LoadDataTests(SimpleTestCase):
             ),
             patch(
                 "wareApp.load_data.rollups._save_batched_extrema",
-                side_effect=lambda model, _site, bucket_extrema: saved.append(
+                side_effect=lambda model, _site, bucket_extrema, **_kwargs: saved.append(
                     (
                         model.__name__,
                         [
@@ -541,6 +543,7 @@ class LoadDataTests(SimpleTestCase):
                     _site,
                     bucket_extrema,
                     saved_records=saved,
+                    **_kwargs,
                 ):
                     saved_records.append(
                         (

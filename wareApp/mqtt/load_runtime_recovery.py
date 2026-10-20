@@ -6,7 +6,7 @@ from django.db import transaction
 
 from wareApp.models import SupplyLoadTimeShare
 from wareApp.mqtt.log_context import home_gateway_id_for
-from wareApp.mqtt.log_format import hour_ranges
+from wareApp.mqtt.log_format import hour_ranges, log_bulk_write
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.payloads import split_paired_lists
 from wareApp.mqtt.services.recovery_status import (
@@ -69,6 +69,16 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        log_bulk_write(
+            logger,
+            written,
+            table="SupplyLoadTimeShare",
+            site_id=location_id,
+            home_gateway_id=home_gateway_id,
+            aisle_group_name=f"power source {source}",
+            leg_id=None,
+            describe=hour_ranges,
+        )
         error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
             "Queue1 runtime recovery bulk write: site=%s home_gateway_id=%s source=%s "
@@ -99,5 +109,7 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
             location_id,
             home_gateway_id,
         )
-        record_dead_letter("recovery/loadRuntime", location_id, gateway_id, message, error)
+        record_dead_letter(
+            "recovery/loadRuntime", location_id, gateway_id, message, error
+        )
         return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

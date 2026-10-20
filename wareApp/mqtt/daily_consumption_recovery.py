@@ -6,7 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, DailySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
-from wareApp.mqtt.log_format import day_ranges
+from wareApp.mqtt.log_format import day_ranges, log_bulk_write
 from wareApp.mqtt.services.baseline import baseline_row
 from wareApp.mqtt.services.consumption_alarms import evaluate_days
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
@@ -32,7 +32,9 @@ def _parse_daily_recovery_message(message):
         raise ValueError("Invalid dailyConsumption recovery payload")
 
     aisle_group_id, recovery_dates, unit_consumptions, _ = match.groups()
-    slots, values = split_paired_lists(recovery_dates, unit_consumptions, "dailyConsumption")
+    slots, values = split_paired_lists(
+        recovery_dates, unit_consumptions, "dailyConsumption"
+    )
     return aisle_group_id, slots, values
 
 
@@ -85,7 +87,11 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
         status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
             monitor = status.record_response(
-                scope, DAILY_CONSUMPTION, status_slots, message, slot_length=timedelta(days=1)
+                scope,
+                DAILY_CONSUMPTION,
+                status_slots,
+                message,
+                slot_length=timedelta(days=1),
             )
             written = upsert_slots(
                 DailySiteReading.objects.filter(
@@ -95,7 +101,11 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 ).order_by("pk"),
                 key_of=lambda row: row.reading_for,
                 slots=slots,
-                update_fields=["unit_consumption", "daily_baseline_value", "energy_saved"],
+                update_fields=[
+                    "unit_consumption",
+                    "daily_baseline_value",
+                    "energy_saved",
+                ],
                 build_row=lambda reading_for, values: DailySiteReading(
                     associated_Site=site,
                     aisle_group=aisle_group,
@@ -110,11 +120,26 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
-        alarms = evaluate_days(site, aisle_group, list(written.created) + list(written.updated))
+        log_bulk_write(
+            logger,
+            written,
+            table="DailySiteReading",
+            site_id=location_id,
+            home_gateway_id=home_gateway_id,
+            aisle_group_name=aisle_group.aisleGroupName,
+            leg_id=aisle_group_id,
+            describe=day_ranges,
+        )
+        alarms = evaluate_days(
+            site, aisle_group, list(written.created) + list(written.updated)
+        )
         if alarms:
             logger.info(
                 "Queue1 daily recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
-                location_id, aisle_group_id, aisle_group.aisleGroupName, "; ".join(alarms),
+                location_id,
+                aisle_group_id,
+                aisle_group.aisleGroupName,
+                "; ".join(alarms),
             )
         if baseline_missing:
             logger.warning(
@@ -158,5 +183,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
             location_id,
             home_gateway_id,
         )
-        record_dead_letter("recovery/dailyConsumption", location_id, gateway_id, message, error)
+        record_dead_letter(
+            "recovery/dailyConsumption", location_id, gateway_id, message, error
+        )
         return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

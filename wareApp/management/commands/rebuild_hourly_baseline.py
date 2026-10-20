@@ -7,6 +7,7 @@ Dry run by default: prints what would change per site and leg.
     python manage.py rebuild_hourly_baseline --from 2026-09-01 --to 2026-10-20 [--site 125] [--all] [--apply]
 """
 
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -94,10 +95,15 @@ class Command(BaseCommand):
             )
             self.stdout.write(f"site {site_obj.id} {site_obj.site_name}: {len(changed)} rows -> {legs}")
             if apply:
+                started = time.perf_counter()
                 with transaction.atomic():
                     HourlySiteReading.objects.bulk_update(
                         changed, ["hourly_baseline_value", "energy_saved"], batch_size=BATCH
                     )
+                self.stdout.write(
+                    f"BULK UPDATE HourlySiteReading: site={site_obj.id} rows={len(changed)} "
+                    f"duration={(time.perf_counter() - started) * 1000:.1f} ms"
+                )
 
         action = "updated" if apply else "would update (dry run, use --apply)"
         self.stdout.write(f"checked {total_rows} rows; {action} {total_changed}")

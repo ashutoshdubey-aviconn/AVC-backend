@@ -366,7 +366,7 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         save_raw.assert_called_once_with(site, aisle_group, reading)
         update_monthly.assert_called_once_with(site, aisle_group, reading)
-        roll_up.assert_called_once_with(site, reading.created)
+        roll_up.assert_called_once_with(site, reading.created, home_gateway_id="gateway-01")
 
     def test_queue_one_ignores_malformed_topics(self):
         client = FakeMqttClient()
