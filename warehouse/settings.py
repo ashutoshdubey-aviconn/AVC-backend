@@ -295,6 +295,25 @@ MQTT_TRANSIENT_MESSAGES = config("MQTT_TRANSIENT_MESSAGES", default=True, cast=b
 # of inline in the MQTT processing worker.
 MQTT_ASYNC_NOTIFICATIONS = config("MQTT_ASYNC_NOTIFICATIONS", default=True, cast=bool)
 
+# Consumption packets are collected and written in bulk every N seconds
+# (wareApp/mqtt/consumption_batch.py). 0 = one task per packet as before.
+MQTT_CONSUMPTION_BATCH_SECONDS = config(
+    "MQTT_CONSUMPTION_BATCH_SECONDS", default=60, cast=int
+)
+
+CELERY_BEAT_SCHEDULE = {}
+if MQTT_CONSUMPTION_BATCH_SECONDS > 0:
+    CELERY_BEAT_SCHEDULE["flush-consumption-batch"] = {
+        "task": "wareApp.tasks.flush_consumption_batch",
+        "schedule": MQTT_CONSUMPTION_BATCH_SECONDS,
+        # Runs in the serial queue-1 worker, so it never overlaps live packets.
+        # A flush not started in time is dropped; the next one takes its packets.
+        "options": {
+            "queue": "queue1_processing",
+            "expires": max(MQTT_CONSUMPTION_BATCH_SECONDS - 5, 5),
+        },
+    }
+
 CELERY_TASK_QUEUES = (
     Queue("celery"),
     Queue("queue1"),

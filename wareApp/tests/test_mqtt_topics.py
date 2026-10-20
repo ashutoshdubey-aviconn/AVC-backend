@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.db import OperationalError as DatabaseOperationalError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from kombu.exceptions import OperationalError
 from paho.mqtt.client import MQTT_ERR_CONN_LOST, MQTT_ERR_SUCCESS
 
@@ -382,6 +382,8 @@ class GatewayTopicParserTests(SimpleTestCase):
 
         self.assertIn("Ignoring malformed queue1 topic", logs.output[0])
 
+    # Per-packet routing (batching off).
+    @override_settings(MQTT_CONSUMPTION_BATCH_SECONDS=0)
     def test_queue_one_defers_missing_site_validation_to_processing(self):
         client = FakeMqttClient()
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
@@ -486,6 +488,8 @@ class GatewayTopicParserTests(SimpleTestCase):
         ):
             client.on_message(client, None, message)
 
+    # Per-packet routing (batching off).
+    @override_settings(MQTT_CONSUMPTION_BATCH_SECONDS=0)
     def test_queue_one_queues_consumption_for_processing(self):
         client = FakeMqttClient()
         with patch("wareApp.mqtt.consumers.mqtt.Client", return_value=client):
