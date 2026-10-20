@@ -362,13 +362,13 @@ LOGGING = {
             "formatter": "verbose",
         },
         "file": {
-            # Rotated (was an ever-growing FileHandler: 206 MB on test).
+            # Several processes (gunicorn, Celery) write this file, so it is
+            # rotated by logrotate (deploy/logrotate/django-debuglog,
+            # copytruncate), not by a RotatingFileHandler in each process.
             "level": config("DEBUG_LOG_LEVEL", default="INFO"),
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.FileHandler",
             "filename": f"{LOG_FILE}/debug.log",
             "formatter": "verbose",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 5,
         },
         "recovery_file": {
             "level": "INFO",
