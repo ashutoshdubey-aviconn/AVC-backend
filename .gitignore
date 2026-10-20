@@ -28,6 +28,7 @@ media/
 # Environment
 .env
 .env.*
+!.env.example
 
 # VS Code
 .vscode/
