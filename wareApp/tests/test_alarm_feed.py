@@ -163,3 +163,38 @@ class SnapshotAlarmCountTests(AlarmFeedTests):
         response = client.post("/api/snapshot/", {"user_id": admin.id}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["alarms"], 2)  # 4 meter rows + 3 PF rows = 2 issues
+
+
+class SnapshotEnergyTotalsTests(TestCase):
+    def setUp(self):
+        from datetime import date
+
+        today = date.today()
+        self.day = today.replace(day=1)
+        for name, consumed, baseline in (("Cust-A", 40.0, 100.0), ("Cust-B", 60.0, 100.0)):
+            customer = User.objects.create(username=name, UserType=4)
+            site = Site.objects.create(site_name=f"{name} site", customer=customer, is_live=True)
+            from wareApp.models import DailySiteReading
+
+            DailySiteReading.objects.create(
+                associated_Site=site, leg_id="1", unit_consumption=consumed,
+                daily_baseline_value=baseline, energy_saved=baseline - consumed,
+                reading_for=self.day, is_visible=True,
+            )
+        self.admin = User.objects.create(username="AVCadmin4", UserType=1)
+        self.client_api = APIClient()
+        self.client_api.force_authenticate(self.admin)
+
+    def test_totals_are_counted_once(self):
+        data = self.client_api.post("/api/snapshot/", {"user_id": self.admin.id}, format="json").data
+        self.assertEqual(data["total_unit_consumed"], 100.0)  # 40 + 60, not x2 customers
+        self.assertEqual(data["total_energy_saved"], 100.0)  # 60 + 40
+        self.assertEqual(data["total_saved_percentage"], "50.0")  # 100 / 200
+
+    def test_date_range_variant_works(self):
+        day = self.day.strftime("%Y/%m/%d")
+        response = self.client_api.post(
+            "/api/snapshot/", {"user_id": self.admin.id, "start_date": day, "end_date": day}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_unit_consumed"], 100.0)

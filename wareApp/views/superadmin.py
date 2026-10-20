@@ -155,63 +155,30 @@ class SuperAdminSnapShot(APIView):
         # Same issues as the alarm list (alarmTypeApi): one per issue, both alarm tables.
         all_alarms = len(active_alarms(all_live_sites_id))
         logger.debug("%s", all_alarms)
-        counter = 0
-        total_percentage_saved = 0
-        total_consumed_energy = 0
-        total_saved_energy = 0
-        for users in all_users:
-            logger.debug("%s %s", "users : ", users)
-            customer_data = {}
-            total_sites = Site.objects.filter(customer=users).count()
-            total_live_sites = all_live_sites.count()
-            logger.debug("%s %s", "live_sites", total_live_sites)
-            all_live_sites_id = [i.id for i in all_live_sites]
-            if start_date is not None and end_date is not None:
-                start_date = datetime.strptime(start_date, "%Y/%m/%d")
-                logger.debug("%s %s", "start_date", start_date)
-                end_date = datetime.strptime(end_date, "%Y/%m/%d")
-                logger.debug("%s %s", "end_date", end_date)
-                d = (
-                    DailySiteReading.objects.values("reading_for")
-                    .filter(
-                        associated_Site__in=all_live_sites_id,
-                        reading_for__gte=start_date,
-                        reading_for__lte=end_date,
-                    )
-                    .annotate(
-                        leg_count=Count("leg_id"),
-                        sum=Sum("energy_saved"),
-                        baseline=Sum("daily_baseline_value"),
-                    )
-                )
-                logger.debug("%s %s", "d", d)
-            else:
-                current_date = datetime.now()
-                d = DailySiteReading.objects.filter(
-                    associated_Site__in=all_live_sites_id,
-                    reading_for__year=current_date.year,
-                    reading_for__month=current_date.month,
-                ).aggregate(
-                    total_energy_saved=Sum("energy_saved"),
-                    total_baseline=Sum("daily_baseline_value"),
-                    total_unit_consumed=Sum("unit_consumption"),
-                )
-                logger.debug("%s %s", "output : ", d)
-            if (
-                d.get("total_energy_saved") is not None
-                and d.get("total_energy_saved") > 0
-                and d.get("total_baseline") is not None
-                and d.get("total_baseline") > 0
-            ):
-                counter += 1
-                total_percentage_saved += (
-                    d.get("total_energy_saved") / d.get("total_baseline")
-                ) * 100
-                logger.debug("%s %s", "total_percentage_saved", total_percentage_saved)
-                total_consumed_energy += d.get("total_unit_consumed")
-                logger.debug("%s %s", "total_consumed_energy", total_consumed_energy)
-                total_saved_energy += d.get("total_energy_saved")
-                logger.debug("%s %s", "total_saved_energy", total_saved_energy)
+        # One total over all live sites. (The former per-customer loop added the
+        # same all-sites total once per customer, multiplying every figure.)
+        readings = DailySiteReading.objects.filter(associated_Site__in=all_live_sites_id)
+        if start_date is not None and end_date is not None:
+            readings = readings.filter(
+                reading_for__gte=datetime.strptime(start_date, "%Y/%m/%d"),
+                reading_for__lte=datetime.strptime(end_date, "%Y/%m/%d"),
+            )
+        else:
+            readings = readings.filter(
+                reading_for__year=current_date.year,
+                reading_for__month=current_date.month,
+            )
+        d = readings.aggregate(
+            total_energy_saved=Sum("energy_saved"),
+            total_baseline=Sum("daily_baseline_value"),
+            total_unit_consumed=Sum("unit_consumption"),
+        )
+        logger.debug("%s %s", "output : ", d)
+        total_percentage_saved = total_consumed_energy = total_saved_energy = 0
+        if (d["total_energy_saved"] or 0) > 0 and (d["total_baseline"] or 0) > 0:
+            total_percentage_saved = d["total_energy_saved"] / d["total_baseline"] * 100
+            total_consumed_energy = d["total_unit_consumed"] or 0
+            total_saved_energy = d["total_energy_saved"]
 
         return Response(
             {
