@@ -8,6 +8,12 @@ import django
 django.setup()
 import requests
 from datetime import datetime, timedelta
+from wareApp.fuel_providers import (
+    ROADCAST_PULL_API_URL,
+    loconav_auth_headers,
+    roadcast_auth_headers,
+    roadcast_pull_params,
+)
 from wareApp.models import Site
 
 
@@ -30,7 +36,7 @@ def sample_sites(limit=5):
 
 
 def test_loconav(vehicle):
-    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+    headers = loconav_auth_headers()
     now = datetime.now()
     start = int((now - timedelta(hours=24)).timestamp())
     end = int(now.timestamp())
@@ -57,13 +63,10 @@ def test_loconav(vehicle):
 
 def test_roadcast(device_imei):
     # uses two endpoints seen in code
-    headers1 = {
-        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3bHkiOjAsInR6IjotMzMwLCJ0el9zIjoiQXNpYS9Lb2xrYXRhIiwic3NvIjowLCJkZXZpY2UiOiJ3ZWIiLCJhbGlhcyI6IiJ9LCJmcmVzaCI6ZmFsc2UsInR5cGUiOiJhY2Nlc3MifQ.Fwn08jciwxlm659ZYEfq1LpQBAf2fddUZ9zrjmrzcmU"
-    }
-    url_pull = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
-    status_p, j_p, raw_p = request_json(url_pull, headers=headers1)
+    url_pull = ROADCAST_PULL_API_URL
+    status_p, j_p, raw_p = request_json(url_pull, params=roadcast_pull_params())
     # pull_fuel_report may require vehicle and date range
-    headers2 = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    headers2 = roadcast_auth_headers()
     now = datetime.now()
     start_date = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
     end_date = now.strftime("%Y-%m-%dT%H:%M:%S")

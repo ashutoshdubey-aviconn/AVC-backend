@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import requests
+
+from _secrets import loconav_auth_headers
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,7 +17,7 @@ start_s = int(start.timestamp())
 end_s = int(now.timestamp())
 
 url = "https://marketplace.loconav.com/api/v1/vehicles/fuel"
-headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+headers = loconav_auth_headers()
 params = {"vehicle_number": vehicle, "start_time": start_s, "end_time": end_s}
 
 try:

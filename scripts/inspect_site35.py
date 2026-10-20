@@ -17,6 +17,8 @@ django.setup()
 from wareApp.models import Site, DgFuelConsumptionData, DgUnitConsumption
 import requests
 
+from wareApp.fuel_providers import loconav_auth_headers, roadcast_auth_headers
+
 OUT_DIR = Path(proj_root) / "logs" / "third_party"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +78,7 @@ if hasattr(site, "site_name") and site.site_name:
 vehicle_candidates = list(dict.fromkeys(vehicle_candidates))
 print("\nVehicle candidates for Loconav probe:", vehicle_candidates)
 
-loc_headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+loc_headers = loconav_auth_headers()
 for veh in vehicle_candidates[:3]:
     url = "https://marketplace.loconav.com/api/v1/vehicles/fuel"
     params = {"vehicle_number": veh, "start_time": start, "end_time": end}
@@ -96,7 +98,7 @@ for veh in vehicle_candidates[:3]:
 rc_device = getattr(site, "partner_dg_fuel_id", None)
 if rc_device:
     rc_url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    rc_headers = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    rc_headers = roadcast_auth_headers()
     params = {"device_imei": str(rc_device), "from_time": start, "to_time": end}
     try:
         r = requests.get(rc_url, params=params, headers=rc_headers, timeout=15)

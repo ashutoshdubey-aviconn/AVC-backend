@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import requests
+
+from _secrets import loconav_auth_headers
 import time
 import json
 from pathlib import Path
@@ -9,7 +11,7 @@ OUT_DIR = Path("/home/ashutosh-dubey/django_project/logs/third_party")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 url = "https://marketplace.loconav.com/api/v1/vehicles"
-headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+headers = loconav_auth_headers()
 
 try:
     r = requests.get(url, headers=headers, timeout=20)

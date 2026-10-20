@@ -61,7 +61,7 @@ def roadcasteAPI(start_time, end_time):
 
     payload = {}
     headers = {
-        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MjczMzE2MjIsIm5iZiI6MTcyNzMzMTYyMiwianRpIjoiZGMwODI2YzUtYjA3NS00MDg2LWIyNjUtZGM5ZDI3NWEzYjE4IiwiZXhwIjoxNzI3NTkwODIyLCJpZGVudGl0eSI6eyJpZCI6Nzg0NDYsImRiIjowLCJjbyI6MSwibmFtZSI6IkF2aWNvbm4iLCJ0eXBlIjoiYWRtaW4iLCJyZWFkX29ubHkiOjAsInR6IjotMzMwLCJ0el9zIjoiQXNpYS9Lb2xrYXRhIiwic3NvIjowLCJkZXZpY2UiOiJ3ZWIiLCJhbGlhcyI6IiJ9LCJmcmVzaCI6ZmFsc2UsInR5cGUiOiJhY2Nlc3MifQ.Fwn08jciwxlm659ZYEfq1LpQBAf2fddUZ9zrjmrzcmU"
+        "Authorization": "Bearer " + os.environ.get("ROADCAST_BEARER_TOKEN", "")
     }
     try:
         response = requests.request("GET", url, headers=headers, data=payload)
@@ -772,7 +772,7 @@ def _retired_mqtt_client1_inline():
                                         last_record.fetch_fuel_data = True
                                         last_record.save()
                                     # code commented by yash
-                                    """headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+                                    """headers = {"User-Authentication": settings.LOCONAV_API_TOKEN}
                                     vehicle_number = site.partner_dg_fuel_id
                                     fetch_fuel = requests.get(f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}", headers=headers).json()
                                     print("fetched fuel data : ", fetch_fuel)
@@ -876,7 +876,7 @@ def _retired_mqtt_client1_inline():
                                                 last_record.fetch_fuel_data = True
                                                 last_record.save()
 
-                                            # headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+                                            # headers = {"User-Authentication": settings.LOCONAV_API_TOKEN}
                                             # vehicle_number = site.partner_dg_fuel_id
                                             # fetch_fuel = requests.get(f"https://marketplace.loconav.com/api/v1/vehicles/fuel?vehicle_number={vehicle_number}&start_time={dg_start_date}&end_time={dg_end_date}", headers=headers).json()
                                             # print("fetched fuel data : ", fetch_fuel)
