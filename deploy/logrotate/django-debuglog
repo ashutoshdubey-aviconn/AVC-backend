@@ -1,0 +1,20 @@
+# Rotation for the Django request/view log (logges/debug.log), written by
+# gunicorn and the Celery workers. Rotation is done here, not in Python:
+# several processes share the file, and RotatingFileHandler in each of them
+# rotated it independently (lost/duplicated pieces). The app opens it with a
+# plain append-mode FileHandler, which copytruncate handles safely.
+# Install: sudo cp deploy/logrotate/django-debuglog /etc/logrotate.d/django-debuglog
+/home/ubuntu/django_project/logges/debug.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    maxsize 50M
+    dateext
+    dateformat -%Y-%m-%d
+    create 0640 ubuntu ubuntu
+    su ubuntu ubuntu
+}
