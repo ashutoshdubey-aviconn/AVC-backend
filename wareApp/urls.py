@@ -130,4 +130,6 @@ urlpatterns = [
     path("meter-disconnections/", views.MeterDisconnectionListView.as_view()),
     path("v1/recovery/", include("wareApp.recovery.urls")),
     path("gateway-status/", views.HomeGatewayStatusApi.as_view()),
+    # Called by the gateways' temperature monitor (CPU >= 85 °C).
+    path("temp/dispatch/mail/", views.GatewayOverheatAlertApi.as_view()),
 ]

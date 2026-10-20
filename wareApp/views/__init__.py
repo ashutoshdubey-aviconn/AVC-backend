@@ -13,6 +13,7 @@ from .devices import *  # noqa: F401,F403
 from .dg_fuel import *  # noqa: F401,F403
 from .energy_saving import *  # noqa: F401,F403
 from .fire import *  # noqa: F401,F403
+from .gateway_overheat import *  # noqa: F401,F403
 from .load import *  # noqa: F401,F403
 from .monitoring import *  # noqa: F401,F403
 from .power_distribution import *  # noqa: F401,F403

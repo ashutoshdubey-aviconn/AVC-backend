@@ -106,6 +106,8 @@ REST_FRAMEWORK = {
         "user": "1000/minute",
         # forgot/ and reset/ together, per client IP.
         "password_reset": config("PASSWORD_RESET_RATE", default="10/hour"),
+        # Gateway overheat alerts: the gateway script posts every ~3 s.
+        "gateway_overheat": "60/minute",
     },
 }
 
@@ -207,6 +209,10 @@ ALARM_EMAIL_OVERRIDE_TO = config(
     "ALARM_EMAIL_OVERRIDE_TO", default="ashutosh.dubey@aviconncorp.com", cast=_host_list
 )
 ALARM_EMAIL_DEFAULT_TO = config("ALARM_EMAIL_DEFAULT_TO", default="", cast=_host_list)
+# Gateway overheat alerts (wareApp/gateway_overheat.py): store at most one
+# update per gateway per STORE window, e-mail at most once per EMAIL window.
+GATEWAY_OVERHEAT_STORE_SECONDS = config("GATEWAY_OVERHEAT_STORE_SECONDS", default=60, cast=int)
+GATEWAY_OVERHEAT_EMAIL_SECONDS = config("GATEWAY_OVERHEAT_EMAIL_SECONDS", default=3600, cast=int)
 # Alarm lists (wareApp/alarm_feed.py): only issues seen within this many days
 # are shown; 0 shows every active issue.
 ALARM_FEED_MAX_AGE_DAYS = config("ALARM_FEED_MAX_AGE_DAYS", default=30, cast=int)

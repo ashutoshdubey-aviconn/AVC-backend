@@ -29,6 +29,8 @@ from wareApp.models import (
 PRIORITY_LABELS = {0: "High", 1: "Medium", 2: "Low"}
 
 CONSUMPTION_TYPES = dict(AlarmNotifications._meta.get_field("Alarm_type").flatchoices)
+# Stored by wareApp/gateway_overheat.py (object_id = gateway number, no aisle).
+GATEWAY_OVERHEAT = 13
 POWER_TYPES = {
     **dict(NewAlarmsNotifications._meta.get_field("alarm_type").flatchoices),
     # Stored by wareApp/dg_fuel/sessions.py but missing from the model choices.
@@ -121,6 +123,33 @@ def active_alarms(site_ids):
         last_seen = max(
             d for d in (group["last_created"], group["last_seen"]) if d is not None
         )
+        if group["Alarm_type"] == GATEWAY_OVERHEAT:
+            # object_id is the gateway number (…_<n> in the home gateway id).
+            number = group["object_id"]
+            gateways = site_gateways.get(site.id, [])
+            home_gateway = next(
+                (g for g in gateways if number is not None and g.endswith(f"_{number}")),
+                ", ".join(gateways) or None,
+            )
+            rows.append(
+                _row(
+                    site,
+                    source="gateway",
+                    alarm_type=group["Alarm_type"],
+                    alarm=CONSUMPTION_TYPES.get(group["Alarm_type"], "Gateway Overheat"),
+                    priority=group["priority"],
+                    first_seen=group["first_seen"],
+                    last_seen=last_seen,
+                    occurrences=group["occurrences"] or 1,
+                    aisle_group_id=None,
+                    aisle_group_name=None,
+                    leg_id=None,
+                    power_source=None,
+                    home_gateway_id=home_gateway,
+                    issue=alarm.to_do or "Gateway CPU temperature high",
+                )
+            )
+            continue
         rows.append(
             _row(
                 site,
