@@ -6,7 +6,7 @@ from django.db import transaction
 
 from wareApp.models import AisleGroup, HourlySiteReading
 from wareApp.mqtt.log_context import home_gateway_id_for
-from wareApp.mqtt.log_format import day_ranges, hour_ranges
+from wareApp.mqtt.log_format import day_ranges, hour_ranges, log_bulk_write
 from wareApp.mqtt.services.baseline import BaselineMemo
 from wareApp.mqtt.services.consumption_alarms import evaluate_days
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
@@ -32,7 +32,9 @@ def _parse_hourly_recovery_message(message):
         raise ValueError("Invalid hourlyConsumption recovery payload")
 
     aisle_group_id, recovery_hours, unit_consumptions, _ = match.groups()
-    slots, values = split_paired_lists(recovery_hours, unit_consumptions, "hourlyConsumption")
+    slots, values = split_paired_lists(
+        recovery_hours, unit_consumptions, "hourlyConsumption"
+    )
     return aisle_group_id, slots, values
 
 
@@ -64,7 +66,9 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 "unit_consumption": consumption,
                 "hourly_baseline_value": hourly_baseline,
                 # Same rule as live packets: saving only for active aisles.
-                "energy_saved": (hourly_baseline - consumption) if aisle_group.is_active else 0.0,
+                "energy_saved": (
+                    (hourly_baseline - consumption) if aisle_group.is_active else 0.0
+                ),
             }
 
         scope = RecoveryScope.aisle(aisle_group)
@@ -81,7 +85,11 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 ),
                 key_of=lambda row: (row.reading_from, row.reading_to),
                 slots=slots,
-                update_fields=["unit_consumption", "hourly_baseline_value", "energy_saved"],
+                update_fields=[
+                    "unit_consumption",
+                    "hourly_baseline_value",
+                    "energy_saved",
+                ],
                 build_row=lambda key, values: HourlySiteReading(
                     associated_Site=site,
                     aisle_group=aisle_group,
@@ -93,11 +101,24 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 ),
             )
             status.record_applied(monitor, scope, status_slots)
+        log_bulk_write(
+            logger,
+            written,
+            table="HourlySiteReading",
+            site_id=location_id,
+            home_gateway_id=home_gateway_id,
+            aisle_group_name=aisle_group.aisleGroupName,
+            leg_id=aisle_group_id,
+            describe=lambda keys: hour_ranges([start for start, _ in keys]),
+        )
         alarms = evaluate_days(site, aisle_group, [start.date() for start, _ in slots])
         if alarms:
             logger.info(
                 "Queue1 hourly recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
-                location_id, aisle_group_id, aisle_group.aisleGroupName, "; ".join(alarms),
+                location_id,
+                aisle_group_id,
+                aisle_group.aisleGroupName,
+                "; ".join(alarms),
             )
         if baselines.missing_days:
             logger.warning(
@@ -139,5 +160,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             location_id,
             home_gateway_id,
         )
-        record_dead_letter("recovery/hourlyConsumption", location_id, gateway_id, message, error)
+        record_dead_letter(
+            "recovery/hourlyConsumption", location_id, gateway_id, message, error
+        )
         return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

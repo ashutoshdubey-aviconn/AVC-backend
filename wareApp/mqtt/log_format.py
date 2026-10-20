@@ -67,3 +67,36 @@ def day_ranges(days):
         text += f", +{len(runs) - MAX_RANGES} more ranges"
     return text
 
+
+def log_bulk_write(
+    logger,
+    written,
+    *,
+    table,
+    site_id,
+    home_gateway_id,
+    aisle_group_name,
+    leg_id,
+    describe,
+):
+    """One BULK CREATE and/or BULK UPDATE line for an ``upsert_slots`` result.
+
+    ``describe(keys)`` renders the slot keys as a period, e.g. ``hour_ranges``.
+    """
+    for action, keys, ms in (
+        ("BULK CREATE", written.created, written.create_ms),
+        ("BULK UPDATE", written.updated, written.update_ms),
+    ):
+        if keys:
+            logger.info(
+                "%s %s: site=%s home_gateway_id=%s aisle_group_name=%s leg_id=%s rows=%s period=[%s] duration=%.1f ms",
+                action,
+                table,
+                site_id,
+                home_gateway_id,
+                aisle_group_name,
+                leg_id,
+                len(keys),
+                describe(keys),
+                ms,
+            )

@@ -7,6 +7,7 @@ per slot on main (one WAL flush per row). Here a whole message is one
 inside the caller's transaction (a single commit).
 """
 
+import time
 from collections import defaultdict
 from typing import NamedTuple
 
@@ -19,6 +20,8 @@ class SlotWriteResult(NamedTuple):
     updated: list
     created: list
     skipped: list
+    update_ms: float = 0.0
+    create_ms: float = 0.0
 
 
 def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_update=None):
@@ -57,8 +60,13 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
             to_update.append(row)
         updated.append(key)
 
+    update_ms = create_ms = 0.0
     if to_update:
+        started = time.perf_counter()
         model.objects.bulk_update(to_update, update_fields, batch_size=BULK_BATCH_SIZE)
+        update_ms = (time.perf_counter() - started) * 1000
     if to_create:
+        started = time.perf_counter()
         model.objects.bulk_create(to_create, batch_size=BULK_BATCH_SIZE)
-    return SlotWriteResult(updated, created, skipped)
+        create_ms = (time.perf_counter() - started) * 1000
+    return SlotWriteResult(updated, created, skipped, update_ms, create_ms)
