@@ -247,30 +247,37 @@ class _BaselineMemo:
         return self._values()[1]
 
 
-def _resync_daily_with_hourly(site, aisle_group, daily_record, observed_at):
-    """Set the day's total to the sum of its hourly readings in one UPDATE.
+def _daily_total_from_hourly(site, leg_id, day):
+    """SQL expression: the day's total = sum of its hourly readings (0 if none).
 
-    Replaces aggregate() + save() (two round trips) with a correlated
-    subquery. The calendar-day window matches the previous implementation.
+    The daily row always equals what the hourly rows say. (Previously each
+    packet added its new units to the day and the day was re-summed only at
+    the hour change, so the two drifted apart whenever a packet's units did
+    not match the hour total.)
     """
-    day_start = observed_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = datetime.combine(day, datetime.min.time())
     hourly_total = (
         HourlySiteReading.objects.filter(
             associated_Site=site,
-            aisle_group=aisle_group,
+            leg_id=leg_id,
             reading_from__gte=day_start,
             reading_from__lt=day_start + timedelta(days=1),
         )
         .order_by()
-        .values("aisle_group")
+        .values("leg_id")
         .annotate(total=Sum("unit_consumption"))
         .values("total")[:1]
     )
-    DailySiteReading.objects.filter(pk=daily_record.pk).update(
-        unit_consumption=Coalesce(
-            Subquery(hourly_total, output_field=FloatField()), Value(0.0)
-        )
-    )
+    return Coalesce(Subquery(hourly_total, output_field=FloatField()), Value(0.0))
+
+
+def _daily_updates(site, leg_id, day, daily_baseline):
+    total = _daily_total_from_hourly(site, leg_id, day)
+    return {
+        "unit_consumption": total,
+        "energy_saved": Value(float(daily_baseline)) - total,
+        "daily_baseline_value": daily_baseline,
+    }
 
 
 @transaction.atomic
@@ -331,7 +338,6 @@ def handle_consumption_message(
         daily_entries = DailySiteReading.objects.filter(
             associated_Site=site, leg_id=aisle_group_id, reading_for=observed_at.date()
         )
-        daily_record = None
         baselines = _BaselineMemo(
             site, aisle_group, observed_at.date(), home_gateway_id
         )
@@ -346,7 +352,6 @@ def handle_consumption_message(
             )
             previous_record = previous_entries.first()
             if previous_record:
-                daily_record = daily_entries.first()
                 # Sync the previous hour with the gateway total and store its
                 # saving in one UPDATE (previously up to two).
                 previous_updates = {}
@@ -368,11 +373,6 @@ def handle_consumption_message(
                     )
                 if previous_updates:
                     previous_entries.update(**previous_updates)
-
-                if daily_record:
-                    _resync_daily_with_hourly(
-                        site, aisle_group, daily_record, observed_at
-                    )
 
                 HourlySiteReading.objects.create(
                     associated_Site=site,
@@ -521,37 +521,39 @@ def handle_consumption_message(
                 observed_at,
             )
 
+        # The day's total is the sum of its hourly rows (one UPDATE).
         daily_baseline = baselines.daily
-        if daily_record:
-            daily_entries.update(
-                unit_consumption=F("unit_consumption") + values["new_unit_consumption"],
-                energy_saved=daily_baseline
-                - (F("unit_consumption") + values["new_unit_consumption"]),
-                daily_baseline_value=daily_baseline,
+        if not daily_entries.update(
+            **_daily_updates(site, aisle_group_id, observed_at.date(), daily_baseline)
+        ):
+            # First packet of the day: create the row with the hourly sum.
+            day_start = datetime.combine(observed_at.date(), datetime.min.time())
+            total = (
+                HourlySiteReading.objects.filter(
+                    associated_Site=site,
+                    leg_id=aisle_group_id,
+                    reading_from__gte=day_start,
+                    reading_from__lt=day_start + timedelta(days=1),
+                ).aggregate(total=Sum("unit_consumption"))["total"]
+                or 0.0
             )
-        else:
-            if not daily_entries.update(
-                unit_consumption=F("unit_consumption") + values["new_unit_consumption"],
-                energy_saved=daily_baseline
-                - (F("unit_consumption") + values["new_unit_consumption"]),
+            DailySiteReading.objects.create(
+                associated_Site=site,
+                aisle_group=aisle_group,
+                leg_id=aisle_group_id,
+                unit_consumption=total,
+                energy_saved=daily_baseline - total,
                 daily_baseline_value=daily_baseline,
-            ):
-                DailySiteReading.objects.create(
-                    associated_Site=site,
-                    aisle_group=aisle_group,
-                    leg_id=aisle_group_id,
-                    unit_consumption=values["new_unit_consumption"],
-                    daily_baseline_value=daily_baseline,
-                    reading_for=observed_at.date(),
-                    is_visible=True,
-                )
-                yesterday = DailySiteReading.objects.filter(
-                    associated_Site=site,
-                    leg_id=aisle_group_id,
-                    reading_for=observed_at.date() - timedelta(days=1),
-                ).first()
-                if yesterday:
-                    _consumption_alarms(site, aisle_group, yesterday)
+                reading_for=observed_at.date(),
+                is_visible=True,
+            )
+            yesterday = DailySiteReading.objects.filter(
+                associated_Site=site,
+                leg_id=aisle_group_id,
+                reading_for=observed_at.date() - timedelta(days=1),
+            ).first()
+            if yesterday:
+                _consumption_alarms(site, aisle_group, yesterday)
 
         logger.info(
             "Queue1 consumption daily reading updated: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s observed_date=%s",
