@@ -183,6 +183,38 @@ class BatchMatchesSinglePacketTests(TestCase):
         self.assertIn("stored=7", summary)
         self.assertEqual(HourlySiteReading.objects.filter(associated_Site=batch.site).count(), 5)
 
+    def test_daily_total_always_equals_sum_of_hourly_rows(self):
+        """Packet units that do not add up to the hour total no longer drift the day."""
+
+        def prepare(w):
+            w.hourly("A1", 2, 8, 3.0)
+            w.hourly("A1", 2, 9, 4.0)
+            w.daily("A1", 2, 99.0)  # stale total
+
+        single, batch, _ = self.run_both(
+            prepare,
+            [
+                ("A1", packet(2, 9, 6.0, 0, new_units=0.2)),
+                ("A1", packet(2, 10, 1.0, 6.5, new_units=5.0)),
+                ("A1", packet(2, 10, 2.0, 6.5, new_units=5.0)),
+            ],
+        )
+        for world in (single, batch):
+            daily = DailySiteReading.objects.get(associated_Site=world.site)
+            self.assertEqual(daily.unit_consumption, 3.0 + 6.5 + 2.0)
+            self.assertEqual(daily.energy_saved, 48.0 - (3.0 + 6.5 + 2.0))
+
+    def test_negative_and_huge_values_are_cleaned_like_save(self):
+        self.run_both(
+            lambda w: None,
+            [
+                ("A1", packet(2, 10, 20000, 0, new_units=20000)),
+                ("A2", packet(2, 10, -3.0, 0, new_units=-3.0)),
+                ("A1", packet(2, 11, 1.0, 25000, new_units=1.0)),
+                ("A2", packet(2, 11, 2.0, -1.0, new_units=2.0)),
+            ],
+        )
+
     def test_existing_rows_current_hour_and_new_hour(self):
         def prepare(w):
             w.hourly("A1", 2, 8, 3.0)
@@ -431,3 +463,64 @@ class FlushAndListenerTests(TestCase):
             consumers._queue_one_message_for_processing(5, "gw", "p", topic)
         enqueue.assert_not_called()
         apply_async.assert_called_once()
+
+
+class ResyncDailyTotalsCommandTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.world = World("resync", {"A1": {"is_active": True}, "A2": {"is_active": True}})
+        for hour in range(24):
+            self.world.hourly("A1", 2, hour, 0.25)  # 6.0 for the day
+        self.world.daily("A1", 2, 99.0)  # drifted
+        self.world.hourly("A1", 3, 9, 4.0)  # day 3: only one hour stored
+        self.world.daily("A1", 3, 50.0)
+        for hour in range(24):  # day 4: complete, but one meter glitch
+            self.world.hourly("A1", 4, hour, 0.25)
+        # Stored through .update() (skips save()'s cap), as on the test server.
+        HourlySiteReading.objects.filter(
+            associated_Site=self.world.site, reading_from=datetime(2026, 10, 4, 9)
+        ).update(unit_consumption=17260472869.25)
+        self.world.daily("A1", 4, 6.0)
+        self.world.daily("A2", 2, 7.0)  # no hourly rows: left alone
+        DailySiteReading.objects.filter(associated_Site=self.world.site).update(
+            daily_baseline_value=48.0
+        )
+
+    def run_command(self, *extra):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command(
+            "resync_daily_totals", "--from", "2026-10-01", "--to", "2026-10-04",
+            "--site", str(self.world.site.id), *extra, stdout=out,
+        )
+        return out.getvalue()
+
+    def totals(self):
+        return {
+            (r.leg_id, r.reading_for.day): (r.unit_consumption, r.energy_saved)
+            for r in DailySiteReading.objects.filter(associated_Site=self.world.site)
+        }
+
+    def test_dry_run_changes_nothing(self):
+        before = self.totals()
+        output = self.run_command()
+        self.assertIn("would update (dry run, use --apply) 1", output)
+        self.assertEqual(self.totals(), before)
+
+    def test_apply_sets_daily_to_hourly_sum(self):
+        output = self.run_command("--apply")
+        self.assertIn("BULK UPDATE DailySiteReading", output)
+        totals = self.totals()
+        self.assertEqual(totals[(self.world.legs["A1"], 2)], (6.0, 48.0 - 6.0))
+        self.assertEqual(totals[(self.world.legs["A2"], 2)][0], 7.0)
+        # Day 3 misses 23 hours: left alone unless asked.
+        self.assertEqual(totals[(self.world.legs["A1"], 3)][0], 50.0)
+        self.assertIn("left alone 1 days with missing hourly rows and 1 days with an implausible", output)
+        self.assertIn("implausible hourly value 17260472869.250 kWh at 09:00", output)
+        self.assertEqual(totals[(self.world.legs["A1"], 4)][0], 6.0)
+        self.assertIn("updated 0", self.run_command("--apply"))
+        self.run_command("--apply", "--include-incomplete")
+        self.assertEqual(self.totals()[(self.world.legs["A1"], 3)][0], 4.0)

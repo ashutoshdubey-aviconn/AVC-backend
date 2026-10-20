@@ -1,8 +1,7 @@
 from datetime import date, datetime
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
-from django.db.models import F
 from django.core.cache import cache
 from django.test import SimpleTestCase
 
@@ -156,18 +155,19 @@ class ConsumptionHandlerTests(SimpleTestCase):
         ), patch(
             "wareApp.mqtt.consumption.DailySiteReading.objects.filter",
             return_value=daily_entries,
-        ):
+        ), patch(
+            "wareApp.mqtt.consumption._daily_updates",
+            return_value={"unit_consumption": "hourly sum"},
+        ) as daily_updates:
             consumption.handle_consumption_message.__wrapped__(
                 site, 156, "gateway-01", self.message, Mock()
             )
 
         current_hour.update.assert_called_once_with(unit_consumption=12.5)
         daily_entries.first.assert_not_called()
-        daily_entries.update.assert_called_once_with(
-            unit_consumption=F("unit_consumption") + 1.5,
-            energy_saved=0.0 - (F("unit_consumption") + 1.5),
-            daily_baseline_value=0.0,
-        )
+        # The day is set to the sum of its hourly rows (not old total + units).
+        daily_updates.assert_called_once_with(site, ANY, ANY, 0.0)
+        daily_entries.update.assert_called_once_with(unit_consumption="hourly sum")
 
     def test_reconciliation_aggregates_the_full_calendar_day(self):
         site = SimpleNamespace(id=156)

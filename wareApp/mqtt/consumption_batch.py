@@ -21,6 +21,7 @@ still written. Messages are acknowledged by the caller only after the commit.
 
 import json
 import logging
+import math
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -290,6 +291,47 @@ def _last_hourly_entry(state):
     return max(candidates, key=lambda r: (r.reading_from, r.pk or 10**18))
 
 
+def _clean_float(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return 0
+    if math.isnan(value) or math.isinf(value):
+        return 0
+    return max(value, 0)
+
+
+def _as_saved(row):
+    """Apply what HourlySiteReading/DailySiteReading.save() does to a new row.
+
+    bulk_create skips save(); the per-packet path creates rows with
+    objects.create(), so new rows get the same cleaning here (NaN/inf/negative
+    -> 0, consumption over 10000 -> 0 with saving = baseline).
+    """
+    baseline_field = (
+        "hourly_baseline_value" if isinstance(row, HourlySiteReading) else "daily_baseline_value"
+    )
+    row.unit_consumption = _clean_float(row.unit_consumption)
+    setattr(row, baseline_field, _clean_float(getattr(row, baseline_field)))
+    row.energy_saved = _clean_float(row.energy_saved)
+    if row.unit_consumption > 10000:
+        row.unit_consumption = 0
+        row.energy_saved = getattr(row, baseline_field)
+    return row
+
+
+def _day_total(state, day):
+    """Sum of the aisle's hourly rows of ``day`` (stored or new in this batch)."""
+    day_start = datetime.combine(day, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    return sum(
+        (row.unit_consumption or 0.0)
+        for hour, rows in state.hourly.items()
+        if day_start <= hour < day_end
+        for row in rows
+    ) or 0.0
+
+
 def _stored(state, observed_at):
     if state.last_stored is None or observed_at > state.last_stored:
         state.last_stored = observed_at
@@ -321,7 +363,6 @@ def _apply(state, p, publish_recovery):
         )
 
     current = state.hourly.get(_hour(observed_at), [])
-    daily_record = None
     if current:
         for row in current:
             row.unit_consumption = values["current_hour_consumption"]
@@ -336,7 +377,6 @@ def _apply(state, p, publish_recovery):
         previous = state.hourly.get(_hour(observed_at - timedelta(hours=1)), [])
         previous_record = _first(previous)
         if previous_record:
-            daily_record = _first(state.daily.get(observed_at.date(), []))
             updates = {}
             if previous_record.unit_consumption != values["previous_hour_consumption"]:
                 updates["unit_consumption"] = values["previous_hour_consumption"]
@@ -350,19 +390,7 @@ def _apply(state, p, publish_recovery):
                         setattr(row, name, value)
                     if row.pk is not None:
                         state.dirty_hourly[id(row)] = row
-            if daily_record:
-                day_start = datetime.combine(observed_at.date(), datetime.min.time())
-                total = sum(
-                    row.unit_consumption
-                    for hour, rows in state.hourly.items()
-                    if day_start <= hour < day_start + timedelta(days=1)
-                    for row in rows
-                    if row.aisle_group_id == aisle.id
-                )
-                daily_record.unit_consumption = total
-                if daily_record.pk is not None:
-                    state.dirty_daily[id(daily_record)] = daily_record
-            row = HourlySiteReading(
+            row = _as_saved(HourlySiteReading(
                 associated_Site=site,
                 aisle_group=aisle,
                 leg_id=leg_id,
@@ -371,7 +399,7 @@ def _apply(state, p, publish_recovery):
                 reading_from=observed_at,
                 reading_to=hour_end,
                 is_visible=True,
-            )
+            ))
             state.new_hourly.append(row)
             state.hourly[_hour(observed_at)].append(row)
             logger.info(
@@ -419,7 +447,7 @@ def _apply(state, p, publish_recovery):
                 return f"skipped: leg {leg_id} gap {gap}, recovery failed after {decision.monitor.attempt} attempts"
 
             release_recovery_request(location_id, "aisle", leg_id)
-            row = HourlySiteReading(
+            row = _as_saved(HourlySiteReading(
                 associated_Site=site,
                 aisle_group=aisle,
                 leg_id=leg_id,
@@ -428,10 +456,10 @@ def _apply(state, p, publish_recovery):
                 reading_from=observed_at,
                 reading_to=hour_end,
                 is_visible=True,
-            )
+            ))
             state.new_hourly.append(row)
             state.hourly[_hour(observed_at)].append(row)
-            day = DailySiteReading(
+            day = _as_saved(DailySiteReading(
                 associated_Site=site,
                 aisle_group=aisle,
                 leg_id=leg_id,
@@ -439,7 +467,7 @@ def _apply(state, p, publish_recovery):
                 daily_baseline_value=baselines.daily,
                 reading_for=observed_at.date(),
                 is_visible=True,
-            )
+            ))
             state.new_daily.append(day)
             state.daily[observed_at.date()].append(day)
             logger.info(
@@ -450,25 +478,28 @@ def _apply(state, p, publish_recovery):
             _stored(state, observed_at)
             return f"stored: leg {leg_id} first hourly+daily reading {observed_at:%Y-%m-%d %H:00}"
 
+    # The day's total is the sum of its hourly rows (same as the per-packet path).
     daily_baseline = baselines.daily
+    total = _day_total(state, observed_at.date())
     days = state.daily.get(observed_at.date(), [])
     if days:
         for row in days:
-            row.unit_consumption = row.unit_consumption + values["new_unit_consumption"]
-            row.energy_saved = daily_baseline - row.unit_consumption
+            row.unit_consumption = total
+            row.energy_saved = daily_baseline - total
             row.daily_baseline_value = daily_baseline
             if row.pk is not None:
                 state.dirty_daily[id(row)] = row
     else:
-        day = DailySiteReading(
+        day = _as_saved(DailySiteReading(
             associated_Site=site,
             aisle_group=aisle,
             leg_id=leg_id,
-            unit_consumption=values["new_unit_consumption"],
+            unit_consumption=total,
+            energy_saved=daily_baseline - total,
             daily_baseline_value=daily_baseline,
             reading_for=observed_at.date(),
             is_visible=True,
-        )
+        ))
         state.new_daily.append(day)
         state.daily[observed_at.date()].append(day)
         state.alarm_days.add(observed_at.date() - timedelta(days=1))
