@@ -267,3 +267,21 @@ class PersistentMessageSettingTests(SimpleTestCase):
             consumers._queue_one_message_for_processing(198, "gw-198", "payload", topic)
 
         self.assertNotIn("delivery_mode", enqueue.call_args.kwargs)
+
+
+class PfThresholdWarningTests(SimpleTestCase):
+    def test_missing_thresholds_are_logged_once_per_site_per_hour(self):
+        from wareApp.mqtt import load
+
+        cache.clear()
+        site = SimpleNamespace(
+            id=145, site_name="Site 145", is_pf_visible=True,
+            r_phase_pf_threshold=None, y_phase_pf_threshold=0.85, b_phase_pf_threshold=0.85,
+        )
+        values = {"power_factors": (0.5, 0.5, 0.5), "status": "ON", "power_source": "Mains Supply", "meter_number": 1}
+        with self.assertLogs("wareApp.mqtt.load", level="WARNING") as logs:
+            for _ in range(5):
+                load._record_power_factor_alarm(site, values)
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn("site=145", logs.output[0])
+        cache.clear()

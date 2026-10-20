@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timedelta
 
+from django.core.cache import cache
+
 from wareApp.models import (
     NewAlarmsNotifications,
     PowerFactorData,
@@ -159,9 +161,16 @@ def _record_power_factor_alarm(site, values):
         site.b_phase_pf_threshold,
     )
     if any(threshold is None for threshold in thresholds):
-        logger.warning(
-            "Skipping PF alarm for site %s without all PF thresholds", site.id
-        )
+        # Once per site per hour instead of on every load packet.
+        if cache.add(f"pf-thresholds-missing-log:{site.id}", 1, 3600):
+            logger.warning(
+                "PF alarm skipped, PF thresholds not configured (logged once per hour): site=%s site_name=%s source=%s meter=%s thresholds r/y/b=%s/%s/%s",
+                site.id,
+                getattr(site, "site_name", ""),
+                values.get("power_source"),
+                values.get("meter_number"),
+                *thresholds,
+            )
         return
     if not any(value < threshold for value, threshold in zip(factors, thresholds)):
         return
