@@ -1,16 +1,10 @@
-
-from django.core import exceptions
-from rest_framework import serializers
-from .models import User, CustomerInfo, Site, NewAlarmsNotifications, MeterDisconnectionEvent
-from django.contrib.auth import authenticate
-from rest_framework.authtoken.models import Token
 import base64
+import binascii
 
-class TokenSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Token
-        fields = ["key", "user"]
+from django.contrib.auth import authenticate
+from rest_framework import serializers
 
+from .models import CustomerInfo, MeterDisconnectionEvent, NewAlarmsNotifications, Site, User
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -18,25 +12,19 @@ class LoginSerializer(serializers.Serializer):
 
     
     def validate(self, data):
-        print("dataa")
+        # The client sends the password base64-encoded. Never log or print it.
         username = data.get("username", "")
-        password = base64.b64decode(data.get("password", ""))#data.get("password", "")
-        print(password)
+        try:
+            password = base64.b64decode(data.get("password", ""), validate=True)
+        except (binascii.Error, ValueError):
+            raise serializers.ValidationError("invalid data")
 
-        if username and password:
-            user = authenticate(username=username, password=password)
-            print("user", user)
-            if user:
-                data["user"] = user
-            else:
-                print('user authentication fails')
-                msg = 'invalid credentials. try again'
-                raise serializers.ValidationError(msg)
-        else:
-            print('username & password doesnt exist')
-            msg = "invalid data"
-            raise serializers.ValidationError(msg)
-
+        if not username or not password:
+            raise serializers.ValidationError("invalid data")
+        user = authenticate(username=username, password=password)
+        if not user:
+            raise serializers.ValidationError("invalid credentials. try again")
+        data["user"] = user
         return data
 
 
@@ -61,13 +49,6 @@ class CustomerInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerInfo
         fields = ["address", "total_sites", "customer"]
-
-
-class CustomerWarehouseDetailSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Site
-        fields = ["id", "site_name", "site_manager_number"]
 
 
 class SiteSerializer(serializers.ModelSerializer):

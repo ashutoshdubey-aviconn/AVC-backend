@@ -1,29 +1,47 @@
-from datetime import datetime
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.utils import timezone
-from django.db.models import Sum, Q
+from django.db.models import Q
 
-try:
-    from jsonfield import JSONField
-except Exception as err:
-    print("Error while importing jsonfiled: ", err)
+from jsonfield import JSONField
 
 
-# from model_utils.models import TimeStampedModel
 import math
 
-"""
-def save(self, *args, **kwargs):
-    self.unit_consumption = max(self.unit_consumption, 0)
-    self.daily_baseline_value = max(self.daily_baseline_value, 0)
-    self.energy_saved = max(self.energy_saved, 0)
-    if self.unit_consumption > 10000:
-        self.unit_consumption = 0
-        self.energy_saved = self.daily_baseline_value
-    super(DailySiteReading, self).save(*args, **kwargs)"""
+def clean_reading_float(value, default=0):
+    """NaN, inf, negative or non-numeric readings become ``default`` / 0."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(value) or math.isinf(value):
+        return default
+    return max(value, 0)
+
+
+class CleanReadingMixin:
+    """save() cleaning shared by HourlySiteReading and DailySiteReading.
+
+    Consumption over 10000 kWh is treated as a meter glitch: stored as 0 with
+    saving = baseline. (bulk_create / update() skip save(); see
+    wareApp/mqtt/consumption_batch.py ``_as_saved`` for the batch path.)
+    """
+
+    baseline_field = None
+
+    def clean_reading_values(self):
+        self.unit_consumption = clean_reading_float(self.unit_consumption)
+        setattr(self, self.baseline_field, clean_reading_float(getattr(self, self.baseline_field)))
+        self.energy_saved = clean_reading_float(self.energy_saved)
+        if self.unit_consumption > 10000:
+            self.unit_consumption = 0
+            self.energy_saved = getattr(self, self.baseline_field)
+
+    def save(self, *args, **kwargs):
+        self.clean_reading_values()
+        super().save(*args, **kwargs)
 
 
 class User(AbstractUser):
@@ -34,31 +52,31 @@ class User(AbstractUser):
         (4, "Customer"),
         (5, "Cust_Site_Manager"),
     )
-    UserType = models.PositiveIntegerField(default=1, choices=user_type)
+    # Least privilege: a user created without a type is a Customer (it used to
+    # default to Super_Admin, which also grants admin-site access).
+    UserType = models.PositiveIntegerField(default=4, choices=user_type)
     Contact_number = models.CharField(
         max_length=15, help_text="Enter the contact number"
     )
 
 
 def Create_Group(sender, instance, *args, **kwargs):
-    if instance._state.adding is True and len(
-        Group.objects.filter(name=instance.get_UserType_display())
-    ):
-        print("Group has been created successfully ")
-        Group.objects.create(name=instance.get_UserType_display())
+    """Make sure the group of a new user's type exists (it used to be created
+    only when it already existed, which raised IntegrityError)."""
+    if instance._state.adding:
+        Group.objects.get_or_create(name=instance.get_UserType_display())
 
 
-def Add_group_to_user(sender, instance, *args, **kwargs):
-    try:
-        if instance.UserType == 1:
-            User.objects.filter(username=instance.username).update(is_staff=True)
-        g = Group.objects.filter(name=instance.get_UserType_display())
-        print(g)
-        print("Instance has been added inside the group")
-        instance.groups.set(g)
+def Add_group_to_user(sender, instance, *args, update_fields=None, **kwargs):
+    """Put the user in the group of its type; Super_Admin users get admin access.
 
-    except Exception:
-        pass
+    Skipped for saves that only touch last_login (every login).
+    """
+    if update_fields is not None and set(update_fields) <= {"last_login"}:
+        return
+    if instance.UserType == 1 and not instance.is_staff:
+        User.objects.filter(pk=instance.pk).update(is_staff=True)
+    instance.groups.set(Group.objects.filter(name=instance.get_UserType_display()))
 
 
 post_save.connect(Add_group_to_user, sender=User)
@@ -82,8 +100,6 @@ class CustomerInfo(models.Model):
     total_energy_saved = models.FloatField(default=0)
     total_sites = models.PositiveIntegerField(default=0)
 
-    def __unicode__(self):
-        return self.customer.username
 
     def __str__(self):
         return self.customer.username
@@ -117,7 +133,6 @@ class Site(models.Model):
     current_baseline = models.FloatField(null=True, blank=True)
     consumed_energy = models.FloatField(null=True, blank=True)
     total_energy_saved = models.FloatField(null=True, blank=True)
-    # site_manager = models.ForeignKey(User, related_name='site_manager', on_delete=models.CASCADE, null=True, blank=True)
     site_manager = models.CharField(max_length=50, null=True, blank=True)
     site_manager_contact = models.CharField(max_length=50, null=True, blank=True)
     site_manager_email = models.EmailField(max_length=50, null=True, blank=True)
@@ -214,8 +229,6 @@ class HomeGatewayId(models.Model):
         max_length=10, unique=True, blank=True, null=True
     )
 
-    def __unicode__(self):
-        return self.hgw_id
 
     def __str__(self):
         return self.hgw_id
@@ -232,9 +245,7 @@ class SupplyLoadTimeShare(models.Model):
         (5, "DG 5"),
     )
     power_source = models.PositiveSmallIntegerField(default=0, choices=sources)
-    # power_source = models.CharField(max_length=40, blank=True, null=True)
     hourly_run_time = models.IntegerField()
-    # total_run_time_till_date = models.IntegerField()
     reading_from = models.DateTimeField(default=timezone.now)
     reading_to = models.DateTimeField(default=timezone.now)
 
@@ -260,9 +271,6 @@ class Image(models.Model):
     def __str__(self):
         return self.image_file
 
-    def __unicode__(self):
-        return self.image_file
-
 
 class BlockInfo(models.Model):
     block_name = models.CharField(max_length=50)
@@ -272,18 +280,12 @@ class BlockInfo(models.Model):
     def __str__(self):
         return self.block_name + " " + str(self.site_id)
 
-    def __unicode__(self):
-        return self.block_name + " " + str(self.site_id)
-
 
 class Panel(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     panel = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return self.panel + " " + str(self.site)
-
-    def __unicode__(self):
         return self.panel + " " + str(self.site)
 
 
@@ -300,9 +302,6 @@ class Floor(models.Model):
     floor = models.CharField(max_length=30, choices=FLOOR, null=True, blank=True)
 
     def __str__(self):
-        return self.floor + " " + str(self.site)
-
-    def __unicode__(self):
         return self.floor + " " + str(self.site)
 
 
@@ -370,28 +369,12 @@ class AisleGroup(models.Model):
     def __str__(self):
         return self.aisleGroupName + " " + str(self.site)
 
-    def __unicode__(self):
-        return self.aisleGroupName + " " + str(self.site)
 
-
-# class DgFuelSystem(models.Model):
-#   aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
-#  identifier = models.CharField(max_length=200, null = False, blank=False)
-
-
-# def __str__(self):
-#    return f'{self.aisle_group.aisleGroupName} - {self.identifier}'
-
-
-def aisle_group_update_leg_id(sender, instance, *args, **kwargs):
-    if instance:
-        print("new id generated is : ", instance.id)
-        leg_id = AisleGroup.objects.filter(id=instance.id).update(
-            attached_leg_id=instance.id
-        )
-        print("leg is successfully update")
-        a = AisleGroup.objects.get(id=instance.id).attached_leg_id
-        print("leg id is :", a)
+def aisle_group_update_leg_id(sender, instance, created=False, **kwargs):
+    """A new aisle group's leg id is its own id (set once, on creation)."""
+    if created and str(instance.attached_leg_id or "") != str(instance.id):
+        AisleGroup.objects.filter(id=instance.id).update(attached_leg_id=instance.id)
+        instance.attached_leg_id = str(instance.id)
 
 
 post_save.connect(aisle_group_update_leg_id, sender=AisleGroup)
@@ -407,11 +390,10 @@ class AisleInfo(models.Model):
     def __str__(self):
         return self.aisle_name
 
-    def __unicode__(self):
-        return self.aisle_name
 
+class HourlySiteReading(CleanReadingMixin, models.Model):
+    baseline_field = "hourly_baseline_value"
 
-class HourlySiteReading(models.Model):
     associated_Site = models.ForeignKey(
         Site, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -426,28 +408,6 @@ class HourlySiteReading(models.Model):
     reading_to = models.DateTimeField(blank=True, null=True)
     is_visible = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        # Sanitize floats — catch NaN, inf, and garbage values
-        def clean_float(val, default=0):
-            try:
-                val = float(val)
-                if math.isnan(val) or math.isinf(val):
-                    return default
-                return max(val, 0)
-            except (TypeError, ValueError):
-                return default
-
-        # print("actual value: ", self.unit_consumption)
-        self.unit_consumption = clean_float(self.unit_consumption)
-        self.hourly_baseline_value = clean_float(self.hourly_baseline_value)
-        self.energy_saved = clean_float(self.energy_saved)
-        # print("clean Value: ", self.unit_consumption)
-
-        if self.unit_consumption > 10000:
-            self.unit_consumption = 0
-            self.energy_saved = self.hourly_baseline_value
-
-        super(HourlySiteReading, self).save(*args, **kwargs)
 
     class Meta:
         indexes = [
@@ -466,7 +426,9 @@ class HourlySiteReading(models.Model):
         return str(self.leg_id)
 
 
-class DailySiteReading(models.Model):
+class DailySiteReading(CleanReadingMixin, models.Model):
+    baseline_field = "daily_baseline_value"
+
     associated_Site = models.ForeignKey(
         Site, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -480,28 +442,6 @@ class DailySiteReading(models.Model):
     reading_for = models.DateField(blank=True, null=True)
     is_visible = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        # Sanitize floats — catch NaN, inf, and garbage values
-        def clean_float(val, default=0):
-            try:
-                val = float(val)
-                if math.isnan(val) or math.isinf(val):
-                    return default
-                return max(val, 0)
-            except (TypeError, ValueError):
-                return default
-
-        # print("actual value: ", self.unit_consumption)
-        self.unit_consumption = clean_float(self.unit_consumption)
-        self.daily_baseline_value = clean_float(self.daily_baseline_value)
-        self.energy_saved = clean_float(self.energy_saved)
-        # print("clean Value: ", self.unit_consumption)
-
-        if self.unit_consumption > 10000:
-            self.unit_consumption = 0
-            self.energy_saved = self.daily_baseline_value
-
-        super(DailySiteReading, self).save(*args, **kwargs)
 
     class Meta:
         indexes = [
@@ -543,7 +483,6 @@ class SiteBaseline(models.Model):
     leg_id = models.CharField(max_length=50, null=True, blank=True)
     baseline_value = models.FloatField(default=0)
     working_hours = models.FloatField(default=24)
-    # created = models.DateTimeField(auto_now=True)
     baseline_from = models.DateField(blank=True, null=True)
     baseline_to = models.DateField(blank=True, null=True)
 
@@ -557,34 +496,6 @@ class SiteBaseline(models.Model):
                 name="idx_baseline_site_leg_dates",
             )
         ]
-
-
-# class AlarmNotifications(models.Model):
-#     created_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-#     site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
-#     USER_LEVEL = ((1, 'Super_Admin'), (2, 'Aviconn_Admin'), (3, 'Aviconn_Executive'), (4, "Customer"),
-#                   (5, 'Cust_Site_Manager'))
-#     user_level = models.PositiveIntegerField(choices=USER_LEVEL, default=1)
-#     OBJECT_TYPE = ((0, 'No_Type'), (1, 'Sensor'), (3, 'Light'), (4, 'Meter'), (5, 'Gateway'))
-#     object_type = models.PositiveIntegerField(default=0, choices=OBJECT_TYPE)
-#     object_id = models.PositiveIntegerField(blank=True, null=True)
-#     alarm_type = ((0, "Low_balance"), (1, "Power_Cut"), (2, "Pending Balance"), (3, "Pending Request"),
-#                   (4, "Zero balance"), (5, "Box opened"), (6, "Internet_Gone"), (7, "No meter reading"))
-#     Alarm_type = models.PositiveIntegerField(choices=alarm_type)
-#     create_DateTime = models.DateTimeField(auto_now=False, auto_now_add=True)
-#     alarm_priorities = ((0, 'Normal'), (1, 'High'))
-#     Alarm_priority = models.PositiveIntegerField(choices=alarm_priorities, default=0)
-#     created_time = models.DateTimeField(default=timezone.now)
-#     to_do = models.CharField(max_length=200, blank=True, null=True)
-#     off_time = models.DateTimeField(default=timezone.now)
-#     cloud_time = models.DateTimeField(auto_now=False, auto_now_add=True)
-#     is_active = models.BooleanField(default=True)
-
-#     def __unicode__(self):
-#         return "Notification for {}".format(str(self.site_id))
-
-#     def __str__(self):
-#         return "Notification for {}".format(str(self.site_id))
 
 
 class AlarmNotifications(models.Model):
@@ -650,8 +561,6 @@ class AlarmNotifications(models.Model):
             ),
         ]
 
-    def __unicode__(self):
-        return "Notification for {}".format(str(self.site_id))
 
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))
@@ -680,8 +589,6 @@ class OTP(models.Model):
     user_id = models.PositiveIntegerField(default=0)
     created = models.DateTimeField(auto_now=False, auto_now_add=True)
 
-    def __unicode__(self):
-        return "OTP  {} on {}".format(self.otp, self.created)
 
     def __str__(self):
         return "OTP  {} on {}".format(self.otp, self.created)
@@ -740,21 +647,6 @@ class SiteLoadPower(models.Model):
             )
         )
 
-    def __unicode__(self):
-        return (
-            "Total Load: {},R-phase voltage: {}, Y-phase voltage: {}, B-phase voltage: {},"
-            " R-phase current: {},"
-            " Y-phase current: {}, B-phase current: {}".format(
-                str(self.Site_Total_Load),
-                str(self.r_volt),
-                str(self.y_volt),
-                str(self.b_volt),
-                str(self.r_current),
-                str(self.y_current),
-                str(self.b_current),
-            )
-        )
-
 
 class MeterSource(models.Model):
     Associated_Site = models.ForeignKey(
@@ -780,9 +672,6 @@ class MeterSource(models.Model):
     is_PS2_valid = models.BooleanField(default=False)
 
     def __str__(self):
-        return str(self.power_source_1)
-
-    def __unicode__(self):
         return str(self.power_source_1)
 
 
@@ -816,8 +705,6 @@ class MeterReadings(models.Model):
     previous_reading_value = models.CharField(max_length=100, null=True, blank=True)
     updated_on = models.DateTimeField(default=timezone.now)
 
-    def __unicode__(self):
-        return self.reading_of
 
     def __str__(self):
         return self.reading_of
@@ -968,7 +855,7 @@ class HourlyLoadData(models.Model):
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
-    updated_on = models.DateTimeField(auto_now=datetime.now())
+    updated_on = models.DateTimeField(auto_now=True)
     is_bypassed = models.BooleanField(default=False)
 
     class Meta:
@@ -995,7 +882,7 @@ class DailyLoadData(models.Model):
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
-    updated_on = models.DateTimeField(auto_now=datetime.now())
+    updated_on = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
@@ -1018,7 +905,7 @@ class MainsDgLoadData(models.Model):
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=200, blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
-    updated_on = models.DateTimeField(auto_now=datetime.now())
+    updated_on = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return str(self.load_data)
@@ -1060,8 +947,7 @@ class MonthlyMinMaxLoadData(models.Model):
 
 class DGAlertsData(models.Model):
     alert_data = JSONField(default=dict)
-    created = models.DateTimeField(auto_now=datetime.now())
-    # created_at = models.DateTimeField(null = True)
+    created = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return str(self.alert_data)
@@ -1073,7 +959,6 @@ class DgFuelConsumptionData(models.Model):
         AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
     )
     vehicle_number = models.CharField(max_length=50, null=True, blank=True, default=1)
-    # vehicle_number = models.ForeignKey(DgFuelSystem, on_delete=models.CASCADE, null=True, blank=True)
     fuel_consumption = models.FloatField(default=0, null=True, blank=True)
     # Source of the fuel data (e.g. 'loconav' or 'roadcast')
     fuel_data_source = models.CharField(max_length=32, null=True, blank=True)
@@ -1111,7 +996,7 @@ class DgUnitConsumption(models.Model):
     dg_start_date = models.DateTimeField(blank=True, null=True)
     dg_end_date = models.DateTimeField(blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
-    updated_on = models.DateTimeField(auto_now=datetime.now())
+    updated_on = models.DateTimeField(auto_now=True)
     epoch_time = models.CharField(max_length=50, null=True, blank=True)
     is_dg_on = models.BooleanField(default=False)
     fetch_fuel_data = models.BooleanField(default=False)
@@ -1179,8 +1064,6 @@ class NewAlarmsNotifications(models.Model):
     off_time = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
-    def __unicode__(self):
-        return "Notification for {}".format(str(self.site_id))
 
     def save(self, *args, **kwargs):
         def _safe_round(val):
@@ -1221,14 +1104,14 @@ class SiteLoadParameters(models.Model):
     b_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
 
-    def __unicode__(self):
-        return "Notification for {}".format(str(self.site_id))
 
     def save(self, *args, **kwargs):
-        self.r_phase = round(float(self.r_phase), 2)
-        self.y_phase = round(float(self.y_phase), 2)
-        self.b_phase = round(float(self.b_phase), 2)
-        super(SiteLoadParameters, self).save(*args, **kwargs)
+        # Phases are optional; round only the ones that are set.
+        for name in ("r_phase", "y_phase", "b_phase"):
+            value = getattr(self, name)
+            if value is not None:
+                setattr(self, name, round(float(value), 2))
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))

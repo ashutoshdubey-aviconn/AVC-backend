@@ -17,7 +17,9 @@ from wareApp.models import (
     Site,
     User,
 )
-from wareApp.serializers import CustomerInfoSerializer, SiteSerializer, Token
+from rest_framework.authtoken.models import Token
+
+from wareApp.serializers import CustomerInfoSerializer, SiteSerializer
 from wareApp.utility import entryExit, logger
 
 

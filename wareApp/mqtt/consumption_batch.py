@@ -21,7 +21,6 @@ still written. Messages are acknowledged by the caller only after the commit.
 
 import json
 import logging
-import math
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -291,32 +290,13 @@ def _last_hourly_entry(state):
     return max(candidates, key=lambda r: (r.reading_from, r.pk or 10**18))
 
 
-def _clean_float(value):
-    try:
-        value = float(value)
-    except (TypeError, ValueError):
-        return 0
-    if math.isnan(value) or math.isinf(value):
-        return 0
-    return max(value, 0)
-
-
 def _as_saved(row):
-    """Apply what HourlySiteReading/DailySiteReading.save() does to a new row.
+    """Apply what the model's save() does (CleanReadingMixin) to a new row.
 
     bulk_create skips save(); the per-packet path creates rows with
-    objects.create(), so new rows get the same cleaning here (NaN/inf/negative
-    -> 0, consumption over 10000 -> 0 with saving = baseline).
+    objects.create(), so new rows get the same cleaning here.
     """
-    baseline_field = (
-        "hourly_baseline_value" if isinstance(row, HourlySiteReading) else "daily_baseline_value"
-    )
-    row.unit_consumption = _clean_float(row.unit_consumption)
-    setattr(row, baseline_field, _clean_float(getattr(row, baseline_field)))
-    row.energy_saved = _clean_float(row.energy_saved)
-    if row.unit_consumption > 10000:
-        row.unit_consumption = 0
-        row.energy_saved = getattr(row, baseline_field)
+    row.clean_reading_values()
     return row
 
 

@@ -1,6 +1,8 @@
-import time
-import requests
+import base64
 import logging
+import time
+
+import requests
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -34,6 +36,41 @@ def _try_request(
     return None
 
 
+# Credentials come from settings (warehouse/.env), never from this file.
+ROADCAST_PULL_API_URL = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api"
+
+
+def _roadcast_credentials():
+    return (
+        getattr(settings, "ROADCAST_PULL_USERNAME", ""),
+        getattr(settings, "ROADCAST_PULL_PASSWORD", ""),
+    )
+
+
+def _roadcast_headers():
+    """Basic auth header for the Roadcast report API ({} when not configured)."""
+    username, password = _roadcast_credentials()
+    if not username or not password:
+        LOG.warning("Roadcast: ROADCAST_PULL_USERNAME/PASSWORD not configured")
+        return {}
+    token = base64.b64encode(f"{username}:{password}".encode()).decode()
+    return {"Authorization": f"Basic {token}"}
+
+
+def _roadcast_pull_params():
+    username, password = _roadcast_credentials()
+    return {"username": username, "password": password}
+
+
+def _loconav_headers():
+    """Loconav API token header ({} when not configured)."""
+    token = getattr(settings, "LOCONAV_API_TOKEN", "")
+    if not token:
+        LOG.warning("Loconav: LOCONAV_API_TOKEN not configured")
+        return {}
+    return {"User-Authentication": token}
+
+
 def _to_float(value) -> Optional[float]:
     if value is None:
         return None
@@ -53,7 +90,7 @@ def fetch_roadcast_fuel(
     Returns numeric value or None on failure.
     """
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    headers = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    headers = _roadcast_headers()
     params = {
         "device_imei": vehicle_imei,
         "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -76,8 +113,8 @@ def fetch_roadcast_fuel(
 
     # mapping fallback: try to map imei/deviceId to canonical device and retry once
     try:
-        map_url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
-        m = _try_request(map_url, timeout=8, retries=2)
+        map_url = ROADCAST_PULL_API_URL
+        m = _try_request(map_url, params=_roadcast_pull_params(), timeout=8, retries=2)
         if m is not None and m.status_code == 200:
             mj = m.json()
             for dev in mj.get("data", []) if isinstance(mj, dict) else []:
@@ -113,14 +150,13 @@ def fetch_roadcast_fuel(
 
 
 def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
-    url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api"
-    username = getattr(settings, "ROADCAST_PULL_USERNAME", "")
-    password = getattr(settings, "ROADCAST_PULL_PASSWORD", "")
+    username, password = _roadcast_credentials()
     if not username or not password:
         LOG.warning("fetch_roadcast_pull_api: ROADCAST_PULL_USERNAME/PASSWORD not configured")
         return None
-    params = {"username": username, "password": password}
-    response = _try_request(url, params=params, timeout=8, retries=2)
+    response = _try_request(
+        ROADCAST_PULL_API_URL, params=_roadcast_pull_params(), timeout=8, retries=2
+    )
     if response is None or response.status_code != 200:
         return None
     try:
@@ -160,7 +196,7 @@ def fetch_loconav_fuel(
     """Attempt to fetch Loconav fuel consumed between start_dt and end_dt.
     Returns numeric fuel_consumed or None.
     """
-    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+    headers = _loconav_headers()
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 
@@ -292,7 +328,7 @@ def fetch_roadcast_report(
     vehicle_imei: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    headers = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+    headers = _roadcast_headers()
     params = {
         "device_imei": vehicle_imei,
         "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -312,8 +348,10 @@ def fetch_roadcast_report(
             )
 
     try:
-        map_url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
-        mapping_response = _try_request(map_url, timeout=8, retries=2)
+        map_url = ROADCAST_PULL_API_URL
+        mapping_response = _try_request(
+            map_url, params=_roadcast_pull_params(), timeout=8, retries=2
+        )
         if mapping_response is not None and mapping_response.status_code == 200:
             mapping_payload = mapping_response.json()
             for device in (
@@ -353,7 +391,7 @@ def fetch_roadcast_report(
 def fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
-    headers = {"User-Authentication": "51uKh_YaL72s7zhx6bwZ"}
+    headers = _loconav_headers()
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 
