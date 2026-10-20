@@ -239,6 +239,16 @@ def process_mqtt_message(message_type, message_subtype, site_id, gateway_id, mes
     return _dispatch(message_type, message_subtype, site_id, gateway_id, message)
 
 
+@app.task(queue="queue1_processing")
+@_with_database_connection_cleanup
+def flush_consumption_batch():
+    """Write the consumption packets collected since the last run in bulk."""
+    from wareApp.mqtt import consumption_batch
+    from wareApp.mqtt.handlers import publish_recovery_request
+
+    return consumption_batch.flush(publish_recovery_request)
+
+
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):

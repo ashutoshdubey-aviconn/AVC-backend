@@ -27,7 +27,7 @@ class PartitionRoutingTests(SimpleTestCase):
         self.assertEqual(processing_queue_for_site(125), "mqtt.site.1")
         self.assertEqual(processing_queue_for_site(124), "mqtt.site.0")
 
-    @override_settings(MQTT_SITE_PARTITIONS=4)
+    @override_settings(MQTT_SITE_PARTITIONS=4, MQTT_CONSUMPTION_BATCH_SECONDS=0)
     def test_listener_enqueues_on_the_site_partition(self):
         topic = parse_gateway_topic(
             "/Acclivate/iOmniControl/198/gw-198/in/consumption/state"
@@ -260,7 +260,7 @@ class LocalCacheSizeTests(SimpleTestCase):
 
 
 class PersistentMessageSettingTests(SimpleTestCase):
-    @override_settings(MQTT_TRANSIENT_MESSAGES=False)
+    @override_settings(MQTT_TRANSIENT_MESSAGES=False, MQTT_CONSUMPTION_BATCH_SECONDS=0)
     def test_persistent_when_transient_messages_are_off(self):
         topic = parse_gateway_topic("/Acclivate/iOmniControl/198/gw-198/in/consumption/state")
         with patch("wareApp.tasks.process_mqtt_message.apply_async") as enqueue:

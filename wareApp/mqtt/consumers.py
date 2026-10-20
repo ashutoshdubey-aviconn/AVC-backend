@@ -46,6 +46,11 @@ def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
         return False
 
     from wareApp import tasks
+    from wareApp.mqtt import consumption_batch
+
+    if topic.message_type == "consumption" and consumption_batch.batching_enabled():
+        consumption_batch.enqueue(site_id, gateway_id, message)
+        return True
 
     tasks.process_mqtt_message.apply_async(
         args=(topic.message_type, topic.message_subtype, site_id, gateway_id, message),
