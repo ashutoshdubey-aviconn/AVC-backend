@@ -537,6 +537,7 @@ class AlarmNotifications(models.Model):
         (10, "Meter Reading Issue"),
         (11, "Bypassed"),
         (12, "Operation Hours Increased"),
+        (13, "Gateway Overheat"),
     )
     Alarm_type = models.PositiveIntegerField(choices=alarm_type)
     create_DateTime = models.DateTimeField(auto_now=False, auto_now_add=True)
