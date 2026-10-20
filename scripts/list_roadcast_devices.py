@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import requests
+
+from _secrets import ROADCAST_PULL_API_URL, roadcast_pull_params
 import time
 import json
 from pathlib import Path
@@ -8,13 +10,10 @@ OUT_DIR = Path("/home/ashutosh-dubey/django_project/logs/third_party")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Roadcaste 'pull_api' mapping endpoint (used in tasks.py)
-url = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api?username=Aviconn&password=Abc@1234"
-headers = {
-    "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3MjczMzE2MjIsIm5iZiI6MTcyNzMzMTYyMiwianRpIjoiZGMwODI2YzUtYjA3NS00MDg2LWIyNjUtZGM5ZDI3NWEzYjE4IiwiZXhwIjoxNzI3NTkwODIyLCJpZGVudGl0eSI6eyJpZCI6Nzg0NDYsImRiIjowLCJjbyI6MSwibmFtZSI6IkF2aWNvbm4iLCJ0eXBlIjoiYWRtaW4iLCJyZWFkX29ubHkiOjAsInR6IjotMzMwLCJ0el9zIjoiQXNpYS9Lb2xrYXRhIiwic3NvIjowLCJkZXZpY2UiOiJ3ZWIiLCJhbGlhcyI6IiJ9LCJmcmVzaCI6ZmFsc2UsInR5cGUiOiJhY2Nlc3MifQ.Fwn08jciwxlm659ZYEfq1LpQBAf2fddUZ9zrjmrzcmU"
-}
+url = ROADCAST_PULL_API_URL
 
 try:
-    r = requests.get(url, headers=headers, timeout=20)
+    r = requests.get(url, params=roadcast_pull_params(), timeout=20)
     out = {"status_code": r.status_code, "url": r.url, "text": r.text}
 except Exception as e:
     out = {"error": str(e)}

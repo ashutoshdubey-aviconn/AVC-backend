@@ -197,16 +197,16 @@ class FuelProviderCredentialTests(SimpleTestCase):
     @override_settings(ROADCAST_PULL_USERNAME="u", ROADCAST_PULL_PASSWORD="p", LOCONAV_API_TOKEN="t")
     def test_credentials_come_from_settings(self):
         self.assertEqual(
-            fuel_providers._roadcast_headers(),
+            fuel_providers.roadcast_auth_headers(),
             {"Authorization": "Basic " + base64.b64encode(b"u:p").decode()},
         )
-        self.assertEqual(fuel_providers._roadcast_pull_params(), {"username": "u", "password": "p"})
-        self.assertEqual(fuel_providers._loconav_headers(), {"User-Authentication": "t"})
+        self.assertEqual(fuel_providers.roadcast_pull_params(), {"username": "u", "password": "p"})
+        self.assertEqual(fuel_providers.loconav_auth_headers(), {"User-Authentication": "t"})
 
     @override_settings(ROADCAST_PULL_USERNAME="", ROADCAST_PULL_PASSWORD="", LOCONAV_API_TOKEN="")
     def test_unset_credentials_send_no_auth(self):
-        self.assertEqual(fuel_providers._roadcast_headers(), {})
-        self.assertEqual(fuel_providers._loconav_headers(), {})
+        self.assertEqual(fuel_providers.roadcast_auth_headers(), {})
+        self.assertEqual(fuel_providers.loconav_auth_headers(), {})
 
     def test_no_credentials_in_source(self):
         source = open(fuel_providers.__file__).read()

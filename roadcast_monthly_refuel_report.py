@@ -57,10 +57,10 @@ from wareApp.models import (
     Site,
 )
 
+from wareApp.fuel_providers import roadcast_auth_headers  # noqa: E402
+
 ROADCAST_FUEL_URL = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-ROADCAST_USERNAME = os.environ.get("ROADCAST_USERNAME", "Aviconn")
-ROADCAST_PASSWORD = os.environ.get("ROADCAST_PASSWORD", "Abc@1234")
-ROADCAST_AUTH_HEADERS = {"Authorization": "Basic QXZpY29ubjpBYmNAMTIzNA=="}
+# Credentials: ROADCAST_PULL_USERNAME / ROADCAST_PULL_PASSWORD in warehouse/.env.
 PROJECT_ROOT = Path(__file__).resolve().parent
 ROADCAST_RESPONSES_DIR = PROJECT_ROOT / "logs" / "roadcast" / "api_responses"
 
@@ -183,7 +183,7 @@ def _fetch_roadcast_day_report(
         response = requests.get(
             ROADCAST_FUEL_URL,
             params=params,
-            headers=ROADCAST_AUTH_HEADERS,
+            headers=roadcast_auth_headers(),
             timeout=20,
         )
     except requests.RequestException as exc:

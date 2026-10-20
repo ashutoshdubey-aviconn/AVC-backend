@@ -40,16 +40,16 @@ def _try_request(
 ROADCAST_PULL_API_URL = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_api"
 
 
-def _roadcast_credentials():
+def roadcast_credentials():
     return (
         getattr(settings, "ROADCAST_PULL_USERNAME", ""),
         getattr(settings, "ROADCAST_PULL_PASSWORD", ""),
     )
 
 
-def _roadcast_headers():
+def roadcast_auth_headers():
     """Basic auth header for the Roadcast report API ({} when not configured)."""
-    username, password = _roadcast_credentials()
+    username, password = roadcast_credentials()
     if not username or not password:
         LOG.warning("Roadcast: ROADCAST_PULL_USERNAME/PASSWORD not configured")
         return {}
@@ -57,12 +57,12 @@ def _roadcast_headers():
     return {"Authorization": f"Basic {token}"}
 
 
-def _roadcast_pull_params():
-    username, password = _roadcast_credentials()
+def roadcast_pull_params():
+    username, password = roadcast_credentials()
     return {"username": username, "password": password}
 
 
-def _loconav_headers():
+def loconav_auth_headers():
     """Loconav API token header ({} when not configured)."""
     token = getattr(settings, "LOCONAV_API_TOKEN", "")
     if not token:
@@ -90,7 +90,7 @@ def fetch_roadcast_fuel(
     Returns numeric value or None on failure.
     """
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    headers = _roadcast_headers()
+    headers = roadcast_auth_headers()
     params = {
         "device_imei": vehicle_imei,
         "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -114,7 +114,7 @@ def fetch_roadcast_fuel(
     # mapping fallback: try to map imei/deviceId to canonical device and retry once
     try:
         map_url = ROADCAST_PULL_API_URL
-        m = _try_request(map_url, params=_roadcast_pull_params(), timeout=8, retries=2)
+        m = _try_request(map_url, params=roadcast_pull_params(), timeout=8, retries=2)
         if m is not None and m.status_code == 200:
             mj = m.json()
             for dev in mj.get("data", []) if isinstance(mj, dict) else []:
@@ -150,12 +150,12 @@ def fetch_roadcast_fuel(
 
 
 def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
-    username, password = _roadcast_credentials()
+    username, password = roadcast_credentials()
     if not username or not password:
         LOG.warning("fetch_roadcast_pull_api: ROADCAST_PULL_USERNAME/PASSWORD not configured")
         return None
     response = _try_request(
-        ROADCAST_PULL_API_URL, params=_roadcast_pull_params(), timeout=8, retries=2
+        ROADCAST_PULL_API_URL, params=roadcast_pull_params(), timeout=8, retries=2
     )
     if response is None or response.status_code != 200:
         return None
@@ -196,7 +196,7 @@ def fetch_loconav_fuel(
     """Attempt to fetch Loconav fuel consumed between start_dt and end_dt.
     Returns numeric fuel_consumed or None.
     """
-    headers = _loconav_headers()
+    headers = loconav_auth_headers()
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 
@@ -328,7 +328,7 @@ def fetch_roadcast_report(
     vehicle_imei: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
-    headers = _roadcast_headers()
+    headers = roadcast_auth_headers()
     params = {
         "device_imei": vehicle_imei,
         "from_time": start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -350,7 +350,7 @@ def fetch_roadcast_report(
     try:
         map_url = ROADCAST_PULL_API_URL
         mapping_response = _try_request(
-            map_url, params=_roadcast_pull_params(), timeout=8, retries=2
+            map_url, params=roadcast_pull_params(), timeout=8, retries=2
         )
         if mapping_response is not None and mapping_response.status_code == 200:
             mapping_payload = mapping_response.json()
@@ -391,7 +391,7 @@ def fetch_roadcast_report(
 def fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
-    headers = _loconav_headers()
+    headers = loconav_auth_headers()
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
 

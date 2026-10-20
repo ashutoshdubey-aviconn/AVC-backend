@@ -76,9 +76,10 @@ if not logger.handlers:
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-LOCONAV_API_KEY = os.environ.get("LOCONAV_API_KEY", "51uKh_YaL72s7zhx6bwZ")
-ROADCAST_USERNAME = os.environ.get("ROADCAST_USERNAME", "Aviconn")
-ROADCAST_PASSWORD = os.environ.get("ROADCAST_PASSWORD", "Abc@1234")
+# Credentials come from warehouse/.env via settings (never from this file).
+LOCONAV_API_KEY = settings.LOCONAV_API_TOKEN
+ROADCAST_USERNAME = settings.ROADCAST_PULL_USERNAME
+ROADCAST_PASSWORD = settings.ROADCAST_PULL_PASSWORD
 POLL_INTERVAL_SECONDS = int(os.environ.get("DG_FUEL_POLL_INTERVAL_SECONDS", "300"))
 RETRY_BATCH_SIZE = int(os.environ.get("DG_FUEL_RETRY_BATCH_SIZE", "100"))
 RETRY_LIMIT_PER_CYCLE = int(os.environ.get("DG_FUEL_RETRY_LIMIT_PER_CYCLE", "500"))

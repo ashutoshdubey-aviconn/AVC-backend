@@ -4621,7 +4621,7 @@ class CreateCustomerUsingProvisioning(APIView):
         data = request.data
         try:
             username = data.get("customer_name")
-            password = "Aviconn@123#"
+            password = settings.DEFAULT_CUSTOMER_PASSWORD  # removed from source
             customer_type = 4
             email = data.get("customer_email")
             contact = data.get("customer_contact")

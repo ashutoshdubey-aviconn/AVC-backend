@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import os
+
 import psycopg2
 from psycopg2 import sql
 import sys
@@ -12,7 +14,7 @@ try:
             port=5432,
             database="postgres",
             user="postgres",
-            password="postgres"
+            password=os.environ.get("PGPASSWORD", "")
         )
     except:
         # Try without password (trust auth)
@@ -68,7 +70,7 @@ try:
             port=5432,
             database="warehouse",
             user="postgres",
-            password="postgres"
+            password=os.environ.get("PGPASSWORD", "")
         )
     except:
         conn = psycopg2.connect(
