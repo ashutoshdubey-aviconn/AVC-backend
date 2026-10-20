@@ -2,8 +2,8 @@ from django.apps import AppConfig
 
 
 class WareappConfig(AppConfig):
-    defualt_auto_field = 'django.db.models.BigAutoField'
-    name = 'wareApp'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "wareApp"
 
     def ready(self):
         # Register cache-invalidation signal receivers in every process

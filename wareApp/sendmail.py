@@ -1,35 +1,41 @@
 import logging
 import smtplib
 import ssl
-import os
-import random
+import secrets
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from warehouse import settings
+from django.conf import settings
 
-# Try to load project settings like the original code; fall back to Django's settings
+from datetime import timedelta
+
 from django.utils import timezone
 from django.template.loader import render_to_string
 from wareApp.models import OTP, User, Site
 
 logger = logging.getLogger(__name__)
 
-# ---------------- SMTP CONFIG (reads from Django settings) ---------------- #
-SMTP_HOST =  "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USER = "no.reply@aviconncorp.com"
-SMTP_PASS = "fnrv wpyz ofed gkgc"
-USE_TLS = True
-USE_SSL =  False
-DEFAULT_FROM = "no.reply@aviconncorp.com"
-# ------------------------------------------------------------------------ #
+# SMTP configuration comes from Django settings (warehouse/.env: EMAIL_HOST,
+# EMAIL_PORT, EMAIL_USE_TLS, EMAIL_USE_SSL, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD,
+# DEFAULT_FROM_EMAIL). Nothing secret lives in this file.
+
+
+def _smtp_config():
+    user = settings.EMAIL_HOST_USER
+    return {
+        "host": settings.EMAIL_HOST,
+        "port": settings.EMAIL_PORT,
+        "user": user,
+        "password": settings.EMAIL_HOST_PASSWORD,
+        "use_tls": settings.EMAIL_USE_TLS,
+        "use_ssl": getattr(settings, "EMAIL_USE_SSL", False),
+        "timeout": getattr(settings, "EMAIL_TIMEOUT", 10),
+        "from": settings.DEFAULT_FROM_EMAIL or user,
+    }
 
 
 def _alarm_override_recipients():
     """Addresses that replace every alarm email's recipients (test servers), or []."""
-    from django.conf import settings as django_settings
-
-    return list(getattr(django_settings, "ALARM_EMAIL_OVERRIDE_TO", []) or [])
+    return list(getattr(settings, "ALARM_EMAIL_OVERRIDE_TO", []) or [])
 
 
 def _send_smtp_email(
@@ -43,7 +49,7 @@ def _send_smtp_email(
         to (list[str] | str): recipient(s)
         cc (list[str] | None): CC list
         bcc (list[str] | None): BCC list
-        from_email (str | None): From address (defaults to DEFAULT_FROM / SMTP_USER)
+        from_email (str | None): From address (defaults to settings.DEFAULT_FROM_EMAIL or EMAIL_HOST_USER)
     Returns:
         bool: True on success, False otherwise
     """
@@ -73,7 +79,11 @@ def _send_smtp_email(
         logger.warning("Email not sent, no recipients: subject=%r", subject)
         return False
 
-    from_addr = from_email or DEFAULT_FROM or SMTP_USER
+    smtp = _smtp_config()
+    if not smtp["host"]:
+        logger.error("Email failed: subject=%r error=EMAIL_HOST not configured", subject)
+        return False
+    from_addr = from_email or smtp["from"]
 
     # Build MIME message
     msg = MIMEMultipart("alternative")
@@ -87,22 +97,22 @@ def _send_smtp_email(
     recipients = list(dict.fromkeys(to + cc + bcc))  # de-dup while preserving order
 
     try:
-        if USE_SSL and not USE_TLS:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
-                if SMTP_USER and SMTP_PASS:
-                    server.login(SMTP_USER, SMTP_PASS)
-                server.sendmail(from_addr, recipients, msg.as_string())
+        context = ssl.create_default_context()
+        if smtp["use_ssl"] and not smtp["use_tls"]:
+            connection = smtplib.SMTP_SSL(
+                smtp["host"], smtp["port"], context=context, timeout=smtp["timeout"]
+            )
         else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            connection = smtplib.SMTP(smtp["host"], smtp["port"], timeout=smtp["timeout"])
+        with connection as server:
+            if not smtp["use_ssl"]:
                 server.ehlo()
-                if USE_TLS:
-                    context = ssl.create_default_context()
+                if smtp["use_tls"]:
                     server.starttls(context=context)
                     server.ehlo()
-                if SMTP_USER and SMTP_PASS:
-                    server.login(SMTP_USER, SMTP_PASS)
-                server.sendmail(from_addr, recipients, msg.as_string())
+            if smtp["user"] and smtp["password"]:
+                server.login(smtp["user"], smtp["password"])
+            server.sendmail(from_addr, recipients, msg.as_string())
         logger.info("Email sent: subject=%r to=%s", subject, recipients)
         return True
     except Exception as e:  # pragma: no cover
@@ -113,7 +123,8 @@ def _send_smtp_email(
 # ---------------- Helpers ---------------- #
 
 def line(size, li=range(10)):
-    return ''.join(map(str, ([random.choice(li) for _ in range(size)])))
+    """Random digit string (cryptographically secure: used for OTPs)."""
+    return "".join(str(secrets.choice(li)) for _ in range(size))
 
 
 def _now_str():
@@ -149,7 +160,6 @@ def _tpl_footer():
 # ---------------- Original function names (SMTP-based) ---------------- #
 
 def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
-    from_mail = DEFAULT_FROM
     site = Site.objects.get(id=site_id)
     site_name = site.site_name
     location = getattr(site, "location", "-")
@@ -175,7 +185,7 @@ def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
         """
         subject_mail = f"Notification for {site_name},{location} : Alarm for system By-Pass"
         to = ['mandeep.kahlon@aviconncorp.com', 'rnd@aviconn.in']
-        return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=None, from_email=from_mail)
+        return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=None)
     else:
         html_message = f"""
             <html><head></head><body>
@@ -197,11 +207,10 @@ def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
         to = ['nidhish.shahi@myntra.Com']
         cc = ['mandeep.kahlon@aviconncorp.com']
         bcc = ['manish@aviconncorp.com', 'rnd@aviconn.in']
-        return _send_smtp_email(subject_mail, html_message, to, cc=cc, bcc=bcc, from_email=from_mail)
+        return _send_smtp_email(subject_mail, html_message, to, cc=cc, bcc=bcc)
 
 
 def send_mail_fire_alarm_aviconn_user(alarm_type):
-    from_mail = DEFAULT_FROM
     date_str = timezone.now().strftime("%b %d,%Y")
     html_message = f"""
         <html><head></head><body>
@@ -214,64 +223,51 @@ def send_mail_fire_alarm_aviconn_user(alarm_type):
     """
     subject_mail = "Fire Alarm Generated"
     to = ["komal.bhati@aviconn.in", "mandeep.kahlon@aviconncorp.com"]
-    return _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to)
+
+
+# Fire-equipment (FEMS) service and warranty reminders: same template and
+# recipients, only the subject differs. The internal BCC list these functions
+# used to build was never passed to the sender, so it is left out.
+_FEMS_RECIPIENTS = [
+    "jatender.talwandi@myntra.com",
+    "rewexecutivebinola@myntra.com",
+    "jatender.s@flipkart.com",
+]
+
+
+def _send_fems_email(devices, subject, extra_to=()):
+    html_message = render_to_string("femDeviceEmail.html", {"allDevicesData": devices})
+    return _send_smtp_email(subject, html_message, [*_FEMS_RECIPIENTS, *extra_to])
 
 
 def send_mail_fire_equipments_system_8days_before(devices, userEmail):
-    from_mail = DEFAULT_FROM
-    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
-    html_message = render_to_string(f"{htmlPath}/femDeviceEmail.html", {"allDevicesData": devices})
-    subject = 'FEMS Device next service date information alert Before 8 Days'
-    to = [
-        "Jatender.talwandi@myntra.Com",
-        "rewexecutivebinola@myntra.com", "jatender.s@flipkart.com"
-    ]
-    bcc = ["mandeep.kahlon@aviconncorp.com","ashutosh.dubey@aviconncorp.com"]
-    return _send_smtp_email(subject, html_message, to, from_email=from_mail)
+    return _send_fems_email(
+        devices, "FEMS Device next service date information alert Before 8 Days"
+    )
 
 
 def send_mail_fire_equipments_system_after4days(devices, userEmail):
-    from_mail = DEFAULT_FROM
-    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
-    html_message = render_to_string(f"{htmlPath}/femDeviceEmail.html", {"allDevicesData": devices})
-    subject = 'FEMS device service due information alert After 4 days'
-    to = [
-        "Jatender.talwandi@myntra.Com", 
-        "Rewexecutivebinola@myntra.Com", "jatender.s@flipkart.com", "rewexecutivebinola@myntra.com"
-    ]
-    bcc = ["mandeep.kahlon@aviconncorp.com","ashutosh.dubey@aviconncorp.com"]
-    return _send_smtp_email(subject, html_message, to, from_email=from_mail)
+    return _send_fems_email(
+        devices, "FEMS device service due information alert After 4 days"
+    )
 
 
 def send_mail_fire_equipments_system_45days_before(devices, userEmail):
-    from_mail = DEFAULT_FROM
-    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
-    html_message = render_to_string(f"{htmlPath}/femDeviceEmail.html", {"allDevicesData": devices})
-    subject = 'Before 45 Days device Warranty expired information alert.'
-    to = [
-        "Jatender.talwandi@myntra.Com",
-        "Rewexecutivebinola@myntra.Com", "Binolasecurity@myntra.Com", "rewexecutivebinola@myntra.com", 
-        "jatender.s@flipkart.com"
-    ]
-    bcc = ["mandeep.kahlon@aviconncorp.com","ashutosh.dubey@aviconncorp.com"]
-    return _send_smtp_email(subject, html_message, to, from_email=from_mail)
+    return _send_fems_email(
+        devices,
+        "Before 45 Days device Warranty expired information alert.",
+        extra_to=["binolasecurity@myntra.com"],
+    )
 
 
 def send_mail_fire_equipments_system_30days_before(devices, userEmail):
-    from_mail = DEFAULT_FROM
-    htmlPath = os.path.join(settings.BASE_DIR, 'templates')
-    html_message = render_to_string(f"{htmlPath}/femDeviceEmail.html", {"allDevicesData": devices})
-    subject = 'Before 30 Days device Warranty expired information alert.'
-    to = [
-        "Jatender.talwandi@myntra.Com",
-        "Rewexecutivebinola@myntra.Com", "jatender.s@flipkart.com", "rewexecutivebinola@myntra.com"
-    ]
-    bcc = ["mandeep.kahlon@aviconncorp.com","ashutosh.dubey@aviconncorp.com"]
-    return _send_smtp_email(subject, html_message, to, from_email=from_mail)
+    return _send_fems_email(
+        devices, "Before 30 Days device Warranty expired information alert."
+    )
 
 
 def send_mail_fire_alarm_user(email, alarm_type, device_type, motor_status=0):
-    from_mail = DEFAULT_FROM
 
     if motor_status == 1:
         motor_mode = "Yes"
@@ -352,11 +348,10 @@ def send_mail_fire_alarm_user(email, alarm_type, device_type, motor_status=0):
     subject_mail = "Aviconn IOT System Notification - Change in Status"
     to = ["rewexecutivebinola@myntra.com", "jatender.s@flipkart.com"]
     bcc = ['ashutosh.dubey@aviconncorp.com', 'mandeep.kahlon@aviconncorp.com']
-    return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=bcc, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=bcc)
 
 
 def send_mail_for_motor_aviconn_user(motor):
-    from_mail = DEFAULT_FROM
     date_str = timezone.now().strftime("%b %d,%Y")
     html_message = f"""
     <html><head></head><body>
@@ -369,13 +364,18 @@ def send_mail_for_motor_aviconn_user(motor):
     """
     subject_mail = "Motor Status"
     to = ["komal.bhati@aviconn.in", "mandeep.kahlon@aviconncorp.com"]
-    return _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to)
 
 
 def emailcheck(id, username, email):
-    from_mail = DEFAULT_FROM
     userId = User.objects.get(username=username).id
     otp = line(5)
+    # One valid code per user; expired codes of everyone are dropped.
+    valid_after = timezone.now() - timedelta(
+        minutes=getattr(settings, "PASSWORD_RESET_OTP_MINUTES", 10)
+    )
+    OTP.objects.filter(user_id=userId).delete()
+    OTP.objects.filter(created__lt=valid_after).delete()
     OTP.objects.create(otp=otp, user_id=userId)
     date_str = timezone.now().strftime("%b %d,%Y")
 
@@ -397,12 +397,11 @@ def emailcheck(id, username, email):
 
     subject_mail = "Password Change Request for Your Smart Meter Account"
     to = [email]
-    _send_smtp_email(subject_mail, html_message, to, from_email=from_mail, is_alarm=False)
+    _send_smtp_email(subject_mail, html_message, to, is_alarm=False)
     return otp
 
 
 def send_mail_fire_equipments_system(device):
-    from_mail = DEFAULT_FROM
     html_message = f"""
         <html><head></head><body>
         Dear Customer,
@@ -416,7 +415,7 @@ def send_mail_fire_equipments_system(device):
     subject_mail = "fire Equipemnt System"
     to = ['komalbhati8527@gmai.com']
     bcc = ['komal.bhati@aviconn.in', 'mandeep.kahlon@aviconncorp.com', "ashutosh.dubey@aviconncorp.com"]
-    return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=bcc, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to, cc=None, bcc=bcc)
 
 
 def send_mail_for_pf_fluctuation(data):
@@ -477,7 +476,6 @@ def send_alarm_for_high_voltage(data):
     r_max_volt = data['r_volt_threshold']
     y_max_volt = data['y_volt_threshold']
     b_max_volt = data['b_volt_threshold']
-    from_mail = DEFAULT_FROM
 
     r_phase_color = 'color:red;' if int(data['r_volts']) > int(r_max_volt) else 'color:green;'
     y_phase_color = 'color:red;' if int(data['y_volts']) > int(y_max_volt) else 'color:green;'
@@ -504,7 +502,7 @@ def send_alarm_for_high_voltage(data):
 
     subject_mail = "High Voltage Alarm Testing"
     to = ['abhishek.mehra@aviconn.in','mandeep.kahlon@aviconncorp.com']
-    return _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to)
 
 
 def send_alarm_for_low_voltage(data):
@@ -513,7 +511,6 @@ def send_alarm_for_low_voltage(data):
     r_min_volt = data['r_volt_threshold']
     y_min_volt = data['y_volt_threshold']
     b_min_volt = data['b_volt_threshold']
-    from_mail = DEFAULT_FROM
 
     r_phase_color = 'color:red;' if int(data['r_volts']) < int(r_min_volt) else 'color:green;'
     y_phase_color = 'color:red;' if int(data['y_volts']) < int(y_min_volt) else 'color:green;'
@@ -540,13 +537,12 @@ def send_alarm_for_low_voltage(data):
 
     subject_mail = "Low Voltage Alarm Testing"
     to = ['abhishek.mehra@aviconn.in', 'mandeep.kahlon@aviconncorp.com']
-    return _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to)
 
 
 def send_mail_for_dg_fuel_under_level(data):
     site = Site.objects.get(id=data['site_id'])
     site_name = site.site_name
-    from_mail = DEFAULT_FROM
 
     html_message = f"""
         <html><head><title>Fuel Level Alarm</title></head>
@@ -567,12 +563,11 @@ def send_mail_for_dg_fuel_under_level(data):
 
     subject_mail = "Fuel Level Alarm Testing"
     to = ['abhishek.mehra@aviconn.in','mandeep.kahlon@aviconncorp.com']
-    return _send_smtp_email(subject_mail, html_message, to, from_email=from_mail)
+    return _send_smtp_email(subject_mail, html_message, to)
 
 
 def send_alarm_for_dg_overtime(data):
-    site = Site.objects.get(id=data['site_id'])
-    # Original function was a stub; preserved.
+    # Not implemented yet (no email is sent for DG overtime).
     return None
 
 

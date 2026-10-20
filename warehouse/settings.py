@@ -40,7 +40,6 @@ CORS_ORIGIN_ALLOW_ALL = config("CORS_ORIGIN_ALLOW_ALL", default=True, cast=bool)
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=False, cast=bool)
 SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=False, cast=bool)
 CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=False, cast=bool)
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
@@ -102,8 +101,18 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "5/minute", "user": "1000/minute"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "5/minute",
+        "user": "1000/minute",
+        # forgot/ and reset/ together, per client IP.
+        "password_reset": config("PASSWORD_RESET_RATE", default="10/hour"),
+    },
 }
+
+# Password reset (wareApp/views/auth.py): OTP lifetime, and whether forgot/
+# also returns the OTP in its response (old clients; off = only by e-mail).
+PASSWORD_RESET_OTP_MINUTES = config("PASSWORD_RESET_OTP_MINUTES", default=10, cast=int)
+PASSWORD_RESET_RETURN_OTP = config("PASSWORD_RESET_RETURN_OTP", default=False, cast=bool)
 
 # --- Database -------------------------------------------------------------------
 
@@ -211,9 +220,12 @@ ALARM_REEVALUATE_DAYS = config("ALARM_REEVALUATE_DAYS", default=7, cast=int)
 
 # --- DG fuel providers -----------------------------------------------------------
 
-# Roadcast pull API (wareApp/fuel_providers.py); the pull is skipped when unset.
+# Roadcast API (wareApp/fuel_providers.py): pull API and the Basic-auth report
+# API use the same account; the Roadcast pull is skipped when unset.
 ROADCAST_PULL_USERNAME = config("ROADCAST_PULL_USERNAME", default="")
 ROADCAST_PULL_PASSWORD = config("ROADCAST_PULL_PASSWORD", default="")
+# Loconav fuel API token; the Loconav pull is skipped when unset.
+LOCONAV_API_TOKEN = config("LOCONAV_API_TOKEN", default="")
 
 # --- Cache ----------------------------------------------------------------------
 
@@ -350,10 +362,13 @@ LOGGING = {
             "formatter": "verbose",
         },
         "file": {
-            "level": "DEBUG",
-            "class": "logging.FileHandler",
+            # Rotated (was an ever-growing FileHandler: 206 MB on test).
+            "level": config("DEBUG_LOG_LEVEL", default="INFO"),
+            "class": "logging.handlers.RotatingFileHandler",
             "filename": f"{LOG_FILE}/debug.log",
             "formatter": "verbose",
+            "maxBytes": 20 * 1024 * 1024,
+            "backupCount": 5,
         },
         "recovery_file": {
             "level": "INFO",
@@ -397,16 +412,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "wareApp.dg_fuel.ingestion": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "wareApp.dg_fuel.sessions": {
-            "handlers": ["dg_fuel_file", "console"],
-            "level": "INFO",
-            "propagate": False,
-        },
+        # wareApp.dg_fuel.* (ingestion, sessions) inherit the logger above.
         "fetch_fuel_data": {
             "handlers": ["dg_fuel_file", "console"],
             "level": "INFO",

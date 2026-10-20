@@ -1,9 +1,57 @@
 from django.contrib import admin
-from django.contrib.admin import ModelAdmin
-from .models import *
+
+from wareApp.mqtt.services.cooldown import release_recovery_request
+from .models import (
+    AisleGroup,
+    AisleInfo,
+    AisleSyncRecoveryStatus,
+    AlarmNotifications,
+    BlockInfo,
+    CustomerInfo,
+    CustomerSiteManager,
+    DGAlertsData,
+    DGFuelAlertsData,
+    DailyLoadData,
+    DailySiteReading,
+    DgFuelConsumptionData,
+    DgUnitConsumption,
+    Email_History,
+    FansData,
+    FireEquipmentsSystem,
+    FireEquipmentsSystemType,
+    FirePumpAlarm,
+    Floor,
+    HomeGatewayId,
+    HourlyLoadData,
+    HourlySiteReading,
+    Image,
+    LightsData,
+    MainsDgLoadData,
+    MeterDisconnectionEvent,
+    MeterSource,
+    MonthlyLoadSharePercentage,
+    MonthlyMinMaxLoadData,
+    MqttDeadLetter,
+    NewAlarmsNotifications,
+    Panel,
+    PowerFactorData,
+    RawLoadData,
+    RecoveryMonitor,
+    SensorAisleUnitConsumption,
+    Site,
+    SiteBaseline,
+    SiteCeleryPing,
+    SiteConsumptionPing,
+    SiteLoadParameters,
+    SiteLoadPower,
+    SupplyLoadTimeShare,
+    User,
+)
 
 
+@admin.register(HourlySiteReading)
 class HourlyReadingFields(admin.ModelAdmin):
+    list_select_related = ["associated_Site", "aisle_group"]
 
     list_display = [
         "associated_Site",
@@ -13,11 +61,10 @@ class HourlyReadingFields(admin.ModelAdmin):
         "reading_to",
     ]
 
-    class Meta:
-        model = HourlySiteReading
 
-
+@admin.register(SupplyLoadTimeShare)
 class SupplyTimeShareFields(admin.ModelAdmin):
+    list_select_related = ["site"]
 
     list_display = [
         "site",
@@ -27,19 +74,16 @@ class SupplyTimeShareFields(admin.ModelAdmin):
         "reading_to",
     ]
 
-    class Meta:
-        model = SupplyLoadTimeShare
 
-
-class siteLoadPower(admin.ModelAdmin):
+@admin.register(SiteLoadPower)
+class SiteLoadPowerAdmin(admin.ModelAdmin):
     list_display = ["Associated_Site", "Supply_Source", "Status"]
     readonly_fields = ("Supply_Source", "Meter_Number")
 
-    class Meta:
-        model = SiteLoadPower
 
-
-class monthlyLoadSharePercentage(admin.ModelAdmin):
+@admin.register(MonthlyLoadSharePercentage)
+class MonthlyLoadSharePercentageAdmin(admin.ModelAdmin):
+    list_select_related = ["site"]
     list_display = [
         "site",
         "power_source",
@@ -48,11 +92,10 @@ class monthlyLoadSharePercentage(admin.ModelAdmin):
         "monthly_energy_based_percentage",
     ]
 
-    class Meta:
-        model = MonthlyLoadSharePercentage
 
-
+@admin.register(DailySiteReading)
 class DailyReadingFields(admin.ModelAdmin):
+    list_select_related = ["associated_Site", "aisle_group"]
     list_display = [
         "associated_Site",
         "aisle_group",
@@ -61,11 +104,10 @@ class DailyReadingFields(admin.ModelAdmin):
         "reading_for",
     ]
 
-    class Meta:
-        model = DailySiteReading
 
-
+@admin.register(SiteBaseline)
 class SiteBaselineFields(admin.ModelAdmin):
+    list_select_related = ["associated_site_id", "aisle_group"]
     list_display = [
         "associated_site_id",
         "aisle_group",
@@ -75,11 +117,10 @@ class SiteBaselineFields(admin.ModelAdmin):
         "baseline_to",
     ]
 
-    class Meta:
-        model = SiteBaseline
 
-
+@admin.register(AisleGroup)
 class AisleGroupFields(admin.ModelAdmin):
+    list_select_related = ["site"]
     list_display = [
         "site",
         "aisleGroupName",
@@ -92,11 +133,10 @@ class AisleGroupFields(admin.ModelAdmin):
     list_filter = ["power_source", "dg_fuel_enabled", "dg_fuel_provider"]
     search_fields = ["site__site_name", "aisleGroupName", "attached_leg_id"]
 
-    class Meta:
-        model = AisleGroup
 
-
+@admin.register(Site)
 class SiteFields(admin.ModelAdmin):
+    list_select_related = ["customer"]
     list_display = [
         "id",
         "customer",
@@ -108,25 +148,21 @@ class SiteFields(admin.ModelAdmin):
         "bypass_consumption_units",
     ]
 
-    class Meta:
-        model = Site
 
-
+@admin.register(Floor)
 class FloorFields(admin.ModelAdmin):
+    list_select_related = ["site"]
     list_display = ["id", "site", "floor"]
 
-    class Meta:
-        model = Floor
 
-
+@admin.register(Email_History)
 class EmailHistoryAdmin(admin.ModelAdmin):
     list_display = ["deviceName", "fire_site", "email_for"]
 
-    class Meta:
-        model = Email_History
 
-
+@admin.register(HourlyLoadData)
 class HourlyLoadDataAdmin(admin.ModelAdmin):
+    list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
         "site",
@@ -137,11 +173,10 @@ class HourlyLoadDataAdmin(admin.ModelAdmin):
         "updated_on",
     ]
 
-    class Meta:
-        model = HourlyLoadData
 
-
+@admin.register(DailyLoadData)
 class DailyLoadDataAdmin(admin.ModelAdmin):
+    list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
         "site",
@@ -152,11 +187,10 @@ class DailyLoadDataAdmin(admin.ModelAdmin):
         "updated_on",
     ]
 
-    class Meta:
-        model = DailyLoadData
 
-
+@admin.register(MainsDgLoadData)
 class MainsDgLoadDataAdmin(admin.ModelAdmin):
+    list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
         "site",
@@ -166,19 +200,15 @@ class MainsDgLoadDataAdmin(admin.ModelAdmin):
         "epoch_time",
         "updated_on",
     ]
-
-    class Meta:
-        model = MainsDgLoadData
 
 
 class DgFuelConsumptionDataAdmin(admin.ModelAdmin):
     list_display = ["vehicle_number", "fuel_consumption", "epoch_time"]
 
-    class Meta:
-        model = DgFuelConsumptionData
 
-
+@admin.register(DgUnitConsumption)
 class DgUnitConsumptionAdmin(admin.ModelAdmin):
+    list_select_related = ["aisle_group"]
     list_display = [
         "id",
         "aisle_group",
@@ -192,66 +222,45 @@ class DgUnitConsumptionAdmin(admin.ModelAdmin):
         "epoch_time",
     ]
 
-    class Meta:
-        model = DgUnitConsumption
 
-
+@admin.register(SensorAisleUnitConsumption)
 class SensorAisleUnitConsumptionAdmin(admin.ModelAdmin):
     list_display = ["leg_id", "unit_consumption", "reading_for"]
 
-    class Meta:
-        model = SensorAisleUnitConsumption
 
-
+@admin.register(DGFuelAlertsData)
 class DGFuelAlertDataAdmin(admin.ModelAdmin):
     list_display = [f.name for f in DGFuelAlertsData._meta.get_fields()]
-
-    class Meta:
-        model = DGFuelAlertsData
 
 
 admin.site.register(User)
 admin.site.register(CustomerInfo)
-admin.site.register(Site, SiteFields)
 admin.site.register(Image)
 admin.site.register(BlockInfo)
 admin.site.register(AisleInfo)
-admin.site.register(HourlySiteReading, HourlyReadingFields)
 admin.site.register(AlarmNotifications)
-admin.site.register(SiteBaseline, SiteBaselineFields)
-admin.site.register(SupplyLoadTimeShare, SupplyTimeShareFields)
-admin.site.register(SiteLoadPower, siteLoadPower)
-admin.site.register(AisleGroup, AisleGroupFields)
 admin.site.register(Panel)
-admin.site.register(Floor, FloorFields)
 admin.site.register(MeterSource)
-admin.site.register(DailySiteReading, DailyReadingFields)
 admin.site.register(HomeGatewayId)
-admin.site.register(MonthlyLoadSharePercentage, monthlyLoadSharePercentage)
 admin.site.register(FirePumpAlarm)
-admin.site.register(Email_History, EmailHistoryAdmin)
 admin.site.register(FireEquipmentsSystem)
 admin.site.register(FireEquipmentsSystemType)
 admin.site.register(FansData)
 admin.site.register(LightsData)
 admin.site.register(RawLoadData)
-admin.site.register(HourlyLoadData, HourlyLoadDataAdmin)
-admin.site.register(DailyLoadData, DailyLoadDataAdmin)
-admin.site.register(MainsDgLoadData, MainsDgLoadDataAdmin)
 admin.site.register(PowerFactorData)
 admin.site.register(MonthlyMinMaxLoadData)
 admin.site.register(DGAlertsData)
 admin.site.register(DgFuelConsumptionData)
-admin.site.register(DgUnitConsumption, DgUnitConsumptionAdmin)
-admin.site.register(DGFuelAlertsData, DGFuelAlertDataAdmin)
-admin.site.register(SensorAisleUnitConsumption, SensorAisleUnitConsumptionAdmin)
 admin.site.register(CustomerSiteManager)
 admin.site.register(SiteLoadParameters)
 admin.site.register(NewAlarmsNotifications)
 admin.site.register(MeterDisconnectionEvent)
 
 
+@admin.register(SiteConsumptionPing)
 class SiteConsumptionPingAdmin(admin.ModelAdmin):
+    list_select_related = ["site"]
     list_display = [
         "site",
         "home_gateway_id",
@@ -260,14 +269,12 @@ class SiteConsumptionPingAdmin(admin.ModelAdmin):
         "updated_on",
     ]
 
-    class Meta:
-        model = SiteConsumptionPing
 
 
-admin.site.register(SiteConsumptionPing, SiteConsumptionPingAdmin)
 
-
+@admin.register(SiteCeleryPing)
 class SiteCeleryPingAdmin(admin.ModelAdmin):
+    list_select_related = ["site"]
     list_display = [
         "site",
         "home_gateway_id",
@@ -278,17 +285,11 @@ class SiteCeleryPingAdmin(admin.ModelAdmin):
         "updated_on",
     ]
 
-    class Meta:
-        model = SiteCeleryPing
 
-
-admin.site.register(SiteCeleryPing, SiteCeleryPingAdmin)
 
 
 def _retry_recovery(monitors):
     """Re-arm failed/timed-out requests: the next gap packet publishes again."""
-    from django.core.cache import cache
-
     count = 0
     for monitor in monitors:
         monitor.status = "timeout"
@@ -296,12 +297,14 @@ def _retry_recovery(monitors):
         monitor.is_active = True
         monitor.failed_reason = None
         monitor.save(update_fields=["status", "attempt", "is_active", "failed_reason"])
-        scope = (
-            f"aisle:{monitor.leg_id}"
-            if monitor.leg_id
-            else f"source:{monitor.power_source}"
-        )
-        cache.delete(f"mqtt:recovery-req:{monitor.site_id}:{scope}")
+        # Note: with the per-process LocMem cache this clears the cooldown of
+        # the web process only; the worker's copy expires after the cooldown
+        # (MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS). A shared Redis cache
+        # (REDIS_URL) makes it immediate.
+        if monitor.leg_id:
+            release_recovery_request(monitor.site_id, "aisle", monitor.leg_id)
+        else:
+            release_recovery_request(monitor.site_id, "source", monitor.power_source)
         AisleSyncRecoveryStatus.objects.filter(recovery_monitor=monitor).update(
             sync_status="missing", last_error=None
         )
