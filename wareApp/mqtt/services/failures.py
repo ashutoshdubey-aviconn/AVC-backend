@@ -25,12 +25,14 @@ MAX_DEAD_LETTER_PAYLOAD = 20000
 DEAD_LETTER_DEDUPE_SECONDS = 600
 
 
-def record_dead_letter(message_type, site_id, gateway_id, payload, error):
+def record_dead_letter(message_type, site_id, gateway_id, payload, error, dedupe=True):
     """Store a packet that could not be processed. Never raises.
 
-    The same error from the same gateway (e.g. an aisle group missing from
-    the configuration, repeated on every packet) is stored once per
-    ``DEAD_LETTER_DEDUPE_SECONDS``.
+    With ``dedupe`` (default) the same error from the same gateway (e.g. an
+    aisle group missing from the configuration, repeated on every packet) is
+    stored once per ``DEAD_LETTER_DEDUPE_SECONDS``. ``dedupe=False`` keeps
+    every packet, for failures that should be replayed in full
+    (``manage.py replay_dead_letters``).
     """
     from django.core.cache import cache
 
@@ -41,7 +43,7 @@ def record_dead_letter(message_type, site_id, gateway_id, payload, error):
             f"mqtt:dead-letter:{message_type}:{site_id}:{gateway_id}:"
             f"{type(error).__name__}:{str(error)[:100]}"
         )
-        if not cache.add(dedupe_key, 1, DEAD_LETTER_DEDUPE_SECONDS):
+        if dedupe and not cache.add(dedupe_key, 1, DEAD_LETTER_DEDUPE_SECONDS):
             return
         MqttDeadLetter.objects.create(
             message_type=str(message_type)[:50],
