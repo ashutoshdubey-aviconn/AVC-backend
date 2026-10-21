@@ -10,6 +10,10 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
+from kombu.exceptions import KombuError
+
+# Broker not reachable / refused / timed out while publishing.
+QUEUE_ERRORS = (KombuError, OSError)
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +30,37 @@ ALLOWED_NOTIFICATIONS = frozenset(
 
 
 def notify(send_function, *args):
-    """Deliver ``send_function(*args)`` now, or via the notifications queue."""
+    """Deliver ``send_function(*args)`` now, or via the notifications queue.
+
+    Returns True when the e-mail was handed to the queue (the worker retries
+    it), otherwise the send function's own result (True / False). When the
+    queue is unavailable (RabbitMQ down or still starting) the e-mail is sent
+    directly instead of being lost. Inside an open transaction the hand-off
+    happens after commit and None is returned (outcome not known yet).
+    """
     name = getattr(send_function, "__name__", None)
     if not getattr(settings, "MQTT_ASYNC_NOTIFICATIONS", False) or (
         name not in ALLOWED_NOTIFICATIONS
     ):
         return send_function(*args)
 
+    outcome = {}
+
     def enqueue():
         from wareApp.tasks import send_notification
 
-        send_notification.apply_async(args=(name, list(args)), queue="notifications")
+        try:
+            send_notification.apply_async(args=(name, list(args)), queue="notifications")
+            outcome["delivered"] = True
+        except QUEUE_ERRORS as error:
+            logger.warning(
+                "Notification queue unavailable (%s: %s); sending %s directly",
+                type(error).__name__,
+                error,
+                name,
+            )
+            outcome["delivered"] = send_function(*args)
 
     transaction.on_commit(enqueue)
-    return None
+    # Outside an atomic block on_commit runs immediately, so the outcome is known.
+    return outcome.get("delivered")

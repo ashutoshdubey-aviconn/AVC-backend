@@ -71,6 +71,8 @@ To do (like `test_server_migrate.sh` did for test), **checked against main's sch
 1. Stop `root-mqtt-queue1/2`; let queued work finish (`rabbitmqctl list_queues`).
 2. Run the migration script (step 3).
 3. Install `deploy/systemd/*` units and `recovery-status-sweep.timer`, `deploy/logrotate/*`.
+   Also the start-up-order drop-in for gunicorn, celerybeat and fetch-fuel-data
+   (`deploy/systemd/dropins/10-wait-for-broker-db.conf`; check main's PostgreSQL unit name).
 4. Start: processing workers → `mqtt-notifications` → `celerybeat` → `gunicorn` →
    `fetch-fuel-data` → listeners (a listener stop takes ~60 s).
 5. Do not start `root-mqtt-queue1/2` again (disable them).
