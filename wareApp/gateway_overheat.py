@@ -119,9 +119,10 @@ def record_overheat(alert):
         )
 
     email_every = getattr(settings, "GATEWAY_OVERHEAT_EMAIL_SECONDS", 3600)
-    emailed = cache.add(f"gateway-overheat-email:{gateway_key}", 1, email_every)
+    email_key = f"gateway-overheat-email:{gateway_key}"
+    emailed = cache.add(email_key, 1, email_every)
     if emailed:
-        notify(
+        delivered = notify(
             send_alarm_email,
             "Gateway Overheat",
             site.id,
@@ -133,6 +134,10 @@ def record_overheat(alert):
                 ["Threshold", f"{DEFAULT_THRESHOLD_C} °C", False],
             ],
         )
+        if delivered is False:
+            # Not sent: let the next alert of this gateway try again.
+            cache.delete(email_key)
+            emailed = False
     logger.warning(
         "Gateway overheat %s: site=%s gateway_no=%s temperature=%s fan_pwm=%s emailed=%s",
         "repeated" if repeated else "stored",

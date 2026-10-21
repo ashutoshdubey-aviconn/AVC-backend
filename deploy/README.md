@@ -45,6 +45,8 @@ site's packets are never split across two queues.
 
 1. `python manage.py migrate` (0092 alarm index, 0093 recovery status fields).
 2. `sudo cp deploy/systemd/recovery-status-sweep.* /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now recovery-status-sweep.timer`
+   Start-up order for the units not in this folder (gunicorn, celerybeat, fetch-fuel-data):
+   install `deploy/systemd/dropins/10-wait-for-broker-db.conf` as described in that file.
 3. Admin: *Aisle sync recovery statuses* and *Recovery monitors* show the
    current state and the request/response history; both have a "retry" action
    for failed requests.
