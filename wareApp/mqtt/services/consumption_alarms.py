@@ -7,12 +7,17 @@ stored at most once per site, aisle, type and day, so re-evaluating is safe.
 Rules (decided 2026-10-20):
 
 * No baseline for the day, or a day before the baseline start: no alarm.
-* Bypassed (11): consumption >= ``site.bypass_consumption_units``. It
-  supersedes High Consumption for that day.
+* Bypassed (11): consumption >= the aisle's daily baseline x
+  ``ALARM_BYPASS_DEFAULT_PERCENT`` % (default 100: no saving at all that day),
+  or >= ``site.bypass_consumption_units`` when the site sets it (override).
+  It supersedes High Consumption for that day, so High covers 75-100 %.
+  (Changed 2026-10-23: before, Bypassed fired only with the site value set.)
 * High Consumption (7): consumption >= ``site.high_consumption_units``, else
   >= baseline x ``site.high_consumption_baseline_percent`` (default 75 %).
 * Low Consumption (8): consumption < baseline x (1 - ``site.min_threshold_value`` %);
   only for sites that set ``min_threshold_value``.
+  Not automatic on purpose: low consumption is the normal result (median
+  aisle-day uses ~17 % of its baseline), so a default would flood alarms.
 * Operation Hours Increased (12): NL aisles of sites with NL hours and a
   start/end time; an hour counts as active at >= 0.01 kWh. Raised when an
   active hour falls outside the window or there are more active hours than
@@ -43,6 +48,21 @@ def _high_percent(site):
     if value is not None:
         return value
     return getattr(settings, "ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT", 75)
+
+
+def _bypass_threshold(site, baseline):
+    """``(threshold_kwh, how)`` for the Bypassed alarm, or (None, None).
+
+    The site's ``bypass_consumption_units`` overrides; otherwise the aisle's
+    own daily baseline x ALARM_BYPASS_DEFAULT_PERCENT %. No baseline, no alarm.
+    """
+    value = getattr(site, "bypass_consumption_units", None)
+    if value is not None:
+        return value, "site setting"
+    if not baseline:
+        return None, None
+    percent = getattr(settings, "ALARM_BYPASS_DEFAULT_PERCENT", 100)
+    return baseline * percent / 100, f"{percent:g} % of baseline"
 
 
 def _activity_threshold():
@@ -156,12 +176,12 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     ]
     stored = []
 
-    bypass = getattr(site, "bypass_consumption_units", None)
+    bypass, bypass_how = _bypass_threshold(site, baseline)
     if bypass is not None and consumption >= bypass:
         if _record(
             site, aisle_group, day, BYPASSED, "Bypassed Alarm",
-            f"Bypassed: consumption={consumption:.2f}, threshold={bypass:.2f}, baseline={baseline:.2f}.",
-            common + [["Bypass threshold (kWh)", f"{bypass:.2f}", False]],
+            f"Bypassed: consumption={consumption:.2f}, threshold={bypass:.2f} ({bypass_how}), baseline={baseline:.2f}.",
+            common + [["Bypass threshold (kWh)", f"{bypass:.2f} ({bypass_how})", False]],
         ):
             stored.append("Bypassed")
         return stored

@@ -2,7 +2,7 @@ from datetime import date, datetime, time
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from wareApp.models import AisleGroup, AlarmNotifications, DailySiteReading, HourlySiteReading, Site, SiteBaseline
 from wareApp.mqtt.services.consumption_alarms import evaluate_daily_alarms, evaluate_days
@@ -44,6 +44,7 @@ class DailyAlarmRuleTests(TestCase):
 
     def test_configured_units_win_over_percent(self, notify):
         self.site.high_consumption_units = 250.0
+        self.site.bypass_consumption_units = 1000.0  # keep automatic bypass out of this test
         self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(200.0)), [])
         self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(250.0, day=date(2026, 10, 16))), ["High Consumption"])
 
@@ -52,6 +53,33 @@ class DailyAlarmRuleTests(TestCase):
         self.site.bypass_consumption_units = 400.0
         self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(450.0)), ["Bypassed"])
         self.assertEqual(self.types(), [11])
+
+    def test_bypass_is_automatic_at_full_baseline(self, notify):
+        # Baseline 200 kWh: 75 %..<100 % is High, >= 100 % (no saving) is Bypassed.
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(199.0)), ["High Consumption"])
+        self.assertEqual(
+            evaluate_daily_alarms(self.site, self.aisle, self.reading(200.0, day=date(2026, 10, 16))),
+            ["Bypassed"],
+        )
+        self.assertEqual(self.types(), [7, 11])
+        self.assertIn("100 % of baseline", notify.call_args.args[3][-1][1])
+
+    @override_settings(ALARM_BYPASS_DEFAULT_PERCENT=120)
+    def test_bypass_percent_is_a_setting(self, notify):
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(230.0)), ["High Consumption"])
+        self.assertEqual(
+            evaluate_daily_alarms(self.site, self.aisle, self.reading(240.0, day=date(2026, 10, 16))),
+            ["Bypassed"],
+        )
+
+    def test_site_bypass_value_overrides_percent(self, notify):
+        self.site.bypass_consumption_units = 500.0
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.reading(300.0)), ["High Consumption"])
+        self.assertEqual(
+            evaluate_daily_alarms(self.site, self.aisle, self.reading(600.0, day=date(2026, 10, 16))),
+            ["Bypassed"],
+        )
+        self.assertIn("site setting", notify.call_args.args[3][-1][1])
 
     def test_low_consumption_against_baseline(self, notify):
         self.site.min_threshold_value = 90  # alarm below 10 % of baseline = 20 kWh

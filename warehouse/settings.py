@@ -220,6 +220,9 @@ ALARM_FEED_MAX_AGE_DAYS = config("ALARM_FEED_MAX_AGE_DAYS", default=30, cast=int
 ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT = config(
     "ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT", default=75, cast=float
 )
+# Bypassed alarm without a site value: consumption >= this % of the aisle's
+# own daily baseline (100 = the system saved nothing that day).
+ALARM_BYPASS_DEFAULT_PERCENT = config("ALARM_BYPASS_DEFAULT_PERCENT", default=100, cast=float)
 ALARM_ACTIVITY_THRESHOLD_KWH = config("ALARM_ACTIVITY_THRESHOLD_KWH", default=0.01, cast=float)
 # After recovery, re-evaluate alarms only for days within this many days.
 ALARM_REEVALUATE_DAYS = config("ALARM_REEVALUATE_DAYS", default=7, cast=int)
