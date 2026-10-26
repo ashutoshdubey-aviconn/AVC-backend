@@ -21,6 +21,14 @@ def _lookback_minutes():
         return 360
 
 
+def _recheck_minutes():
+    """Minutes before the last rolled minute that are checked again (late packets)."""
+    try:
+        return max(1, int(os.getenv("LOAD_DATA_ROLLUP_RECHECK_MINUTES", "15")))
+    except ValueError:
+        return 15
+
+
 def _minute_bucket(value):
     return value.replace(second=0, microsecond=0)
 
@@ -151,16 +159,22 @@ def _extrema_by_bucket(readings, bucket_function):
 
 
 def roll_up_completed_load_data(
-    site, observed_at, roll_up_daily=True, home_gateway_id=None
+    site, observed_at, roll_up_daily=True, home_gateway_id=None, since=None
 ):
     """Create missing minute and hour min/max points from raw load readings.
 
     A gateway packet only finalizes buckets strictly before its own minute. Rechecking
-    the configurable lookback makes the operation idempotent and independent of the
-    gateway's reporting interval.
+    a window makes the operation idempotent and independent of the gateway's
+    reporting interval. ``since`` is the site's last rolled-up minute: the window then
+    starts LOAD_DATA_ROLLUP_RECHECK_MINUTES before it (late packets) instead of the
+    full LOAD_DATA_ROLLUP_LOOKBACK_MINUTES, which is used only after a restart.
     """
     completed_minute = _minute_bucket(observed_at)
     raw_window_start = completed_minute - timedelta(minutes=_lookback_minutes())
+    if since is not None:
+        raw_window_start = max(
+            raw_window_start, since - timedelta(minutes=_recheck_minutes())
+        )
     raw_readings = (
         RawLoadData.objects.filter(
             site=site,
@@ -248,12 +262,14 @@ def roll_up_load_data_if_due(site, observed_at, home_gateway_id=None):
             roll_up_daily = (
                 _last_daily_rollup_hour_by_site.get(site_key) != completed_hour
             )
+            since = _last_rollup_minute_by_site.get(site_key)
 
         roll_up_completed_load_data(
             site,
             observed_at,
             roll_up_daily=roll_up_daily,
             home_gateway_id=home_gateway_id,
+            since=since,
         )
         with _rollup_schedule_lock:
             _last_rollup_minute_by_site[site_key] = observed_minute
