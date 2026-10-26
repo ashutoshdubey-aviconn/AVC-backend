@@ -777,4 +777,345 @@ aisle, type and day and e-mailed once; the alarm list shows one row per aisle an
 type with first / last day and count.
 """,
     },
+    # ------------------------------------------------------------------ 15
+    {
+        "slug": "15-alarm-catalogue", "anchor": "alarm-catalogue", "number": 15,
+        "title": "Alarm catalogue: every alarm type and where it comes from",
+        "summary": "Two alarm tables. AlarmNotifications: per aisle / meter / gateway. "
+                   "NewAlarmsNotifications: per site and power source. Each type below has its own "
+                   "detailed flow (14, 16-22).",
+        "nodes": {
+            "c": ("consumption packets\n+ day change\n(flows 2, 9)", "ext", 0, 0),
+            "g": ("gateway HTTP\n/api/temp/dispatch/mail/", "ext", 1, 0),
+            "l": ("load packets\n(flow 7)", "ext", 2, 0),
+            "f": ("fetch-fuel-data\n(DG runs, every 5 min)", "ext", 3, 0),
+            "fa": ("FIREALARM packets\n(flow 8)", "ext", 4, 0),
+            "a1": ("AlarmNotifications\n7 High  8 Low  11 Bypassed\n12 Operation Hours\n10 Meter Reading Issue", "db", 0, 2),
+            "a2": ("AlarmNotifications\n13 Gateway Overheat", "db", 1, 2),
+            "n1": ("NewAlarmsNotifications\n0 High Voltage\n1 Low Voltage\n2 PF Bad Value", "db", 2, 2),
+            "n2": ("NewAlarmsNotifications\n9 DG Running Without Load\n6 Fuel Drain", "db", 3, 2),
+            "fe": ("no alarm row:\nEmail_History +\ncustomer e-mail", "alarm", 4, 2),
+            "feed": ("alarm_feed.active_alarms()\none row per issue\nalarmTypeApi / alarmapi /\nsnapshot count", "process", 1, 4),
+            "mail": ("e-mail per alarm\n(flow 10)", "alarm", 3, 4),
+            "unused": ("defined, not raised by\ncurrent code: New 3 DG Overtime,\n4 DG Fuel Under Level,\n5 Mains Higher Consumption;\nAlarm 0-6 (legacy)", "skip", 4, 4),
+        },
+        "edges": [
+            ("c", "a1"), ("g", "a2"), ("l", "n1"), ("f", "n2"), ("fa", "fe"),
+            ("a1", "feed"), ("a2", "feed"), ("n1", "feed"), ("n2", "feed"),
+            ("a1", "mail"), ("a2", "mail"), ("n1", "mail"), ("n2", "mail"),
+        ],
+        "files": [
+            ("wareApp/models.py", "AlarmNotifications (Alarm_type), NewAlarmsNotifications (alarm_type)"),
+            ("wareApp/mqtt/services/consumption_alarms.py", "7, 8, 11, 12"),
+            ("wareApp/mqtt/consumption.py", "10 Meter Reading Issue"),
+            ("wareApp/gateway_overheat.py", "13 Gateway Overheat"),
+            ("wareApp/mqtt/load.py", "0, 1 voltage; 2 power factor"),
+            ("wareApp/dg_fuel/sessions.py", "9 DG Running Without Load, 6 Fuel Drain"),
+            ("wareApp/mqtt/fire_alarm.py", "fire pump e-mails (no alarm row)"),
+            ("wareApp/alarm_feed.py", "active_alarms, PRIORITY_LABELS, CONSUMPTION_TYPES, POWER_TYPES"),
+        ],
+        "details": """
+| Table | Type | Alarm | Raised by | Repeats | E-mail | Flow |
+| --- | --- | --- | --- | --- | --- | --- |
+| AlarmNotifications | 7 | High Consumption | day-end check, per aisle | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 8 | Low Consumption | day-end check (site opt-in) | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 11 | Bypassed | day-end check, per aisle | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 12 | Operation Hours Increased | day-end check, NL aisles with NL window | 1 per aisle / day | yes | 16 |
+| AlarmNotifications | 10 | Meter Reading Issue | live `ERROR!!!` consumption packet | 1 per meter / day (+ count) | first of the day | 17 |
+| AlarmNotifications | 13 | Gateway Overheat | gateway HTTP alert (CPU >= 85 °C) | 1 per gateway / day (+ count) | max 1 / hour | 18 |
+| NewAlarmsNotifications | 0 / 1 | High / Low Voltage | live load packets | max 1 per source / 30 min | yes | 19 |
+| NewAlarmsNotifications | 2 | PF Bad Value | live load packets | max 1 per source / 30 min | yes | 20 |
+| NewAlarmsNotifications | 9 | DG Running Without Load | fuel fetch after a DG run | 1 per DG unit fetch | yes | 21 |
+| NewAlarmsNotifications | 6 | Fuel Drain | fuel fetch after a DG run | 1 per DG unit fetch | yes | 21 |
+| (none) | - | Fire pump mode / motor on | FIREALARM packets | motor-on max 1 / 10 min | yes (customer) | 22 |
+
+Types defined in the models but **not raised by the current code**: NewAlarms 3 DG
+Overtime, 4 DG Fuel Under Level, 5 Mains Higher Consumption (only the old root
+`tasks.py` raised 3; the e-mail functions still exist in `sendmail.py`), and
+AlarmNotifications 0-6 (Low balance, Power cut, ... Internet gone: legacy).
+Priority labels in the alarm list: 0 High, 1 Medium, 2 Low.
+""",
+    },
+    # ------------------------------------------------------------------ 16
+    {
+        "slug": "16-operation-hours", "anchor": "operation-hours", "number": 16,
+        "title": "Operation Hours Increased (Alarm type 12)",
+        "summary": "NL (normal lighting) aisles must only draw power inside the site's NL window; "
+                   "checked per aisle at the day end, between the Bypassed and High checks.",
+        "nodes": {
+            "t": ("day-end check of one aisle\n(flow 14: after Bypassed\nwas not raised)", "ext", 1, 0),
+            "el": ("aisle name marks an\nemergency (EL) supply?", "decision", 1, 1),
+            "skip1": ("not checked\n(EL aisles run 24 h)", "skip", 0, 1),
+            "cfg": ("site.nl_operation_hours\n+ start + end time set?", "decision", 1, 2),
+            "skip2": ("not checked\n(no NL window)", "skip", 0, 2),
+            "hours": ("hours of the day with\n>= 0.01 kWh (HourlySiteReading)\nALARM_ACTIVITY_THRESHOLD_KWH", "db", 1, 3),
+            "test": ("active hour outside the window\nOR active hours >\nnl_operation_hours?", "decision", 1, 4),
+            "ok": ("no alarm", "skip", 0, 5),
+            "rec": ("OPERATION HOURS INCREASED (12)\nto_do: active = N h (NL x h),\noutside window = M h", "alarm", 2, 5),
+            "high": ("then High Consumption check;\nif High fires its text says\n'Cause: operation hours increased'", "process", 2, 6),
+            "mail": ("_record -> AlarmNotifications\n+ e-mail with NL window,\nactive hours, hours outside", "alarm", 1, 6),
+        },
+        "edges": [
+            ("t", "el"), ("el", "skip1", "yes"), ("el", "cfg", "no"), ("cfg", "skip2", "no"),
+            ("cfg", "hours", "yes"), ("hours", "test"), ("test", "ok", "no"), ("test", "rec", "yes"),
+            ("rec", "mail"), ("rec", "high"),
+        ],
+        "files": [
+            ("wareApp/mqtt/services/consumption_alarms.py", "operation_hours_check, _in_window, _activity_threshold, evaluate_daily_alarms, _record"),
+            ("wareApp/mqtt/services/baseline.py", "is_emergency_supply (EL aisle names)"),
+            ("Site fields", "nl_operation_hours, nl_operation_start_time, nl_operation_end_time"),
+            ("Settings", "ALARM_ACTIVITY_THRESHOLD_KWH = 0.01"),
+            ("Models", "HourlySiteReading, AlarmNotifications"),
+        ],
+        "details": """
+An hour counts as *active* when its consumption is at least 0.01 kWh. The NL window
+may cross midnight (`_in_window`). The alarm fires when any active hour lies outside
+the window, or there are more active hours than `nl_operation_hours`. Stored once per
+aisle and day like the other day-end alarms; a High Consumption alarm on the same
+day names it as the cause. **No site has an NL window configured today**, so this
+alarm cannot fire until `nl_operation_hours` and the start / end times are set.
+""",
+    },
+    # ------------------------------------------------------------------ 17
+    {
+        "slug": "17-meter-reading-issue", "anchor": "meter-reading-issue", "number": 17,
+        "title": "Meter Reading Issue (Alarm type 10)",
+        "summary": "The gateway reports that a meter's new cumulative reading is smaller than the "
+                   "previous one (meter reset / fault). Raised live, per meter, once per day.",
+        "nodes": {
+            "in": ("consumption packet starting\n'ERROR!!!' ... 'New meter reading\nfor energy of aisle group id N\nis smaller than previous'", "ext", 1, 0),
+            "match": ("pattern found?\n(meter / leg id N)", "decision", 1, 1),
+            "ign": ("logged only\n(diagnostic)", "skip", 0, 1),
+            "cool": ("same site + gateway + meter\nstored in last 30 min?", "decision", 1, 2),
+            "thr": ("skip: storage throttled", "skip", 0, 2),
+            "today": ("active alarm for this\nmeter already today?", "decision", 1, 3),
+            "rep": ("update last_seen,\noccurrences + 1\n(no e-mail)", "db", 0, 4),
+            "new": ("AlarmNotifications type 10\nobject_type meter, aisle,\nto_do 'lower meter reading'", "db", 2, 4),
+            "mail": ("e-mail 'Meter Reading Issue'\ngateway, leg, aisle", "alarm", 2, 5),
+        },
+        "edges": [
+            ("in", "match"), ("match", "ign", "no"), ("match", "cool", "yes"), ("cool", "thr", "yes"),
+            ("cool", "today", "no"), ("today", "rep", "yes"), ("today", "new", "no"), ("new", "mail"),
+        ],
+        "files": [
+            ("wareApp/mqtt/consumption_batch.py", "_parse: ERROR!!! packets go here instead of the readings"),
+            ("wareApp/mqtt/consumption.py", "_notify_meter_reading_issue, METER_READING_ISSUE_PATTERN, METER_READING_ISSUE_COOLDOWN_SECONDS = 1800"),
+            ("Models", "AlarmNotifications (last_seen, occurrences), AisleGroup"),
+        ],
+        "details": """
+`ERROR!!!` packets carry no reading, so nothing is stored in the reading tables. The
+meter (= leg / aisle group id) is taken from the text. At most one write per site,
+gateway and meter every 30 minutes (cache); within a day the existing alarm is only
+updated (`last_seen`, `occurrences`), so the alarm list shows e.g. "occurrences: 84"
+while the e-mail went out once that day.
+""",
+    },
+    # ------------------------------------------------------------------ 18
+    {
+        "slug": "18-gateway-overheat", "anchor": "gateway-overheat", "number": 18,
+        "title": "Gateway Overheat (Alarm type 13)",
+        "summary": "The gateway's temperature monitor posts over HTTP every ~3 s while its CPU is at "
+                   "or above 85 °C.",
+        "nodes": {
+            "in": ("POST /api/temp/dispatch/mail/\nSite Id, Gateway No,\nGateway Info: Temperature,\nCPU Status, Fan PWM", "ext", 1, 0),
+            "thr": ("rate limit 60 / min\nper client", "process", 1, 1),
+            "parse": ("parse_alert: valid body\nand known site?", "decision", 1, 2),
+            "bad": ("400 rejected", "skip", 0, 2),
+            "st": ("stored for this gateway\nin last 60 s?", "decision", 1, 3),
+            "throt": ("200 'throttled'", "skip", 0, 3),
+            "today": ("alarm for this gateway\nalready today?", "decision", 1, 4),
+            "upd": ("update last_seen,\noccurrences + 1,\nlatest temperature", "db", 0, 5),
+            "new": ("AlarmNotifications type 13\nobject_type gateway,\nobject_id = gateway no.", "db", 2, 5),
+            "hour": ("e-mailed for this gateway\nin the last hour?", "decision", 1, 6),
+            "mail": ("e-mail 'Gateway Overheat'\nCPU °C, frequencies, fan\n(not sent -> retry next alert)", "alarm", 2, 7),
+        },
+        "edges": [
+            ("in", "thr"), ("thr", "parse"), ("parse", "bad", "no"), ("parse", "st", "yes"),
+            ("st", "throt", "yes"), ("st", "today", "no"), ("today", "upd", "yes"), ("today", "new", "no"),
+            ("upd", "hour"), ("new", "hour"), ("hour", "mail", "no"),
+        ],
+        "files": [
+            ("wareApp/views/gateway_overheat.py", "GatewayOverheatAlertApi, GatewayOverheatThrottle"),
+            ("wareApp/gateway_overheat.py", "parse_alert, record_overheat, GATEWAY_OVERHEAT_ALARM_TYPE"),
+            ("wareApp/alarm_feed.py", "shown as source 'gateway' with the matching home gateway id"),
+            ("Settings", "GATEWAY_OVERHEAT_STORE_SECONDS = 60, GATEWAY_OVERHEAT_EMAIL_SECONDS = 3600"),
+            ("Gateway side", "recovery_gateway_live/temperature.py (posts while >= 85 °C)"),
+        ],
+        "details": """
+One alarm row per site, gateway and day; repeats inside the day update the same row.
+The e-mail goes out at most once per gateway per hour while the gateway stays hot;
+if it could not be sent, the hourly mark is released so the next alert retries.
+The response tells the gateway `stored`, `repeated`, `throttled` or `rejected`.
+""",
+    },
+    # ------------------------------------------------------------------ 19
+    {
+        "slug": "19-voltage", "anchor": "voltage", "number": 19,
+        "title": "High / Low Voltage (NewAlarms type 0 / 1)",
+        "summary": "From live load packets: every reading is kept; an alarm needs five consecutive "
+                   "readings outside the site's phase thresholds.",
+        "nodes": {
+            "in": ("load packet\nR / Y / B volt, source, meter", "ext", 1, 0),
+            "on": ("site.show_voltage_alarms\nand all phases > 0?", "decision", 1, 1),
+            "off": ("no voltage check", "skip", 0, 1),
+            "store": ("store reading twice:\nSiteLoadParameters\ntype 0 (high), type 1 (low)", "db", 1, 2),
+            "seven": ("at least 7 readings\nfor this source + type?", "decision", 1, 3),
+            "wait": ("wait for more\nreadings", "skip", 0, 3),
+            "five": ("latest 5 readings ALL have a\nphase > max (high) or\n< min (low) threshold?", "decision", 1, 4),
+            "no": ("no alarm", "skip", 0, 5),
+            "rec": ("same alarm for this source\nin last 30 min?", "decision", 2, 5),
+            "dup": ("skip (30 min)", "skip", 3, 5),
+            "new": ("NewAlarmsNotifications\n0 High / 1 Low Voltage\nR/Y/B values", "db", 2, 6),
+            "mail": ("e-mail high / low voltage\n(send_alarm_for_high_voltage /\nsend_alarm_for_low_voltage)", "alarm", 2, 7),
+        },
+        "edges": [
+            ("in", "on"), ("on", "off", "no"), ("on", "store", "yes"), ("store", "seven"),
+            ("seven", "wait", "no"), ("seven", "five", "yes"), ("five", "no", "no"), ("five", "rec", "yes"),
+            ("rec", "dup", "yes"), ("rec", "new", "no"), ("new", "mail"),
+        ],
+        "files": [
+            ("wareApp/mqtt/load.py", "handle_load_message, _record_voltage_alarm, _voltage_alarm_data"),
+            ("wareApp/sendmail.py", "send_alarm_for_high_voltage, send_alarm_for_low_voltage"),
+            ("Site fields", "show_voltage_alarms, r/y/b_phase_voltage_threshold_max, r/y/b_phase_voltage_threshold_min"),
+            ("Models", "SiteLoadParameters, NewAlarmsNotifications"),
+        ],
+        "details": """
+Each load packet stores its phase voltages twice in `SiteLoadParameters` (type 0 for
+the high check, type 1 for the low check). Once at least seven readings exist, the
+latest five are checked: **all five** must have at least one phase above the site's
+max (high) or below its min (low). At most one alarm per site, source and type per
+30 minutes, each e-mailed. Sites with `show_voltage_alarms` off are never checked.
+""",
+    },
+    # ------------------------------------------------------------------ 20
+    {
+        "slug": "20-power-factor", "anchor": "power-factor", "number": 20,
+        "title": "PF Bad Value (NewAlarms type 2)",
+        "summary": "From live load packets with power factors: any phase below the site's PF "
+                   "threshold while the source is ON.",
+        "nodes": {
+            "in": ("load packet with\nR / Y / B power factor", "ext", 1, 0),
+            "row": ("SiteLoadPower row exists\n(not the first packet)?", "decision", 1, 1),
+            "first": ("first packet: create row,\nno PF check", "skip", 0, 1),
+            "vis": ("site.is_pf_visible and\nstatus = ON?", "decision", 1, 2),
+            "off": ("no PF check", "skip", 0, 2),
+            "thr": ("all three PF thresholds\nset on the site?", "decision", 1, 3),
+            "miss": ("skip; warning once per\nsite per hour (sites 124,\n131, 145, 153, 156 today)", "skip", 0, 3),
+            "low": ("any phase PF <\nits threshold?", "decision", 1, 4),
+            "pfd": ("PowerFactorData\n(low phases recorded)", "db", 2, 5),
+            "rec": ("PF alarm for this source\nin last 30 min?", "decision", 1, 6),
+            "dup": ("skip (30 min)", "skip", 0, 6),
+            "new": ("NewAlarmsNotifications type 2\nR/Y/B power factor", "db", 2, 6),
+            "mail": ("e-mail 'PF Fluctuation Alarm'\nPF values and thresholds", "alarm", 2, 7),
+        },
+        "edges": [
+            ("in", "row"), ("row", "first", "no"), ("row", "vis", "yes"), ("vis", "off", "no"),
+            ("vis", "thr", "yes"), ("thr", "miss", "no"), ("thr", "low", "yes"), ("low", "pfd", "yes"),
+            ("pfd", "rec"), ("rec", "dup", "yes"), ("rec", "new", "no"), ("new", "mail"),
+        ],
+        "files": [
+            ("wareApp/mqtt/load.py", "_record_power_factor_alarm (called from handle_load_message)"),
+            ("wareApp/sendmail.py", "send_mail_for_pf_fluctuation"),
+            ("Site fields", "is_pf_visible, r_phase_pf_threshold, y_phase_pf_threshold, b_phase_pf_threshold"),
+            ("Models", "PowerFactorData, NewAlarmsNotifications, SiteLoadPower"),
+        ],
+        "details": """
+Checked on every load packet after the first one for that source and meter. Missing
+PF thresholds skip the check entirely (one warning per site per hour) - those sites
+never raise PF alarms. Low phases are recorded in `PowerFactorData` on every packet;
+the alarm itself is limited to one per site and source per 30 minutes, each e-mailed.
+""",
+    },
+    # ------------------------------------------------------------------ 21
+    {
+        "slug": "21-dg-alarms", "anchor": "dg-alarms", "number": 21,
+        "title": "DG alarms: Running Without Load (9) and Fuel Drain (6)",
+        "summary": "Raised by the fetch-fuel-data service after the fuel used by a DG on a day is "
+                   "fetched from the fuel provider (Roadcast / Loconav).",
+        "nodes": {
+            "svc": ("fetch-fuel-data service\nevery 5 min", "ext", 1, 0),
+            "rec": ("reconcile_daily_unit_consumption:\nDgUnitConsumption per DG aisle\nper day (energy from\nDailySiteReading)", "db", 1, 1),
+            "pend": ("units with\nfetch_fuel_data = True", "process", 1, 2),
+            "prov": ("provider configured?\n(aisle / site: roadcast,\nloconav)", "decision", 1, 3),
+            "noprov": ("skip", "skip", 0, 3),
+            "fetch": ("fetch fuel used for the\nDG window (credentials\nfrom .env)", "process", 1, 4),
+            "ok": ("usable fuel value?", "decision", 1, 5),
+            "retry": ("keep fetch_fuel_data = True\n(retry next cycle)", "skip", 0, 5),
+            "save": ("save dg_fuel_consumption,\nfetch_fuel_data = False", "db", 1, 6),
+            "load": ("DG energy (unit_consumption)\n<= 0 kWh?", "decision", 0, 7),
+            "r9": ("NewAlarms 9 DG RUNNING\nWITHOUT LOAD + e-mail", "alarm", 0, 8),
+            "drain": ("fuel used > 1.2 x\nsite.dg_fuel_tank_capacity?", "decision", 2, 7),
+            "r6": ("DGFuelAlertsData 'suspicious_fuel'\n+ NewAlarms 6 FUEL DRAIN\n+ e-mail", "alarm", 2, 8),
+            "prov2": ("provider refuel / theft\nevents -> DGFuelAlertsData\n(stored, no e-mail)", "db", 3, 6),
+        },
+        "edges": [
+            ("svc", "rec"), ("rec", "pend"), ("pend", "prov"), ("prov", "noprov", "no"),
+            ("prov", "fetch", "yes"), ("fetch", "ok"), ("ok", "retry", "no"), ("ok", "save", "yes"),
+            ("save", "load"), ("load", "r9", "yes"), ("save", "drain"), ("drain", "r6", "yes"),
+            ("save", "prov2"),
+        ],
+        "files": [
+            ("fetch_fuel_data.py", "run_dg_fuel_cycle (service loop, DG_FUEL_POLL_INTERVAL_SECONDS = 300)"),
+            ("wareApp/dg_fuel/sessions.py", "reconcile_daily_unit_consumption, attempt_fetch_for_unit, determine_provider, _persist_provider_alerts"),
+            ("wareApp/fuel_providers.py", "detect_suspicious_fuel (> 1.2 x tank), roadcast / loconav fetch"),
+            ("wareApp/sendmail.py", "send_alarm_email"),
+            ("Site / aisle fields", "dg_fuel_tank_capacity, dg_fuel_enabled, dg_fuel_provider, dg_fuel_vehicle_number"),
+            ("Models", "DgUnitConsumption, DGFuelAlertsData, NewAlarmsNotifications"),
+        ],
+        "details": """
+For each DG aisle and day `reconcile_daily_unit_consumption` keeps a
+`DgUnitConsumption` row with the DG's energy (from `DailySiteReading`). Rows still
+needing fuel (`fetch_fuel_data = True`) are fetched from the configured provider;
+without a usable value they are retried on the next cycle.
+
+After a successful fetch:
+- **DG Running Without Load (9):** the DG used fuel but its energy is <= 0 kWh.
+- **Fuel Drain (6):** fuel used is more than 1.2 x the site's tank capacity
+  (also stored as `DGFuelAlertsData` "suspicious_fuel").
+- Refuel / theft events reported by the provider are stored in `DGFuelAlertsData`
+  only (no alarm, no e-mail).
+
+Both alarms are raised once per DG unit (the fetch flag is cleared afterwards) and
+e-mailed. Type 9 is missing from the model's choices; the alarm list adds its name
+(`alarm_feed.POWER_TYPES`).
+""",
+    },
+    # ------------------------------------------------------------------ 22
+    {
+        "slug": "22-fire-pump-emails", "anchor": "fire-pump-emails", "number": 22,
+        "title": "Fire pump e-mails (FIREALARM, no alarm row)",
+        "summary": "Panel mode changes and motor-on events, decoded from the three phase voltages; "
+                   "e-mailed to the site's customer and logged in Email_History.",
+        "nodes": {
+            "in": ("FIREALARM packet\nmeter, R / Y / B volt,\npower status", "ext", 1, 0),
+            "rec": ("FirePumpAlarm row\nfor this meter?", "decision", 1, 1),
+            "skip": ("skipped", "skip", 0, 1),
+            "keep": ("keep previous volts,\nupdate FirePumpAlarm", "db", 1, 2),
+            "modes": ("mode from phases:\nAuto = R>200, Y<100, B>200\nManual = R<100, Y>200, B>200\nOff = R<100, Y<100, B>200", "process", 2, 2),
+            "motor": ("motor ON (power status 1)\nin Auto or Manual?", "decision", 0, 3),
+            "ten": ("motor-on e-mail for this\ndevice in last 10 min?", "decision", 0, 4),
+            "m1": ("e-mail 'Motor-On in\nAuto / Manual-Mode'", "alarm", 0, 5),
+            "chg": ("previous mode !=\nnew mode?", "decision", 2, 3),
+            "m2": ("e-mail mode change, e.g.\n'Auto-Mode to Manual-Mode',\n'Off-Mode to Auto-Mode'", "alarm", 2, 4),
+            "hist": ("Email_History\n(device, email_for, time)", "db", 1, 6),
+        },
+        "edges": [
+            ("in", "rec"), ("rec", "skip", "no"), ("rec", "keep", "yes"), ("keep", "modes"),
+            ("keep", "motor"), ("motor", "ten", "yes"), ("ten", "m1", "no"), ("modes", "chg"),
+            ("chg", "m2", "yes"), ("m1", "hist"), ("m2", "hist"),
+        ],
+        "files": [
+            ("wareApp/mqtt/fire_alarm.py", "handle_fire_alarm_message, _send_fire_alarm_email, _send_throttled_motor_on_email"),
+            ("wareApp/sendmail.py", "send_mail_fire_alarm_user"),
+            ("Models", "FirePumpAlarm, Email_History"),
+        ],
+        "details": """
+No alarm row: these are e-mails to the site's customer (`site.customer.email`),
+recorded in `Email_History` (`email_for`: 1 Auto->Manual, 2 ->Auto, 4 ->Off,
+5 motor on, ...). The mode is read from which phases are above 200 V / below 100 V;
+the handler compares the previous and the new pattern to name the change. Motor-on
+e-mails are limited to one per device per 10 minutes. Being alarm e-mails, they also
+go only to `ALARM_EMAIL_OVERRIDE_TO` while that is set (test).
+""",
+    },
 ]

@@ -45,6 +45,14 @@ subtype (for `recovery` the subtype selects the handler).
 12. [HTTP calls from gateways](#http-from-gateways)
 13. [Timers, sweeps and maintenance commands](#timers-and-checks)
 14. [High / Low Consumption and Bypassed alarms (detail)](#high-low-bypassed)
+15. [Alarm catalogue: every alarm type and where it comes from](#alarm-catalogue)
+16. [Operation Hours Increased (Alarm type 12)](#operation-hours)
+17. [Meter Reading Issue (Alarm type 10)](#meter-reading-issue)
+18. [Gateway Overheat (Alarm type 13)](#gateway-overheat)
+19. [High / Low Voltage (NewAlarms type 0 / 1)](#voltage)
+20. [PF Bad Value (NewAlarms type 2)](#power-factor)
+21. [DG alarms: Running Without Load (9) and Fuel Drain (6)](#dg-alarms)
+22. [Fire pump e-mails (FIREALARM, no alarm row)](#fire-pump-emails)
 
 ## 1. Overview: from gateway to database
 <a id="overview"></a>
@@ -1106,4 +1114,497 @@ type with first / last day and count.
 | `Settings` | ALARM_BYPASS_DEFAULT_PERCENT=100, ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT=75, ALARM_REEVALUATE_DAYS=7, ALARM_EMAIL_OVERRIDE_TO |
 | `Site fields (overrides)` | bypass_consumption_units, high_consumption_units, high_consumption_baseline_percent, min_threshold_value |
 | `Models` | Site, SiteBaseline, AisleGroup, DailySiteReading, AlarmNotifications |
+
+## 15. Alarm catalogue: every alarm type and where it comes from
+<a id="alarm-catalogue"></a>
+
+Two alarm tables. AlarmNotifications: per aisle / meter / gateway. NewAlarmsNotifications: per site and power source. Each type below has its own detailed flow (14, 16-22).
+
+Diagram to open and edit in draw.io: [`drawio/15-alarm-catalogue.drawio`](drawio/15-alarm-catalogue.drawio)
+
+```mermaid
+flowchart TD
+    c[["consumption packets<br/>+ day change<br/>(flows 2, 9)"]]
+    g[["gateway HTTP<br/>/api/temp/dispatch/mail/"]]
+    l[["load packets<br/>(flow 7)"]]
+    f[["fetch-fuel-data<br/>(DG runs, every 5 min)"]]
+    fa[["FIREALARM packets<br/>(flow 8)"]]
+    a1[("AlarmNotifications<br/>7 High  8 Low  11 Bypassed<br/>12 Operation Hours<br/>10 Meter Reading Issue")]
+    a2[("AlarmNotifications<br/>13 Gateway Overheat")]
+    n1[("NewAlarmsNotifications<br/>0 High Voltage<br/>1 Low Voltage<br/>2 PF Bad Value")]
+    n2[("NewAlarmsNotifications<br/>9 DG Running Without Load<br/>6 Fuel Drain")]
+    fe["no alarm row:<br/>Email_History +<br/>customer e-mail"]
+    feed["alarm_feed.active_alarms()<br/>one row per issue<br/>alarmTypeApi / alarmapi /<br/>snapshot count"]
+    mail["e-mail per alarm<br/>(flow 10)"]
+    unused["defined, not raised by<br/>current code: New 3 DG Overtime,<br/>4 DG Fuel Under Level,<br/>5 Mains Higher Consumption;<br/>Alarm 0-6 (legacy)"]
+    c --> a1
+    g --> a2
+    l --> n1
+    f --> n2
+    fa --> fe
+    a1 --> feed
+    a2 --> feed
+    n1 --> feed
+    n2 --> feed
+    a1 --> mail
+    a2 --> mail
+    n1 --> mail
+    n2 --> mail
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class a1,a2,n1,n2 db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class fe,mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class c,g,l,f,fa ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class unused skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class feed process
+```
+
+| Table | Type | Alarm | Raised by | Repeats | E-mail | Flow |
+| --- | --- | --- | --- | --- | --- | --- |
+| AlarmNotifications | 7 | High Consumption | day-end check, per aisle | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 8 | Low Consumption | day-end check (site opt-in) | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 11 | Bypassed | day-end check, per aisle | 1 per aisle / day | yes | 14 |
+| AlarmNotifications | 12 | Operation Hours Increased | day-end check, NL aisles with NL window | 1 per aisle / day | yes | 16 |
+| AlarmNotifications | 10 | Meter Reading Issue | live `ERROR!!!` consumption packet | 1 per meter / day (+ count) | first of the day | 17 |
+| AlarmNotifications | 13 | Gateway Overheat | gateway HTTP alert (CPU >= 85 °C) | 1 per gateway / day (+ count) | max 1 / hour | 18 |
+| NewAlarmsNotifications | 0 / 1 | High / Low Voltage | live load packets | max 1 per source / 30 min | yes | 19 |
+| NewAlarmsNotifications | 2 | PF Bad Value | live load packets | max 1 per source / 30 min | yes | 20 |
+| NewAlarmsNotifications | 9 | DG Running Without Load | fuel fetch after a DG run | 1 per DG unit fetch | yes | 21 |
+| NewAlarmsNotifications | 6 | Fuel Drain | fuel fetch after a DG run | 1 per DG unit fetch | yes | 21 |
+| (none) | - | Fire pump mode / motor on | FIREALARM packets | motor-on max 1 / 10 min | yes (customer) | 22 |
+
+Types defined in the models but **not raised by the current code**: NewAlarms 3 DG
+Overtime, 4 DG Fuel Under Level, 5 Mains Higher Consumption (only the old root
+`tasks.py` raised 3; the e-mail functions still exist in `sendmail.py`), and
+AlarmNotifications 0-6 (Low balance, Power cut, ... Internet gone: legacy).
+Priority labels in the alarm list: 0 High, 1 Medium, 2 Low.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/models.py` | AlarmNotifications (Alarm_type), NewAlarmsNotifications (alarm_type) |
+| `wareApp/mqtt/services/consumption_alarms.py` | 7, 8, 11, 12 |
+| `wareApp/mqtt/consumption.py` | 10 Meter Reading Issue |
+| `wareApp/gateway_overheat.py` | 13 Gateway Overheat |
+| `wareApp/mqtt/load.py` | 0, 1 voltage; 2 power factor |
+| `wareApp/dg_fuel/sessions.py` | 9 DG Running Without Load, 6 Fuel Drain |
+| `wareApp/mqtt/fire_alarm.py` | fire pump e-mails (no alarm row) |
+| `wareApp/alarm_feed.py` | active_alarms, PRIORITY_LABELS, CONSUMPTION_TYPES, POWER_TYPES |
+
+## 16. Operation Hours Increased (Alarm type 12)
+<a id="operation-hours"></a>
+
+NL (normal lighting) aisles must only draw power inside the site's NL window; checked per aisle at the day end, between the Bypassed and High checks.
+
+Diagram to open and edit in draw.io: [`drawio/16-operation-hours.drawio`](drawio/16-operation-hours.drawio)
+
+```mermaid
+flowchart TD
+    t[["day-end check of one aisle<br/>(flow 14: after Bypassed<br/>was not raised)"]]
+    el{"aisle name marks an<br/>emergency (EL) supply?"}
+    skip1["not checked<br/>(EL aisles run 24 h)"]
+    cfg{"site.nl_operation_hours<br/>+ start + end time set?"}
+    skip2["not checked<br/>(no NL window)"]
+    hours[("hours of the day with<br/>>= 0.01 kWh (HourlySiteReading)<br/>ALARM_ACTIVITY_THRESHOLD_KWH")]
+    test{"active hour outside the window<br/>OR active hours ><br/>nl_operation_hours?"}
+    ok["no alarm"]
+    rec["OPERATION HOURS INCREASED (12)<br/>to_do: active = N h (NL x h),<br/>outside window = M h"]
+    high["then High Consumption check;<br/>if High fires its text says<br/>'Cause: operation hours increased'"]
+    mail["_record -> AlarmNotifications<br/>+ e-mail with NL window,<br/>active hours, hours outside"]
+    t --> el
+    el -->|"yes"| skip1
+    el -->|"no"| cfg
+    cfg -->|"no"| skip2
+    cfg -->|"yes"| hours
+    hours --> test
+    test -->|"no"| ok
+    test -->|"yes"| rec
+    rec --> mail
+    rec --> high
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class el,cfg,test decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class hours db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class rec,mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class t ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class skip1,skip2,ok skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class high process
+```
+
+An hour counts as *active* when its consumption is at least 0.01 kWh. The NL window
+may cross midnight (`_in_window`). The alarm fires when any active hour lies outside
+the window, or there are more active hours than `nl_operation_hours`. Stored once per
+aisle and day like the other day-end alarms; a High Consumption alarm on the same
+day names it as the cause. **No site has an NL window configured today**, so this
+alarm cannot fire until `nl_operation_hours` and the start / end times are set.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/services/consumption_alarms.py` | operation_hours_check, _in_window, _activity_threshold, evaluate_daily_alarms, _record |
+| `wareApp/mqtt/services/baseline.py` | is_emergency_supply (EL aisle names) |
+| `Site fields` | nl_operation_hours, nl_operation_start_time, nl_operation_end_time |
+| `Settings` | ALARM_ACTIVITY_THRESHOLD_KWH = 0.01 |
+| `Models` | HourlySiteReading, AlarmNotifications |
+
+## 17. Meter Reading Issue (Alarm type 10)
+<a id="meter-reading-issue"></a>
+
+The gateway reports that a meter's new cumulative reading is smaller than the previous one (meter reset / fault). Raised live, per meter, once per day.
+
+Diagram to open and edit in draw.io: [`drawio/17-meter-reading-issue.drawio`](drawio/17-meter-reading-issue.drawio)
+
+```mermaid
+flowchart TD
+    in[["consumption packet starting<br/>'ERROR!!!' ... 'New meter reading<br/>for energy of aisle group id N<br/>is smaller than previous'"]]
+    match{"pattern found?<br/>(meter / leg id N)"}
+    ign["logged only<br/>(diagnostic)"]
+    cool{"same site + gateway + meter<br/>stored in last 30 min?"}
+    thr["skip: storage throttled"]
+    today{"active alarm for this<br/>meter already today?"}
+    rep[("update last_seen,<br/>occurrences + 1<br/>(no e-mail)")]
+    new[("AlarmNotifications type 10<br/>object_type meter, aisle,<br/>to_do 'lower meter reading'")]
+    mail["e-mail 'Meter Reading Issue'<br/>gateway, leg, aisle"]
+    in --> match
+    match -->|"no"| ign
+    match -->|"yes"| cool
+    cool -->|"yes"| thr
+    cool -->|"no"| today
+    today -->|"yes"| rep
+    today -->|"no"| new
+    new --> mail
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class match,cool,today decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class rep,new db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class in ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class ign,thr skip
+```
+
+`ERROR!!!` packets carry no reading, so nothing is stored in the reading tables. The
+meter (= leg / aisle group id) is taken from the text. At most one write per site,
+gateway and meter every 30 minutes (cache); within a day the existing alarm is only
+updated (`last_seen`, `occurrences`), so the alarm list shows e.g. "occurrences: 84"
+while the e-mail went out once that day.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/consumption_batch.py` | _parse: ERROR!!! packets go here instead of the readings |
+| `wareApp/mqtt/consumption.py` | _notify_meter_reading_issue, METER_READING_ISSUE_PATTERN, METER_READING_ISSUE_COOLDOWN_SECONDS = 1800 |
+| `Models` | AlarmNotifications (last_seen, occurrences), AisleGroup |
+
+## 18. Gateway Overheat (Alarm type 13)
+<a id="gateway-overheat"></a>
+
+The gateway's temperature monitor posts over HTTP every ~3 s while its CPU is at or above 85 °C.
+
+Diagram to open and edit in draw.io: [`drawio/18-gateway-overheat.drawio`](drawio/18-gateway-overheat.drawio)
+
+```mermaid
+flowchart TD
+    in[["POST /api/temp/dispatch/mail/<br/>Site Id, Gateway No,<br/>Gateway Info: Temperature,<br/>CPU Status, Fan PWM"]]
+    thr["rate limit 60 / min<br/>per client"]
+    parse{"parse_alert: valid body<br/>and known site?"}
+    bad["400 rejected"]
+    st{"stored for this gateway<br/>in last 60 s?"}
+    throt["200 'throttled'"]
+    today{"alarm for this gateway<br/>already today?"}
+    upd[("update last_seen,<br/>occurrences + 1,<br/>latest temperature")]
+    new[("AlarmNotifications type 13<br/>object_type gateway,<br/>object_id = gateway no.")]
+    hour{"e-mailed for this gateway<br/>in the last hour?"}
+    mail["e-mail 'Gateway Overheat'<br/>CPU °C, frequencies, fan<br/>(not sent -> retry next alert)"]
+    in --> thr
+    thr --> parse
+    parse -->|"no"| bad
+    parse -->|"yes"| st
+    st -->|"yes"| throt
+    st -->|"no"| today
+    today -->|"yes"| upd
+    today -->|"no"| new
+    upd --> hour
+    new --> hour
+    hour -->|"no"| mail
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class parse,st,today,hour decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class upd,new db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class in ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class bad,throt skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class thr process
+```
+
+One alarm row per site, gateway and day; repeats inside the day update the same row.
+The e-mail goes out at most once per gateway per hour while the gateway stays hot;
+if it could not be sent, the hourly mark is released so the next alert retries.
+The response tells the gateway `stored`, `repeated`, `throttled` or `rejected`.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/views/gateway_overheat.py` | GatewayOverheatAlertApi, GatewayOverheatThrottle |
+| `wareApp/gateway_overheat.py` | parse_alert, record_overheat, GATEWAY_OVERHEAT_ALARM_TYPE |
+| `wareApp/alarm_feed.py` | shown as source 'gateway' with the matching home gateway id |
+| `Settings` | GATEWAY_OVERHEAT_STORE_SECONDS = 60, GATEWAY_OVERHEAT_EMAIL_SECONDS = 3600 |
+| `Gateway side` | recovery_gateway_live/temperature.py (posts while >= 85 °C) |
+
+## 19. High / Low Voltage (NewAlarms type 0 / 1)
+<a id="voltage"></a>
+
+From live load packets: every reading is kept; an alarm needs five consecutive readings outside the site's phase thresholds.
+
+Diagram to open and edit in draw.io: [`drawio/19-voltage.drawio`](drawio/19-voltage.drawio)
+
+```mermaid
+flowchart TD
+    in[["load packet<br/>R / Y / B volt, source, meter"]]
+    on{"site.show_voltage_alarms<br/>and all phases > 0?"}
+    off["no voltage check"]
+    store[("store reading twice:<br/>SiteLoadParameters<br/>type 0 (high), type 1 (low)")]
+    seven{"at least 7 readings<br/>for this source + type?"}
+    wait["wait for more<br/>readings"]
+    five{"latest 5 readings ALL have a<br/>phase > max (high) or<br/>< min (low) threshold?"}
+    no["no alarm"]
+    rec{"same alarm for this source<br/>in last 30 min?"}
+    dup["skip (30 min)"]
+    new[("NewAlarmsNotifications<br/>0 High / 1 Low Voltage<br/>R/Y/B values")]
+    mail["e-mail high / low voltage<br/>(send_alarm_for_high_voltage /<br/>send_alarm_for_low_voltage)"]
+    in --> on
+    on -->|"no"| off
+    on -->|"yes"| store
+    store --> seven
+    seven -->|"no"| wait
+    seven -->|"yes"| five
+    five -->|"no"| no
+    five -->|"yes"| rec
+    rec -->|"yes"| dup
+    rec -->|"no"| new
+    new --> mail
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class on,seven,five,rec decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class store,new db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class in ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class off,wait,no,dup skip
+```
+
+Each load packet stores its phase voltages twice in `SiteLoadParameters` (type 0 for
+the high check, type 1 for the low check). Once at least seven readings exist, the
+latest five are checked: **all five** must have at least one phase above the site's
+max (high) or below its min (low). At most one alarm per site, source and type per
+30 minutes, each e-mailed. Sites with `show_voltage_alarms` off are never checked.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/load.py` | handle_load_message, _record_voltage_alarm, _voltage_alarm_data |
+| `wareApp/sendmail.py` | send_alarm_for_high_voltage, send_alarm_for_low_voltage |
+| `Site fields` | show_voltage_alarms, r/y/b_phase_voltage_threshold_max, r/y/b_phase_voltage_threshold_min |
+| `Models` | SiteLoadParameters, NewAlarmsNotifications |
+
+## 20. PF Bad Value (NewAlarms type 2)
+<a id="power-factor"></a>
+
+From live load packets with power factors: any phase below the site's PF threshold while the source is ON.
+
+Diagram to open and edit in draw.io: [`drawio/20-power-factor.drawio`](drawio/20-power-factor.drawio)
+
+```mermaid
+flowchart TD
+    in[["load packet with<br/>R / Y / B power factor"]]
+    row{"SiteLoadPower row exists<br/>(not the first packet)?"}
+    first["first packet: create row,<br/>no PF check"]
+    vis{"site.is_pf_visible and<br/>status = ON?"}
+    off["no PF check"]
+    thr{"all three PF thresholds<br/>set on the site?"}
+    miss["skip; warning once per<br/>site per hour (sites 124,<br/>131, 145, 153, 156 today)"]
+    low{"any phase PF <<br/>its threshold?"}
+    pfd[("PowerFactorData<br/>(low phases recorded)")]
+    rec{"PF alarm for this source<br/>in last 30 min?"}
+    dup["skip (30 min)"]
+    new[("NewAlarmsNotifications type 2<br/>R/Y/B power factor")]
+    mail["e-mail 'PF Fluctuation Alarm'<br/>PF values and thresholds"]
+    in --> row
+    row -->|"no"| first
+    row -->|"yes"| vis
+    vis -->|"no"| off
+    vis -->|"yes"| thr
+    thr -->|"no"| miss
+    thr -->|"yes"| low
+    low -->|"yes"| pfd
+    pfd --> rec
+    rec -->|"yes"| dup
+    rec -->|"no"| new
+    new --> mail
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class row,vis,thr,low,rec decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class pfd,new db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class in ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class first,off,miss,dup skip
+```
+
+Checked on every load packet after the first one for that source and meter. Missing
+PF thresholds skip the check entirely (one warning per site per hour) - those sites
+never raise PF alarms. Low phases are recorded in `PowerFactorData` on every packet;
+the alarm itself is limited to one per site and source per 30 minutes, each e-mailed.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/load.py` | _record_power_factor_alarm (called from handle_load_message) |
+| `wareApp/sendmail.py` | send_mail_for_pf_fluctuation |
+| `Site fields` | is_pf_visible, r_phase_pf_threshold, y_phase_pf_threshold, b_phase_pf_threshold |
+| `Models` | PowerFactorData, NewAlarmsNotifications, SiteLoadPower |
+
+## 21. DG alarms: Running Without Load (9) and Fuel Drain (6)
+<a id="dg-alarms"></a>
+
+Raised by the fetch-fuel-data service after the fuel used by a DG on a day is fetched from the fuel provider (Roadcast / Loconav).
+
+Diagram to open and edit in draw.io: [`drawio/21-dg-alarms.drawio`](drawio/21-dg-alarms.drawio)
+
+```mermaid
+flowchart TD
+    svc[["fetch-fuel-data service<br/>every 5 min"]]
+    rec[("reconcile_daily_unit_consumption:<br/>DgUnitConsumption per DG aisle<br/>per day (energy from<br/>DailySiteReading)")]
+    pend["units with<br/>fetch_fuel_data = True"]
+    prov{"provider configured?<br/>(aisle / site: roadcast,<br/>loconav)"}
+    noprov["skip"]
+    fetch["fetch fuel used for the<br/>DG window (credentials<br/>from .env)"]
+    ok{"usable fuel value?"}
+    retry["keep fetch_fuel_data = True<br/>(retry next cycle)"]
+    save[("save dg_fuel_consumption,<br/>fetch_fuel_data = False")]
+    load{"DG energy (unit_consumption)<br/><= 0 kWh?"}
+    r9["NewAlarms 9 DG RUNNING<br/>WITHOUT LOAD + e-mail"]
+    drain{"fuel used > 1.2 x<br/>site.dg_fuel_tank_capacity?"}
+    r6["DGFuelAlertsData 'suspicious_fuel'<br/>+ NewAlarms 6 FUEL DRAIN<br/>+ e-mail"]
+    prov2[("provider refuel / theft<br/>events -> DGFuelAlertsData<br/>(stored, no e-mail)")]
+    svc --> rec
+    rec --> pend
+    pend --> prov
+    prov -->|"no"| noprov
+    prov -->|"yes"| fetch
+    fetch --> ok
+    ok -->|"no"| retry
+    ok -->|"yes"| save
+    save --> load
+    load -->|"yes"| r9
+    save --> drain
+    drain -->|"yes"| r6
+    save --> prov2
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class prov,ok,load,drain decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class rec,save,prov2 db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class r9,r6 alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class svc ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class noprov,retry skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class pend,fetch process
+```
+
+For each DG aisle and day `reconcile_daily_unit_consumption` keeps a
+`DgUnitConsumption` row with the DG's energy (from `DailySiteReading`). Rows still
+needing fuel (`fetch_fuel_data = True`) are fetched from the configured provider;
+without a usable value they are retried on the next cycle.
+
+After a successful fetch:
+- **DG Running Without Load (9):** the DG used fuel but its energy is <= 0 kWh.
+- **Fuel Drain (6):** fuel used is more than 1.2 x the site's tank capacity
+  (also stored as `DGFuelAlertsData` "suspicious_fuel").
+- Refuel / theft events reported by the provider are stored in `DGFuelAlertsData`
+  only (no alarm, no e-mail).
+
+Both alarms are raised once per DG unit (the fetch flag is cleared afterwards) and
+e-mailed. Type 9 is missing from the model's choices; the alarm list adds its name
+(`alarm_feed.POWER_TYPES`).
+
+| File | Function / role |
+| --- | --- |
+| `fetch_fuel_data.py` | run_dg_fuel_cycle (service loop, DG_FUEL_POLL_INTERVAL_SECONDS = 300) |
+| `wareApp/dg_fuel/sessions.py` | reconcile_daily_unit_consumption, attempt_fetch_for_unit, determine_provider, _persist_provider_alerts |
+| `wareApp/fuel_providers.py` | detect_suspicious_fuel (> 1.2 x tank), roadcast / loconav fetch |
+| `wareApp/sendmail.py` | send_alarm_email |
+| `Site / aisle fields` | dg_fuel_tank_capacity, dg_fuel_enabled, dg_fuel_provider, dg_fuel_vehicle_number |
+| `Models` | DgUnitConsumption, DGFuelAlertsData, NewAlarmsNotifications |
+
+## 22. Fire pump e-mails (FIREALARM, no alarm row)
+<a id="fire-pump-emails"></a>
+
+Panel mode changes and motor-on events, decoded from the three phase voltages; e-mailed to the site's customer and logged in Email_History.
+
+Diagram to open and edit in draw.io: [`drawio/22-fire-pump-emails.drawio`](drawio/22-fire-pump-emails.drawio)
+
+```mermaid
+flowchart TD
+    in[["FIREALARM packet<br/>meter, R / Y / B volt,<br/>power status"]]
+    rec{"FirePumpAlarm row<br/>for this meter?"}
+    skip["skipped"]
+    keep[("keep previous volts,<br/>update FirePumpAlarm")]
+    modes["mode from phases:<br/>Auto = R>200, Y<100, B>200<br/>Manual = R<100, Y>200, B>200<br/>Off = R<100, Y<100, B>200"]
+    motor{"motor ON (power status 1)<br/>in Auto or Manual?"}
+    ten{"motor-on e-mail for this<br/>device in last 10 min?"}
+    m1["e-mail 'Motor-On in<br/>Auto / Manual-Mode'"]
+    chg{"previous mode !=<br/>new mode?"}
+    m2["e-mail mode change, e.g.<br/>'Auto-Mode to Manual-Mode',<br/>'Off-Mode to Auto-Mode'"]
+    hist[("Email_History<br/>(device, email_for, time)")]
+    in --> rec
+    rec -->|"no"| skip
+    rec -->|"yes"| keep
+    keep --> modes
+    keep --> motor
+    motor -->|"yes"| ten
+    ten -->|"no"| m1
+    modes --> chg
+    chg -->|"yes"| m2
+    m1 --> hist
+    m2 --> hist
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class rec,motor,ten,chg decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class keep,hist db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class m1,m2 alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class in ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class skip skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class modes process
+```
+
+No alarm row: these are e-mails to the site's customer (`site.customer.email`),
+recorded in `Email_History` (`email_for`: 1 Auto->Manual, 2 ->Auto, 4 ->Off,
+5 motor on, ...). The mode is read from which phases are above 200 V / below 100 V;
+the handler compares the previous and the new pattern to name the change. Motor-on
+e-mails are limited to one per device per 10 minutes. Being alarm e-mails, they also
+go only to `ALARM_EMAIL_OVERRIDE_TO` while that is set (test).
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/fire_alarm.py` | handle_fire_alarm_message, _send_fire_alarm_email, _send_throttled_motor_on_email |
+| `wareApp/sendmail.py` | send_mail_fire_alarm_user |
+| `Models` | FirePumpAlarm, Email_History |
 
