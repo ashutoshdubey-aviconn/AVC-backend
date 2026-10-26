@@ -3,6 +3,7 @@ from threading import Event, Thread
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from wareApp import tasks
@@ -43,6 +44,7 @@ class LoadDataTests(SimpleTestCase):
         rollups._last_rollup_minute_by_site.clear()
         rollups._last_daily_rollup_hour_by_site.clear()
         rollups._rollup_locks_by_site.clear()
+        cache.clear()
 
     def test_parser_reads_gateway_payload(self):
         reading = parse_load_data_message(self.message)
@@ -259,9 +261,80 @@ class LoadDataTests(SimpleTestCase):
 
         self.assertEqual(close_connections.call_count, 2)
 
+    def test_scheduler_passes_the_last_rolled_minute(self):
+        site = SimpleNamespace(id=156, pk=156)
+        with patch("wareApp.load_data.rollups.roll_up_completed_load_data") as roll_up:
+            rollups.roll_up_load_data_if_due(site, datetime(2026, 9, 30, 12, 34, 5))
+            rollups.roll_up_load_data_if_due(site, datetime(2026, 9, 30, 12, 35, 7))
+        self.assertIsNone(roll_up.call_args_list[0].kwargs["since"])  # after a restart
+        self.assertEqual(roll_up.call_args_list[1].kwargs["since"], datetime(2026, 9, 30, 12, 34))
+
+    def _raw_window_start(self, since):
+        site = SimpleNamespace(id=156, pk=156)
+        with (
+            patch("wareApp.load_data.rollups.RawLoadData.objects.filter", return_value=QuerySet()) as raw,
+            patch("wareApp.load_data.rollups._materialized_buckets", return_value=set()),
+        ):
+            rollups.roll_up_completed_load_data(
+                site, datetime(2026, 9, 30, 12, 35, 7), roll_up_daily=False, since=since
+            )
+        return raw.call_args.kwargs["created__gte"]
+
+    def test_rollup_rechecks_only_a_margin_before_the_last_rolled_minute(self):
+        self.assertEqual(
+            self._raw_window_start(datetime(2026, 9, 30, 12, 34)), datetime(2026, 9, 30, 12, 19)
+        )
+
+    def test_rollup_uses_the_full_lookback_after_a_restart_or_a_long_pause(self):
+        full = datetime(2026, 9, 30, 6, 35)  # 360 minutes before 12:35
+        self.assertEqual(self._raw_window_start(None), full)
+        self.assertEqual(self._raw_window_start(datetime(2026, 9, 29, 12, 0)), full)
+
+    def test_monthly_bounds_cache_skips_the_database_inside_the_month_range(self):
+        site = SimpleNamespace(id=156)
+        aisle_group = SimpleNamespace(id=967, aisleGroupName="Mains-Supply")
+
+        def reading(value):
+            return LoadReading(load_value=value, leg_id="967", meter_number="1",
+                               created=datetime(2026, 10, 1, 2, 15), epoch_time="1790801110167")
+
+        with (
+            patch("wareApp.load_data.monthly.MonthlyMinMaxLoadData.objects.filter") as filter_monthly,
+            patch("wareApp.load_data.monthly.SiteLoadPower.objects.filter"),
+        ):
+            filter_monthly.return_value.values.return_value.first.return_value = {
+                "min_load": 10.0, "max_load": 100.0
+            }
+            monthly.update_monthly_min_max_load(site, aisle_group, reading(50.0))  # DB, caches 10..100
+            monthly.update_monthly_min_max_load(site, aisle_group, reading(60.0))  # inside: skipped
+            monthly.update_monthly_min_max_load(site, aisle_group, reading(100.0))  # inside: skipped
+            self.assertEqual(filter_monthly.call_count, 1)
+            monthly.update_monthly_min_max_load(site, aisle_group, reading(120.0))  # new max: DB
+            self.assertEqual(filter_monthly.call_count, 2)
+            filter_monthly.return_value.update.assert_called_once()
+            monthly.update_monthly_min_max_load(site, aisle_group, reading(110.0))  # inside 10..120
+            self.assertEqual(filter_monthly.call_count, 2)
+
+    def test_monthly_bounds_cache_is_not_used_while_the_minimum_is_unset(self):
+        site = SimpleNamespace(id=156)
+        aisle_group = SimpleNamespace(id=967, aisleGroupName="Mains-Supply")
+        reading = LoadReading(load_value=5.0, leg_id="967", meter_number="1",
+                              created=datetime(2026, 10, 1, 2, 15), epoch_time="1790801110167")
+        cache.set(monthly._bounds_key(site, aisle_group, datetime.now().replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0)), (0.0, 10.0))
+        with (
+            patch("wareApp.load_data.monthly.MonthlyMinMaxLoadData.objects.filter") as filter_monthly,
+            patch("wareApp.load_data.monthly.SiteLoadPower.objects.filter"),
+        ):
+            filter_monthly.return_value.values.return_value.first.return_value = {
+                "min_load": 0.0, "max_load": 10.0
+            }
+            monthly.update_monthly_min_max_load(site, aisle_group, reading)
+        filter_monthly.assert_called_once()
+
     def test_monthly_update_skips_site_load_query_when_bounds_do_not_change(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(aisleGroupName="Mains-Supply")
+        aisle_group = SimpleNamespace(id=967, aisleGroupName="Mains-Supply")
         reading = LoadReading(
             load_value=50.0,
             leg_id="967",
@@ -289,7 +362,7 @@ class LoadDataTests(SimpleTestCase):
 
     def test_monthly_update_batches_minimum_and_maximum_changes(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(aisleGroupName="Mains-Supply")
+        aisle_group = SimpleNamespace(id=967, aisleGroupName="Mains-Supply")
         reading = LoadReading(
             load_value=50.0,
             leg_id="967",
@@ -327,7 +400,7 @@ class LoadDataTests(SimpleTestCase):
 
     def test_monthly_update_uses_calendar_month_bounds(self):
         site = SimpleNamespace(id=156)
-        aisle_group = SimpleNamespace(aisleGroupName="Mains-Supply")
+        aisle_group = SimpleNamespace(id=967, aisleGroupName="Mains-Supply")
         reading = LoadReading(
             load_value=50.0,
             leg_id="967",
