@@ -705,4 +705,76 @@ All manual commands are dry runs unless given `--apply`:
 | `rebuild_hourly_baseline --from … --to … [--site N] --apply` | recompute hourly baseline and saving |
 """,
     },
+    # ------------------------------------------------------------------ 14
+    {
+        "slug": "14-high-low-bypassed", "anchor": "high-low-bypassed", "number": 14,
+        "title": "High / Low Consumption and Bypassed alarms (detail)",
+        "summary": "One completed day of one aisle is compared with that aisle's own daily baseline. "
+                   "Bypassed >= 100 %, High >= 75 %, Low below a site-set %. Example: UCB-F2, "
+                   "baseline 127.16 kWh: 121.5 kWh -> High, 202.3 kWh -> Bypassed.",
+        "nodes": {
+            "t1": ("Trigger 1: first packet of a\nnew day -> checks YESTERDAY\nconsumption_batch alarm_days", "ext", 0, 0),
+            "t2": ("Trigger 2: recovery reply\nrewrote past days (<= 7)\nevaluate_days()", "ext", 1, 0),
+            "t3": ("Trigger 3: manual\nreplay_consumption_alarms\n--from --to [--apply]", "ext", 2, 0),
+            "read": ("DailySiteReading of the aisle\nconsumption = sum of the\nday's hourly rows", "db", 1, 1),
+            "eval": ("evaluate_daily_alarms\n(site, aisle, daily row)", "process", 1, 2),
+            "base": ("baseline for the day?\nbaseline_info(): SiteBaseline\n(dated row, else newest)", "decision", 1, 3),
+            "none": ("no alarm\n(no baseline, or day\nbefore baseline start)", "skip", 0, 3),
+            "bthr": ("bypass threshold =\nsite.bypass_consumption_units\nelse baseline x 100 %\n(ALARM_BYPASS_DEFAULT_PERCENT)", "process", 1, 4),
+            "byp": ("consumption >=\nbypass threshold?", "decision", 1, 5),
+            "rbyp": ("BYPASSED (11)\nsaved nothing that day\n-> stop (High not checked)", "alarm", 0, 6),
+            "hthr": ("high threshold =\nsite.high_consumption_units\nelse baseline x 75 %\n(site % or ALARM_HIGH_..._PERCENT)", "process", 2, 6),
+            "high": ("consumption >=\nhigh threshold?", "decision", 2, 7),
+            "rhigh": ("HIGH CONSUMPTION (7)\n(75 % .. 100 % of baseline)", "alarm", 3, 7),
+            "low": ("site.min_threshold_value\nset (X %)?", "decision", 2, 8),
+            "nolow": ("Low not checked\n(opt-in only)", "skip", 3, 8),
+            "lowc": ("consumption <\nbaseline x (1 - X %)?", "decision", 2, 9),
+            "rlow": ("LOW CONSUMPTION (8)", "alarm", 3, 9),
+            "ok": ("no alarm for this day", "skip", 1, 9),
+            "rec": ("_record(): alarm for this\naisle + type + day exists?", "decision", 1, 10),
+            "dupe": ("skip: no new row,\nno e-mail", "skip", 0, 10),
+            "store": ("AlarmNotifications\nAlarm_type 7 / 8 / 11, aisle, leg,\ncreated_time = day, to_do = reason", "db", 1, 11),
+            "notify": ("notify(send_alarm_email)\nafter commit -> notifications\nqueue (direct if queue down)", "alarm", 1, 12),
+            "mail": ("e-mail '[Alarm] - [site]'\naisle, leg, date, consumption,\nbaseline, threshold\n(test: override address only)", "alarm", 2, 12),
+            "feed": ("alarm_feed.active_alarms()\n1 row per aisle + type, 30 days\nalarmTypeApi / alarmapi", "process", 0, 12),
+        },
+        "edges": [
+            ("t1", "read"), ("t2", "read"), ("t3", "read"), ("read", "eval"), ("eval", "base"),
+            ("base", "none", "no"), ("base", "bthr", "yes"), ("bthr", "byp"),
+            ("byp", "rbyp", "yes"), ("byp", "hthr", "no"), ("hthr", "high"),
+            ("high", "rhigh", "yes"), ("high", "low", "no"), ("low", "nolow", "no"),
+            ("low", "lowc", "yes"), ("lowc", "rlow", "yes"), ("lowc", "ok", "no"),
+            ("rbyp", "rec"), ("rhigh", "rec"), ("rlow", "rec"),
+            ("rec", "dupe", "yes"), ("rec", "store", "no"), ("store", "notify"),
+            ("notify", "mail"), ("store", "feed"),
+        ],
+        "files": [
+            ("wareApp/mqtt/services/consumption_alarms.py", "evaluate_daily_alarms, evaluate_days, _bypass_threshold, _high_percent, _record (+ operation_hours_check, see flow 9)"),
+            ("wareApp/mqtt/services/baseline.py", "baseline_info, BaselineMemo"),
+            ("wareApp/mqtt/consumption_batch.py", "alarm_days -> yesterday after the bulk write"),
+            ("wareApp/mqtt/hourly / daily_consumption_recovery.py", "evaluate_days after a recovery"),
+            ("wareApp/management/commands/replay_consumption_alarms.py", "manual day-by-day replay"),
+            ("wareApp/mqtt/services/notifications.py, sendmail.py", "notify, send_alarm_email"),
+            ("wareApp/alarm_feed.py", "active_alarms (alarm list APIs)"),
+            ("Settings", "ALARM_BYPASS_DEFAULT_PERCENT=100, ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT=75, ALARM_REEVALUATE_DAYS=7, ALARM_EMAIL_OVERRIDE_TO"),
+            ("Site fields (overrides)", "bypass_consumption_units, high_consumption_units, high_consumption_baseline_percent, min_threshold_value"),
+            ("Models", "Site, SiteBaseline, AisleGroup, DailySiteReading, AlarmNotifications"),
+        ],
+        "details": """
+Focused version of flow 9 for the three consumption-level alarms (Operation Hours
+Increased is checked between Bypassed and High; see flow 9).
+
+| Alarm | Fires when (per aisle, per day) | Setting / override |
+| --- | --- | --- |
+| Bypassed (11) | consumption >= 100 % of the aisle's daily baseline | `ALARM_BYPASS_DEFAULT_PERCENT`; site `bypass_consumption_units` (kWh) |
+| High Consumption (7) | consumption >= 75 % of baseline (and below the Bypassed level) | `ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT`; site `high_consumption_baseline_percent` or `high_consumption_units` (kWh) |
+| Low Consumption (8) | consumption < baseline x (1 - X %) | only when site `min_threshold_value` = X is set |
+
+Worked example - Farrukhnagar UCB-F2, daily baseline 127.16 kWh: Oct 3 121.52 kWh
+(96 %) -> High (threshold 95.37); Oct 15 202.27 kWh (159 %) -> Bypassed (threshold
+127.16); a normal day of ~44 kWh (35 %) -> no alarm. Each alarm is stored once per
+aisle, type and day and e-mailed once; the alarm list shows one row per aisle and
+type with first / last day and count.
+""",
+    },
 ]

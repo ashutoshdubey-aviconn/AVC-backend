@@ -44,6 +44,7 @@ subtype (for `recovery` the subtype selects the handler).
 11. [LoadData (queue 2): load graph data](#loaddata)
 12. [HTTP calls from gateways](#http-from-gateways)
 13. [Timers, sweeps and maintenance commands](#timers-and-checks)
+14. [High / Low Consumption and Bypassed alarms (detail)](#high-low-bypassed)
 
 ## 1. Overview: from gateway to database
 <a id="overview"></a>
@@ -1005,4 +1006,104 @@ All manual commands are dry runs unless given `--apply`:
 | `wareApp/management/commands/replay_consumption_alarms.py` | day-end alarms for a past period |
 | `wareApp/management/commands/resync_daily_totals.py` | daily total = sum of hourly rows (skips incomplete / glitch days) |
 | `wareApp/management/commands/rebuild_hourly_baseline.py` | recompute hourly baseline and saving |
+
+## 14. High / Low Consumption and Bypassed alarms (detail)
+<a id="high-low-bypassed"></a>
+
+One completed day of one aisle is compared with that aisle's own daily baseline. Bypassed >= 100 %, High >= 75 %, Low below a site-set %. Example: UCB-F2, baseline 127.16 kWh: 121.5 kWh -> High, 202.3 kWh -> Bypassed.
+
+Diagram to open and edit in draw.io: [`drawio/14-high-low-bypassed.drawio`](drawio/14-high-low-bypassed.drawio)
+
+```mermaid
+flowchart TD
+    t1[["Trigger 1: first packet of a<br/>new day -> checks YESTERDAY<br/>consumption_batch alarm_days"]]
+    t2[["Trigger 2: recovery reply<br/>rewrote past days (<= 7)<br/>evaluate_days()"]]
+    t3[["Trigger 3: manual<br/>replay_consumption_alarms<br/>--from --to [--apply]"]]
+    read[("DailySiteReading of the aisle<br/>consumption = sum of the<br/>day's hourly rows")]
+    eval["evaluate_daily_alarms<br/>(site, aisle, daily row)"]
+    base{"baseline for the day?<br/>baseline_info(): SiteBaseline<br/>(dated row, else newest)"}
+    none["no alarm<br/>(no baseline, or day<br/>before baseline start)"]
+    bthr["bypass threshold =<br/>site.bypass_consumption_units<br/>else baseline x 100 %<br/>(ALARM_BYPASS_DEFAULT_PERCENT)"]
+    byp{"consumption >=<br/>bypass threshold?"}
+    rbyp["BYPASSED (11)<br/>saved nothing that day<br/>-> stop (High not checked)"]
+    hthr["high threshold =<br/>site.high_consumption_units<br/>else baseline x 75 %<br/>(site % or ALARM_HIGH_..._PERCENT)"]
+    high{"consumption >=<br/>high threshold?"}
+    rhigh["HIGH CONSUMPTION (7)<br/>(75 % .. 100 % of baseline)"]
+    low{"site.min_threshold_value<br/>set (X %)?"}
+    nolow["Low not checked<br/>(opt-in only)"]
+    lowc{"consumption <<br/>baseline x (1 - X %)?"}
+    rlow["LOW CONSUMPTION (8)"]
+    ok["no alarm for this day"]
+    rec{"_record(): alarm for this<br/>aisle + type + day exists?"}
+    dupe["skip: no new row,<br/>no e-mail"]
+    store[("AlarmNotifications<br/>Alarm_type 7 / 8 / 11, aisle, leg,<br/>created_time = day, to_do = reason")]
+    notify["notify(send_alarm_email)<br/>after commit -> notifications<br/>queue (direct if queue down)"]
+    mail["e-mail '[Alarm] - [site]'<br/>aisle, leg, date, consumption,<br/>baseline, threshold<br/>(test: override address only)"]
+    feed["alarm_feed.active_alarms()<br/>1 row per aisle + type, 30 days<br/>alarmTypeApi / alarmapi"]
+    t1 --> read
+    t2 --> read
+    t3 --> read
+    read --> eval
+    eval --> base
+    base -->|"no"| none
+    base -->|"yes"| bthr
+    bthr --> byp
+    byp -->|"yes"| rbyp
+    byp -->|"no"| hthr
+    hthr --> high
+    high -->|"yes"| rhigh
+    high -->|"no"| low
+    low -->|"no"| nolow
+    low -->|"yes"| lowc
+    lowc -->|"yes"| rlow
+    lowc -->|"no"| ok
+    rbyp --> rec
+    rhigh --> rec
+    rlow --> rec
+    rec -->|"yes"| dupe
+    rec -->|"no"| store
+    store --> notify
+    notify --> mail
+    store --> feed
+    classDef decision fill:#fff2cc,stroke:#d6b656
+    class base,byp,high,low,lowc,rec decision
+    classDef db fill:#d5e8d4,stroke:#82b366
+    class read,store db
+    classDef alarm fill:#f8cecc,stroke:#b85450
+    class rbyp,rhigh,rlow,notify,mail alarm
+    classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
+    class t1,t2,t3 ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class none,nolow,ok,dupe skip
+    classDef process fill:#dae8fc,stroke:#6c8ebf
+    class eval,bthr,hthr,feed process
+```
+
+Focused version of flow 9 for the three consumption-level alarms (Operation Hours
+Increased is checked between Bypassed and High; see flow 9).
+
+| Alarm | Fires when (per aisle, per day) | Setting / override |
+| --- | --- | --- |
+| Bypassed (11) | consumption >= 100 % of the aisle's daily baseline | `ALARM_BYPASS_DEFAULT_PERCENT`; site `bypass_consumption_units` (kWh) |
+| High Consumption (7) | consumption >= 75 % of baseline (and below the Bypassed level) | `ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT`; site `high_consumption_baseline_percent` or `high_consumption_units` (kWh) |
+| Low Consumption (8) | consumption < baseline x (1 - X %) | only when site `min_threshold_value` = X is set |
+
+Worked example - Farrukhnagar UCB-F2, daily baseline 127.16 kWh: Oct 3 121.52 kWh
+(96 %) -> High (threshold 95.37); Oct 15 202.27 kWh (159 %) -> Bypassed (threshold
+127.16); a normal day of ~44 kWh (35 %) -> no alarm. Each alarm is stored once per
+aisle, type and day and e-mailed once; the alarm list shows one row per aisle and
+type with first / last day and count.
+
+| File | Function / role |
+| --- | --- |
+| `wareApp/mqtt/services/consumption_alarms.py` | evaluate_daily_alarms, evaluate_days, _bypass_threshold, _high_percent, _record (+ operation_hours_check, see flow 9) |
+| `wareApp/mqtt/services/baseline.py` | baseline_info, BaselineMemo |
+| `wareApp/mqtt/consumption_batch.py` | alarm_days -> yesterday after the bulk write |
+| `wareApp/mqtt/hourly / daily_consumption_recovery.py` | evaluate_days after a recovery |
+| `wareApp/management/commands/replay_consumption_alarms.py` | manual day-by-day replay |
+| `wareApp/mqtt/services/notifications.py, sendmail.py` | notify, send_alarm_email |
+| `wareApp/alarm_feed.py` | active_alarms (alarm list APIs) |
+| `Settings` | ALARM_BYPASS_DEFAULT_PERCENT=100, ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT=75, ALARM_REEVALUATE_DAYS=7, ALARM_EMAIL_OVERRIDE_TO |
+| `Site fields (overrides)` | bypass_consumption_units, high_consumption_units, high_consumption_baseline_percent, min_threshold_value |
+| `Models` | Site, SiteBaseline, AisleGroup, DailySiteReading, AlarmNotifications |
 
