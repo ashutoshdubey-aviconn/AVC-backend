@@ -184,11 +184,12 @@ def _consumption_alarms(site, aisle_group, daily_reading):
 
 
 def stale_history(location_id, home_gateway_id, aisle_group, last_hourly_entry, observed_at):
-    """True when the aisle has no reading for over MQTT_RECOVERY_STALE_DAYS.
+    """True when the aisle has no hourly reading for over MQTT_RECOVERY_STALE_DAYS.
 
-    Such a gap is not recovered (the gateway no longer holds that history): the
-    packet is stored as the aisle's first reading again. Logged once per aisle
-    per day.
+    Such an aisle is inactive for MQTT: its daily totals come from the gateway
+    sync, so the packet is dropped without a recovery request (the gateway no
+    longer holds that history) and nothing is stored that would overwrite the
+    synced total. Logged once per aisle per day.
     """
     stale_days = getattr(settings, "MQTT_RECOVERY_STALE_DAYS", 30)
     if not stale_days or observed_at - last_hourly_entry.reading_from <= timedelta(days=stale_days):
@@ -196,7 +197,7 @@ def stale_history(location_id, home_gateway_id, aisle_group, last_hourly_entry, 
     log_key = f"mqtt:stale-aisle:{location_id}:{aisle_group.id}:{observed_at:%Y-%m-%d}"
     if cache.add(log_key, True, timeout=26 * 60 * 60):
         logger.warning(
-            "Queue1 consumption restarted without recovery (no data for over %s days): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s last_stored_hour=%s observed_at=%s",
+            "Queue1 consumption skipped, aisle inactive (no hourly data for over %s days, no recovery requested): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s last_stored_hour=%s observed_at=%s",
             stale_days,
             location_id,
             home_gateway_id,
@@ -442,9 +443,11 @@ def handle_consumption_message(
                 last_hourly_entry = hourly_entries.order_by(
                     "-reading_from", "-id"
                 ).first()
-                if last_hourly_entry is not None and not stale_history(
-                    location_id, home_gateway_id, aisle_group, last_hourly_entry, observed_at
-                ):
+                if last_hourly_entry is not None:
+                    if stale_history(
+                        location_id, home_gateway_id, aisle_group, last_hourly_entry, observed_at
+                    ):
+                        return f"skipped: leg {aisle_group_id} inactive, no recovery requested"
                     request = _consumption_recovery_request(
                         location_id, gateway_id, aisle_group_id, last_hourly_entry
                     )
@@ -498,8 +501,8 @@ def handle_consumption_message(
                         "(previous reading incomplete)"
                     )
 
-                # First ever reading for this aisle (or history too old to recover):
-                # no gap to request, so give back the cooldown slot claimed above.
+                # First ever reading for this aisle: no gap, so give back the
+                # cooldown slot claimed above.
                 release_recovery_request(location_id, "aisle", aisle_group_id)
                 hourly_baseline = baselines.hourly
                 daily_baseline = baselines.daily

@@ -395,9 +395,11 @@ def _apply(state, p, publish_recovery):
                 )
                 return f"skipped: leg {leg_id} has a gap, recovery already requested (cooldown)"
             last_hourly_entry = _last_hourly_entry(state)
-            if last_hourly_entry is not None and not single.stale_history(
-                location_id, home_gateway_id, aisle, last_hourly_entry, observed_at
-            ):
+            if last_hourly_entry is not None:
+                if single.stale_history(
+                    location_id, home_gateway_id, aisle, last_hourly_entry, observed_at
+                ):
+                    return f"skipped: leg {leg_id} inactive, no recovery requested"
                 request = single._consumption_recovery_request(
                     location_id, gateway_id, leg_id, last_hourly_entry
                 )
