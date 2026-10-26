@@ -1,7 +1,7 @@
 # Test-server rollout: `full-optimization-v2`
 
 Target: test server `ubuntu@43.204.53.81`, project `/home/ubuntu/django_project`
-(see `TEST_SERVER_OPERATIONS.md`). The test server is **not a Git checkout** and
+(see `docs/operations/TEST_SERVER_OPERATIONS.md`). The test server is **not a Git checkout** and
 receives live LoadData from main through the broker bridge, so treat it as
 connected infrastructure.
 

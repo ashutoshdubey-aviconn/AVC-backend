@@ -1,7 +1,7 @@
 """DG-fuel level polling orchestration with an explicit dry-run mode."""
 
 import logging
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any, Callable, Dict, Iterable
 
 from .collection import (
     collect_loconav_levels,

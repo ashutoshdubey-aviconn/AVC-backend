@@ -1,9 +1,4 @@
-import re
 import logging
-
-from datetime import datetime
-
-from wareApp.models import *
 
 logger = logging.getLogger(__name__)
 

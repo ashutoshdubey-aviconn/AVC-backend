@@ -1,6 +1,6 @@
 # Server Performance Evidence Collector
 
-`server_metrics_collector.py` runs on the laptop. It uses normal SSH access to
+`monitoring/server_metrics_collector.py` runs on the laptop. It uses normal SSH access to
 read Linux metrics from each server and writes the evidence only under the local
 `monitoring/data/` directory. It does not install an agent, modify either
 server, or write data remotely.

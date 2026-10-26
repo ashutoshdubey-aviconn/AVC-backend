@@ -10,6 +10,7 @@
   of existing only as a log line.
 """
 
+import hashlib
 import logging
 import time
 
@@ -39,9 +40,12 @@ def record_dead_letter(message_type, site_id, gateway_id, payload, error, dedupe
     from wareApp.models import MqttDeadLetter
 
     try:
+        # The error text has spaces and quotes: hash it so the key is valid
+        # for every cache backend (CacheKeyWarning).
+        error_digest = hashlib.sha1(str(error)[:100].encode()).hexdigest()[:16]
         dedupe_key = (
             f"mqtt:dead-letter:{message_type}:{site_id}:{gateway_id}:"
-            f"{type(error).__name__}:{str(error)[:100]}"
+            f"{type(error).__name__}:{error_digest}"
         )
         if dedupe and not cache.add(dedupe_key, 1, DEAD_LETTER_DEDUPE_SECONDS):
             return

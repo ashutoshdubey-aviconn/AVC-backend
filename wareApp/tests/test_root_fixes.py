@@ -9,6 +9,7 @@ import base64
 import io
 from contextlib import redirect_stdout
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth.models import Group
@@ -209,8 +210,8 @@ class FuelProviderCredentialTests(SimpleTestCase):
         self.assertEqual(fuel_providers.loconav_auth_headers(), {})
 
     def test_no_credentials_in_source(self):
-        source = open(fuel_providers.__file__).read()
+        source = Path(fuel_providers.__file__).read_text()
         self.assertNotRegex(source, r"Basic [A-Za-z0-9+/=]{16,}")
         self.assertNotIn("pull_api?username=", source)
         self.assertNotRegex(source, r'"User-Authentication":\s*"[^"]')
-        self.assertNotRegex(open(sendmail.__file__).read(), r'SMTP_PASS\s*=\s*"')
+        self.assertNotRegex(Path(sendmail.__file__).read_text(), r'SMTP_PASS\s*=\s*"')
