@@ -1,41 +1,31 @@
-"""Active alarms for the dashboards: one row per issue, from both alarm tables.
+"""Active alarms for the dashboards: one row per issue.
 
-``AlarmNotifications`` holds consumption, bypass, operation-hours and meter
-reading alarms (per aisle); ``NewAlarmsNotifications`` holds voltage, power
-factor and DG alarms (per site and power source). Both keep a row for every
-occurrence, so the same issue appears many times. Here every issue becomes
-one row: when it started, when it was last seen and how often, with the
-site, customer, aisle group, leg, home gateway and the latest details.
-
-The work is a fixed number of queries (grouping happens in the database),
-independent of the number of customers or stored alarm rows.
+All alarms live in ``AlarmNotifications`` (one table since migration 0099):
+consumption alarms per aisle, meter / gateway alarms per object, power and DG
+alarms per power source. Repeats are counted on one row per day; this module
+groups an issue's days into one row (first seen, last seen, total occurrences)
+with the site, customer, aisle group, leg, power source, home gateway and the
+latest details. A fixed number of queries, independent of the data volume.
 """
 
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 from django.conf import settings
-from django.db.models import Count, Max, Min, Q, Sum
+from django.db.models import Max, Min, Q, Sum
 
 from wareApp.models import (
     AisleSyncRecoveryStatus,
     AlarmNotifications,
     HomeGatewayId,
-    NewAlarmsNotifications,
     Site,
 )
 
 # Priority labels as the dashboard shows them (0 High, 1 Medium, 2 Low).
 PRIORITY_LABELS = {0: "High", 1: "Medium", 2: "Low"}
 
-CONSUMPTION_TYPES = dict(AlarmNotifications._meta.get_field("Alarm_type").flatchoices)
-# Stored by wareApp/gateway_overheat.py (object_id = gateway number, no aisle).
-GATEWAY_OVERHEAT = 13
-POWER_TYPES = {
-    **dict(NewAlarmsNotifications._meta.get_field("alarm_type").flatchoices),
-    # Stored by wareApp/dg_fuel/sessions.py but missing from the model choices.
-    9: "DG Running Without Load",
-}
+ALARM_TYPES = dict(AlarmNotifications._meta.get_field("Alarm_type").flatchoices)
+GATEWAY_OVERHEAT = AlarmNotifications.GATEWAY_OVERHEAT
 
 
 def _fmt(value):
@@ -44,7 +34,7 @@ def _fmt(value):
 
 def _power_issue(row):
     """Readable details of a voltage / PF / DG alarm row."""
-    alarm_type = row.alarm_type
+    alarm_type = row.Alarm_type
     phases = "/".join(_fmt(v) or "-" for v in (row.r_phase, row.y_phase, row.b_phase))
     if alarm_type in (0, 1):
         return f"R/Y/B voltage {phases} V"
@@ -54,7 +44,7 @@ def _power_issue(row):
         return f"Fuel {_fmt(row.fuel_level)} L"
     if row.run_hours is not None:
         return f"Run hours {_fmt(row.run_hours)}"
-    return POWER_TYPES.get(alarm_type, "")
+    return ALARM_TYPES.get(alarm_type, "")
 
 
 def _cutoff():
@@ -85,17 +75,16 @@ def active_alarms(site_ids):
         site_gateways[site_id].append(hgw_id)
 
     rows = []
-
-    # ---- AlarmNotifications: per site, aisle/meter and type
     groups = list(
         AlarmNotifications.objects.filter(site_id__in=site_ids, is_active=True)
-        .values("site_id", "aisle_group_id", "object_id", "Alarm_type")
+        .values("site_id", "aisle_group_id", "object_id", "power_source", "Alarm_type")
         .annotate(
             first_seen=Min("created_time"),
             last_created=Max("created_time"),
             last_seen=Max("last_seen"),
             occurrences=Sum("occurrences"),
-            priority=Max("Alarm_priority"),
+            # 0 High, 1 Medium, 2 Low: the most severe of the issue's rows.
+            priority=Min("Alarm_priority"),
             latest_id=Max("id"),
         )
         .filter(
@@ -119,100 +108,54 @@ def active_alarms(site_ids):
     for group in groups:
         alarm = latest[group["latest_id"]]
         site = sites[group["site_id"]]
-        aisle = alarm.aisle_group
+        alarm_type = group["Alarm_type"]
+        all_gateways = ", ".join(site_gateways.get(site.id, [])) or None
         last_seen = max(
             d for d in (group["last_created"], group["last_seen"]) if d is not None
         )
-        if group["Alarm_type"] == GATEWAY_OVERHEAT:
+        common = dict(
+            alarm_type=alarm_type,
+            alarm=ALARM_TYPES.get(alarm_type, str(alarm_type)),
+            priority=group["priority"],
+            first_seen=group["first_seen"],
+            last_seen=last_seen,
+            occurrences=group["occurrences"] or 1,
+        )
+        if alarm.source == "gateway":
             # object_id is the gateway number (…_<n> in the home gateway id).
             number = group["object_id"]
-            gateways = site_gateways.get(site.id, [])
             home_gateway = next(
-                (g for g in gateways if number is not None and g.endswith(f"_{number}")),
-                ", ".join(gateways) or None,
+                (
+                    g
+                    for g in site_gateways.get(site.id, [])
+                    if number is not None and g.endswith(f"_{number}")
+                ),
+                all_gateways,
             )
-            rows.append(
-                _row(
-                    site,
-                    source="gateway",
-                    alarm_type=group["Alarm_type"],
-                    alarm=CONSUMPTION_TYPES.get(group["Alarm_type"], "Gateway Overheat"),
-                    priority=group["priority"],
-                    first_seen=group["first_seen"],
-                    last_seen=last_seen,
-                    occurrences=group["occurrences"] or 1,
-                    aisle_group_id=None,
-                    aisle_group_name=None,
-                    leg_id=None,
-                    power_source=None,
-                    home_gateway_id=home_gateway,
-                    issue=alarm.to_do or "Gateway CPU temperature high",
-                )
-            )
-            continue
-        rows.append(
-            _row(
+            rows.append(_row(
+                site, source="gateway", aisle_group_id=None, aisle_group_name=None,
+                leg_id=None, power_source=None, home_gateway_id=home_gateway,
+                issue=alarm.to_do or "Gateway CPU temperature high", **common,
+            ))
+        elif alarm.source == "power":
+            rows.append(_row(
+                site, source="power", aisle_group_id=None, aisle_group_name=None,
+                leg_id=None, power_source=group["power_source"],
+                home_gateway_id=all_gateways, issue=_power_issue(alarm), **common,
+            ))
+        else:
+            aisle = alarm.aisle_group
+            rows.append(_row(
                 site,
                 source="consumption",
-                alarm_type=group["Alarm_type"],
-                alarm=CONSUMPTION_TYPES.get(
-                    group["Alarm_type"], str(group["Alarm_type"])
-                ),
-                priority=group["priority"],
-                first_seen=group["first_seen"],
-                last_seen=last_seen,
-                occurrences=group["occurrences"] or 1,
                 aisle_group_id=aisle.id if aisle else None,
                 aisle_group_name=aisle.aisleGroupName if aisle else None,
                 leg_id=(aisle.attached_leg_id if aisle else None) or group["object_id"],
                 power_source=None,
-                home_gateway_id=aisle_gateways.get(group["aisle_group_id"])
-                or ", ".join(site_gateways.get(site.id, []))
-                or None,
-                issue=alarm.to_do or CONSUMPTION_TYPES.get(group["Alarm_type"], ""),
-            )
-        )
-
-    # ---- NewAlarmsNotifications: per site, type and power source
-    groups = list(
-        NewAlarmsNotifications.objects.filter(site_id__in=site_ids, is_active=True)
-        .values("site_id", "alarm_type", "power_source")
-        .annotate(
-            first_seen=Min("created"),
-            last_seen=Max("created"),
-            occurrences=Count("id"),
-            priority=Min("alarm_priority"),
-            latest_id=Max("id"),
-        )
-        .filter(Q(last_seen__gte=cutoff) if cutoff else Q())
-    )
-    latest = {
-        alarm.id: alarm
-        for alarm in NewAlarmsNotifications.objects.filter(
-            id__in=[g["latest_id"] for g in groups]
-        )
-    }
-    for group in groups:
-        alarm = latest[group["latest_id"]]
-        site = sites[group["site_id"]]
-        rows.append(
-            _row(
-                site,
-                source="power",
-                alarm_type=group["alarm_type"],
-                alarm=POWER_TYPES.get(group["alarm_type"], str(group["alarm_type"])),
-                priority=group["priority"],
-                first_seen=group["first_seen"],
-                last_seen=group["last_seen"],
-                occurrences=group["occurrences"],
-                aisle_group_id=None,
-                aisle_group_name=None,
-                leg_id=None,
-                power_source=group["power_source"],
-                home_gateway_id=", ".join(site_gateways.get(site.id, [])) or None,
-                issue=_power_issue(alarm),
-            )
-        )
+                home_gateway_id=aisle_gateways.get(group["aisle_group_id"]) or all_gateways,
+                issue=alarm.to_do or ALARM_TYPES.get(alarm_type, ""),
+                **common,
+            ))
 
     # Some old power alarm rows have no time; they sort last.
     rows.sort(

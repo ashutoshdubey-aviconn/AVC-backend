@@ -10,7 +10,6 @@ from wareApp.models import (
     AisleSyncRecoveryStatus,
     AlarmNotifications,
     HomeGatewayId,
-    NewAlarmsNotifications,
     Site,
     User,
 )
@@ -38,12 +37,12 @@ class AlarmFeedTests(TestCase):
                 to_do="Gateway avc_FMMCF_BGLR_000162_1: lower meter reading reported.",
             )
         for minutes in (0, 30, 60):
-            NewAlarmsNotifications.objects.create(
-                site_id=self.site, alarm_type=2, alarm_priority=1, power_source="Mains Supply",
-                created=start + timedelta(minutes=minutes), r_phase=0.86, y_phase=0.60, b_phase=0.65,
+            AlarmNotifications.objects.create(
+                site_id=self.site, Alarm_type=2, Alarm_priority=1, power_source="Mains Supply",
+                created_time=start + timedelta(minutes=minutes), r_phase=0.86, y_phase=0.60, b_phase=0.65,
             )
 
-    def test_one_row_per_issue_from_both_tables(self):
+    def test_one_row_per_issue_across_alarm_kinds(self):
         rows = active_alarms([self.site.id])
         self.assertEqual(len(rows), 2)
         meter = next(r for r in rows if r["alarm_type"] == 10)
@@ -62,19 +61,23 @@ class AlarmFeedTests(TestCase):
         self.assertEqual(pf["home_gateway_id"], "avc_site_gw_1")
         self.assertIn("power factor 0.86/0.6/0.65", pf["issue"])
 
-    def test_alarms_without_time_sort_last(self):
-        NewAlarmsNotifications.objects.create(site_id=self.site, alarm_type=0, alarm_priority=0, created=None)
+    def test_copied_power_alarm_without_last_seen_is_listed(self):
+        # Rows copied from the former power table may have no last_seen.
+        when = datetime(2026, 1, 1, 8, 0)
+        AlarmNotifications.objects.create(
+            site_id=self.site, Alarm_type=0, Alarm_priority=0, power_source="DG_1", created_time=when,
+        )
         rows = active_alarms([self.site.id])
         self.assertEqual(len(rows), 3)
-        self.assertIsNone(rows[-1]["last_seen"])
+        self.assertEqual(rows[-1]["last_seen"], when)
+        self.assertEqual(rows[-1]["source"], "power")
 
     def test_inactive_alarms_are_left_out(self):
         AlarmNotifications.objects.update(is_active=False)
-        NewAlarmsNotifications.objects.update(is_active=False)
         self.assertEqual(active_alarms([self.site.id]), [])
 
     def test_query_count_does_not_grow_with_rows(self):
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(5):  # one alarm table
             active_alarms([self.site.id])
 
     def test_type_api_returns_one_row_per_issue(self):
@@ -133,15 +136,15 @@ class AlarmFeedWindowTests(TestCase):
         site = Site.objects.create(site_name="Window site", is_live=True)
         now = datetime.now()
         # Stale: last seen 40 days ago.
-        NewAlarmsNotifications.objects.create(
-            site_id=site, alarm_type=0, alarm_priority=0, power_source="Mains Supply",
-            created=now - timedelta(days=40),
+        AlarmNotifications.objects.create(
+            site_id=site, Alarm_type=0, Alarm_priority=0, power_source="Mains Supply",
+            created_time=now - timedelta(days=40),
         )
         # Long-running but still active: started 60 days ago, seen today.
         for days in (60, 0):
-            NewAlarmsNotifications.objects.create(
-                site_id=site, alarm_type=2, alarm_priority=1, power_source="Mains Supply",
-                created=now - timedelta(days=days),
+            AlarmNotifications.objects.create(
+                site_id=site, Alarm_type=2, Alarm_priority=1, power_source="Mains Supply",
+                created_time=now - timedelta(days=days),
             )
 
         with override_settings(ALARM_FEED_MAX_AGE_DAYS=30):

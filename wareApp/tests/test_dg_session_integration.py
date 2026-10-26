@@ -9,7 +9,7 @@ from wareApp.models import (
     DailySiteReading,
     DgUnitConsumption,
     DGFuelAlertsData,
-    NewAlarmsNotifications,
+    AlarmNotifications,
 )
 from wareApp.dg_fuel.sessions import attempt_fetch_for_unit, reconcile_daily_unit_consumption
 
@@ -158,9 +158,7 @@ class DgSessionIntegrationTests(TestCase):
             site=self.site, alert_name="suspicious_fuel"
         )
         self.assertTrue(alerts.exists())
-        new_alarms = NewAlarmsNotifications.objects.filter(
-            site_id=self.site, alarm_type=6
-        )
+        new_alarms = AlarmNotifications.objects.filter(site_id=self.site, Alarm_type=6)
         self.assertTrue(new_alarms.exists())
 
     @patch("wareApp.dg_fuel.sessions.fetch_roadcast_report")

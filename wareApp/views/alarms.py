@@ -2,65 +2,66 @@
 
 from datetime import datetime
 
+from django.db.models import Min, Sum
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from wareApp.models import AlarmNotifications, NewAlarmsNotifications
+from wareApp.models import AlarmNotifications
 from wareApp.serializers import AlarmListSerializer
 
 
 class AlarmsList(APIView):
+    """Alarm summary of one site: every alarm type (one alarm table).
+
+    Response unchanged; counts are occurrences (a repeated issue is one row per
+    day with a count), so they keep meaning "how many times it happened".
+    """
+
     def post(self, request):
-        data = request.data
-        site = int(data.get("siteId"))
+        site = int(request.data.get("siteId"))
+        alarms = AlarmNotifications.objects.filter(site_id=site)
+
+        def total(queryset):
+            return queryset.aggregate(n=Sum("occurrences"))["n"] or 0
+
         data = []
-        # site = Site.objects.get(id=site_id)
-        total_alarms = NewAlarmsNotifications.objects.filter(site_id=site).count()
-        high_priority = NewAlarmsNotifications.objects.filter(
-            site_id=site, alarm_priority=0
-        ).count()
-        medium_priority = NewAlarmsNotifications.objects.filter(
-            site_id=site, alarm_priority=1
-        ).count()
-        active_alarms = NewAlarmsNotifications.objects.filter(
-            site_id=site, is_active=True
-        ).count()
-        alarms = NewAlarmsNotifications.objects.filter(site_id=site).distinct(
-            "alarm_type"
+        per_type = (
+            alarms.values("Alarm_type")
+            .annotate(count=Sum("occurrences"), priority=Min("Alarm_priority"))
+            .order_by("Alarm_type")
         )
-        for i in alarms:
-            count = NewAlarmsNotifications.objects.filter(
-                site_id=site, alarm_type=i.alarm_type
-            ).count()
+        labels = dict(AlarmNotifications.alarm_priorities)
+        names = dict(AlarmNotifications.alarm_type)
+        for row in per_type:
             data.append(
                 {
-                    "name": i.get_alarm_type_display(),
-                    "count": count,
-                    "priority": i.get_alarm_priority_display(),
-                    "alarm_type": i.alarm_type,
+                    "name": names.get(row["Alarm_type"], str(row["Alarm_type"])),
+                    "count": row["count"] or 0,
+                    "priority": labels.get(row["priority"], ""),
+                    "alarm_type": row["Alarm_type"],
                 }
             )
         return Response(
             {
                 "status": 200,
-                "total_alarm": total_alarms,
-                "high_priority": high_priority,
-                "medium_priority": medium_priority,
-                "active_alarms": active_alarms,
+                "total_alarm": total(alarms),
+                "high_priority": total(alarms.filter(Alarm_priority=AlarmNotifications.PRIORITY_HIGH)),
+                "medium_priority": total(alarms.filter(Alarm_priority=AlarmNotifications.PRIORITY_MEDIUM)),
+                "active_alarms": total(alarms.filter(is_active=True)),
                 "data": data,
             }
         )
 
 
 class AlarmsListDetail(APIView):
+    """All alarms of one site and type, newest first (same JSON keys as before)."""
+
     def post(self, request):
         data = request.data
         try:
-            site_id = data.get("siteId")
-            alarm_type = data.get("alarm_type")
-            alarms = NewAlarmsNotifications.objects.filter(
-                site_id=site_id, alarm_type=int(alarm_type)
-            )
+            alarms = AlarmNotifications.objects.filter(
+                site_id=data.get("siteId"), Alarm_type=int(data.get("alarm_type"))
+            ).select_related("aisle_group").order_by("-created_time")
             serializer = AlarmListSerializer(alarms, many=True)
             return Response({"status": 200, "data": serializer.data})
         except Exception as err:
