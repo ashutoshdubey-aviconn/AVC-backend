@@ -198,7 +198,7 @@ class CustomerSiteManager(models.Model):
     created_by = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, blank=True
     )
-    associated_site = models.ManyToManyField(Site, null=True, blank=True)
+    associated_site = models.ManyToManyField(Site, blank=True)
     created = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
