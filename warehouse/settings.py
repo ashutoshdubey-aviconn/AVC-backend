@@ -304,6 +304,9 @@ MQTT_RECOVERY_MAX_ATTEMPTS = config("MQTT_RECOVERY_MAX_ATTEMPTS", default=3, cas
 MQTT_RECOVERY_FAILED_RETRY_SECONDS = config(
     "MQTT_RECOVERY_FAILED_RETRY_SECONDS", default=6 * 60 * 60, cast=int
 )
+# An aisle whose newest hourly reading is older than this is not recovered: its
+# next packet starts it fresh (one warning per aisle per day). 0 = always recover.
+MQTT_RECOVERY_STALE_DAYS = config("MQTT_RECOVERY_STALE_DAYS", default=30, cast=int)
 # recovery_status_sweep: aisle with no consumption for this long -> late / missing.
 MQTT_SYNC_LATE_SECONDS = config("MQTT_SYNC_LATE_SECONDS", default=70 * 60, cast=int)
 MQTT_SYNC_MISSING_SECONDS = config(
