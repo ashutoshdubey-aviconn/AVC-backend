@@ -56,3 +56,4 @@ monitoring/backups/
 
 # Old code copies (contain credentials); kept on disk only
 wareApp/backups/
+reports/

@@ -530,7 +530,7 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 | Phase C: hourly baseline (EL 24 h, NL hours or legacy working_hours, dated baseline row) for live + recovery; `rebuild_hourly_baseline` backfill (34,538 rows on test, 2026-09-20..10-20; old values in table `fov2_hourly_baseline_backup_20261020`) | done 2026-10-20 | `bb7335f` |
 | Test-server readiness: all tests green (SQLite + PostgreSQL), `0095`, rollout runbook | done | (this commit) |
 
-`python run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
+`python scripts/dev/run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
 also pass on PostgreSQL. Rollout: `docs/deploy/TEST_SERVER_ROLLOUT.md`.
 
 ### 5.1 Duplicate report on the local `warehouse_server` copy (2026-10-19)
