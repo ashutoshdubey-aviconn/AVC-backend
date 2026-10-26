@@ -782,7 +782,7 @@ flowchart TD
     q[/"notifications queue<br/>(persistent)"/]
     direct["send directly<br/>(fallback, logged)"]
     worker["mqtt-notifications<br/>send_notification<br/>(allow-listed functions)"]
-    send["sendmail.<function><br/>-> _send_smtp_email"]
+    send["sendmail.[function]<br/>-> _send_smtp_email"]
     over{"ALARM_EMAIL_OVERRIDE_TO<br/>set?"}
     test["only to override address<br/>(+ 'TEST REDIRECT' banner)"]
     real["real recipients /<br/>ALARM_EMAIL_DEFAULT_TO"]
