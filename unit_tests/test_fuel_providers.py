@@ -1,8 +1,15 @@
+import os
 import unittest
 from unittest.mock import patch
 from datetime import datetime, timedelta
 
-from wareApp import fuel_providers as fp
+import django
+
+# fuel_providers reads Django settings (provider credentials).
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "warehouse.test_settings")
+django.setup()
+
+from wareApp import fuel_providers as fp  # noqa: E402
 
 
 class MockResponse:

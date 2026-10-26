@@ -25,7 +25,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import requests
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
@@ -61,7 +61,7 @@ from wareApp.fuel_providers import roadcast_auth_headers  # noqa: E402
 
 ROADCAST_FUEL_URL = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
 # Credentials: ROADCAST_PULL_USERNAME / ROADCAST_PULL_PASSWORD in warehouse/.env.
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROADCAST_RESPONSES_DIR = PROJECT_ROOT / "logs" / "roadcast" / "api_responses"
 
 

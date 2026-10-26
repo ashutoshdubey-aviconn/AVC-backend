@@ -8,6 +8,7 @@ This avoids the unittest/Django discovery collision by running unit tests
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 venv_python = "./virtualwarehouse/bin/python3"
 if not os.path.exists(venv_python):
@@ -22,6 +23,7 @@ def run(cmd, env=None):
 
 
 if __name__ == "__main__":
+    os.chdir(Path(__file__).resolve().parents[2])  # project root
     # Run unit tests
     run(f"{venv_python} -m unittest discover -v unit_tests")
 

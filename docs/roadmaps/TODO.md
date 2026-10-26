@@ -4,7 +4,7 @@ Summary:
 - This file tracks high-level tasks, status, and ownership for the repo.
 
 Completed
-- Fix test discovery collision and provide `run_tests.py` to run unit + Django tests sequentially. (2026-08-18)
+- Fix test discovery collision and provide `scripts/dev/run_tests.py` to run unit + Django tests sequentially. (2026-08-18)
 - Added provider parsing unit tests (`unit_tests/test_fuel_providers*.py`). (2026-08-18)
 - Hardened DG logic: preserve None `dg_fuel_tank_capacity` and avoid false alerts. (2026-08-18)
 - Hardened `NewAlarmsNotifications.save()` to handle None/invalid phase values. (2026-08-18)
@@ -24,7 +24,7 @@ Completed
 
 In Progress (DG-fuel focused)
 - Integrate `DGFuelAlertsData` dedup logic with normalized epoch strings (partial: epoch strings now consistent). Owner: ingester
-- Add test harness / backfill runner for DGFuel ingestion (site-level backfill). Owner: data-engineer — Implemented: `tools/dg_backfill.py` (dry-run-first)
+- Add test harness / backfill runner for DGFuel ingestion (site-level backfill). Owner: data-engineer — Implemented: `scripts/dg_fuel/dg_backfill.py` (dry-run-first)
 - Further coalescing improvements for `DgUnitConsumption` (consider Redis coalescing for high-rate ON packets) — design phase. Owner: backend
 
 Note: Per project constraints, recovery-related tasks are deferred (see Backlog). Do NOT modify recovery code unless explicitly requested.
@@ -39,13 +39,13 @@ Backlog / Nice-to-have
 - Recovery tasks (DEFERRED): moving MQTT runtime block into `process_runtime` and adding `/api/recovery/metrics/` are deferred and should not be edited without explicit approval.
 
 How to use
-- Small fixes: implement code, run `./virtualwarehouse/bin/python3 run_tests.py`, open a PR referencing this TODO entry.
+- Small fixes: implement code, run `./virtualwarehouse/bin/python3 scripts/dev/run_tests.py`, open a PR referencing this TODO entry.
 - Larger tasks: propose design in an issue or RFC, link to this file and mark ownership.
 
 If you'd like, I can:
 - move the MQTT runtime runtime block into `process_runtime` (minimal change),
 - implement the `/api/recovery/metrics/` endpoint, or
-- create a CI workflow to run `run_tests.py`.
+- create a CI workflow to run `scripts/dev/run_tests.py`.
 
 
 DG Fix Tasks (created 2026-08-18)
@@ -99,7 +99,7 @@ DG Fix Tasks (created 2026-08-18)
 
 - Automated regression suite — GREEN (🟢) — Status: Ready
 	- Owner: QA
-	- Steps: expand coverage to include reconciliation/backfill and coalescing tests; add CI workflow to run `run_tests.py` on PRs and nightly.
+	- Steps: expand coverage to include reconciliation/backfill and coalescing tests; add CI workflow to run `scripts/dev/run_tests.py` on PRs and nightly.
 	- Acceptance: CI runs included tests and reports failures before merge.
 
 - Django warnings — YELLOW (🟡) — Low priority
@@ -112,9 +112,9 @@ Safety & Rollback
 - Apply fixes behind feature flags where possible and promote to production only after staging validation.
 
 Quick commands
-- Run full test suite: `./virtualwarehouse/bin/python3 run_tests.py`
-- Example dry-run backfill command (implement script at `tools/dg_backfill.py`):
-	`./virtualwarehouse/bin/python3 tools/dg_backfill.py --dry-run --site 35`
+- Run full test suite: `./virtualwarehouse/bin/python3 scripts/dev/run_tests.py`
+- Example dry-run backfill command (implement script at `scripts/dg_fuel/dg_backfill.py`):
+	`./virtualwarehouse/bin/python3 scripts/dg_fuel/dg_backfill.py --dry-run --site 35`
 
 Next step
 - I can start with the highest-priority item: create a reproducible test for legacy duplicate DG processing and add it to `unit_tests`. Confirm and I'll implement it.

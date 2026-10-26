@@ -146,7 +146,7 @@ if env in {"Local", "PROD"}:
         DATABASES["default"]["OPTIONS"] = {
             "options": f"-c synchronous_commit={DB_SYNCHRONOUS_COMMIT}"
         }
-    # Main-server database, read by roadcast_monthly_refuel_report.py on the
+    # Main-server database, read by scripts/dg_fuel/roadcast_monthly_refuel_report.py on the
     # test server. Only configured when its password is in the environment.
     MAIN_DB_PASSWORD = config("MAIN_DB_PASSWORD", default="")
     if MAIN_DB_PASSWORD:

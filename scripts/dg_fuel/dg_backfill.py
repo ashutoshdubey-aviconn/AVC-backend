@@ -3,10 +3,10 @@
 
 Usage examples:
   # dry-run, scan site 35 and write audit files
-  ./virtualwarehouse/bin/python3 tools/dg_backfill.py --site 35
+  ./virtualwarehouse/bin/python3 scripts/dg_fuel/dg_backfill.py --site 35
 
   # actually apply deletions (requires --apply)
-  ./virtualwarehouse/bin/python3 tools/dg_backfill.py --site 35 --apply --chunk-size 500
+  ./virtualwarehouse/bin/python3 scripts/dg_fuel/dg_backfill.py --site 35 --apply --chunk-size 500
 
 Notes:
 - This script is intentionally conservative: do not run with --apply unless you
@@ -22,7 +22,7 @@ from datetime import datetime
 
 # bootstrap django
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(THIS_DIR, "..", ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "warehouse.settings")

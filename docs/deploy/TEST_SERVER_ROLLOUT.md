@@ -22,7 +22,7 @@ connected infrastructure.
 
 Unchanged: `wareApp/load_data/` logic (queue 2), `dg_fuel/`, `fetch_fuel_data.py`, `celerybeat`.
 
-Tests before release: `python run_tests.py` → 45 unit tests + 243 app tests pass
+Tests before release: `python scripts/dev/run_tests.py` → 45 unit tests + 243 app tests pass
 (SQLite); the 243 app tests also pass on PostgreSQL.
 
 ## 0. Build the release bundle (local machine)
@@ -103,7 +103,7 @@ Add to `warehouse/.env` (settings no longer contain credentials):
 | Variable | Needed for |
 | --- | --- |
 | `ROADCAST_PULL_USERNAME`, `ROADCAST_PULL_PASSWORD` | Roadcast pull API in the DG graph (skipped, with a warning, when unset) |
-| `MAIN_DB_PASSWORD` (+ optional `MAIN_DB_HOST/NAME/USER/PORT`) | `main` DB alias, used only by `roadcast_monthly_refuel_report.py` |
+| `MAIN_DB_PASSWORD` (+ optional `MAIN_DB_HOST/NAME/USER/PORT`) | `main` DB alias, used only by `scripts/dg_fuel/roadcast_monthly_refuel_report.py` |
 | `REDIS_URL=redis://127.0.0.1:6379/1` | recommended: shared cooldowns, duplicate check and sync-status cache |
 | `ALARM_EMAIL_OVERRIDE_TO` | every alarm email goes only here; defaults to ashutosh.dubey@aviconncorp.com while alarm emails are in testing. Set it empty to send to the real recipients (then `ALARM_EMAIL_DEFAULT_TO` for PF/consumption/meter/DG alarms). |
 
