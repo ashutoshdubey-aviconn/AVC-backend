@@ -10,7 +10,7 @@ from wareApp.mqtt import load
 class LoadHandlerTests(SimpleTestCase):
     def setUp(self):
         # No AlarmSetting rows: the site fields decide (no database here).
-        no_setting = patch("wareApp.alarm_policy.setting", return_value=None)
+        no_setting = patch("wareApp.mqtt.services.alarm_policy.setting", return_value=None)
         no_setting.start()
         self.addCleanup(no_setting.stop)
 

@@ -8,7 +8,7 @@ call counts (DG alarms, once per DG unit).
 
 E-mail: the first occurrence is e-mailed; a repeat only when its ``severity``
 is more than the alarm's repeat tolerance worse than the last e-mailed value
-(wareApp/alarm_policy.py). An alarm switched Off for the site is not raised.
+(wareApp/mqtt/services/alarm_policy.py). An alarm switched Off for the site is not raised.
 """
 
 import logging
@@ -17,7 +17,7 @@ from datetime import datetime
 from django.db.models import F
 from django.utils import timezone
 
-from wareApp import alarm_policy
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import AlarmNotifications
 from wareApp.mqtt.services.notifications import notify
 

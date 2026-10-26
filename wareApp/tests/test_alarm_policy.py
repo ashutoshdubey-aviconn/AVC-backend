@@ -6,7 +6,8 @@ from unittest import mock
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 
-from wareApp import alarm_policy, gateway_overheat
+from wareApp import gateway_overheat
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
     AisleGroup,
     AlarmNotifications,

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.cache import cache
 
-from wareApp import alarm_policy
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
     AlarmNotifications,
     AlarmSetting,
@@ -25,7 +25,7 @@ from wareApp.sendmail import (
 logger = logging.getLogger(__name__)
 
 # Voltage / PF alarms: at most one occurrence per source per 30 min; a repeat
-# is e-mailed only when it got worse (wareApp/alarm_policy.py).
+# is e-mailed only when it got worse (wareApp/mqtt/services/alarm_policy.py).
 ALARM_REPEAT = timedelta(minutes=30)
 
 

@@ -440,7 +440,7 @@ def send_alarm_email(alarm_name, site_id, details, alarm_type=None):
     """Generic alarm email: ``details`` is a list of (label, value, highlight).
 
     Recipients: the software team and the site's ground team as set for
-    ``alarm_type`` (wareApp/alarm_policy.py); ALARM_EMAIL_OVERRIDE_TO replaces
+    ``alarm_type`` (wareApp/mqtt/services/alarm_policy.py); ALARM_EMAIL_OVERRIDE_TO replaces
     them on test servers. With nobody configured nothing is sent.
     """
 
@@ -467,7 +467,7 @@ def send_alarm_email(alarm_name, site_id, details, alarm_type=None):
         </body>
         </html>
     """
-    from wareApp.alarm_policy import recipients
+    from wareApp.mqtt.services.alarm_policy import recipients
 
     to = recipients(site_id, alarm_type)
     return _send_smtp_email(f"{alarm_name} - {site_name}", html_message, to)
@@ -504,7 +504,7 @@ def send_alarm_for_high_voltage(data):
     """
 
     subject_mail = "High Voltage Alarm Testing"
-    from wareApp.alarm_policy import recipients
+    from wareApp.mqtt.services.alarm_policy import recipients
 
     to = recipients(data['site_id'], 0)
     return _send_smtp_email(subject_mail, html_message, to)
@@ -541,7 +541,7 @@ def send_alarm_for_low_voltage(data):
     """
 
     subject_mail = "Low Voltage Alarm Testing"
-    from wareApp.alarm_policy import recipients
+    from wareApp.mqtt.services.alarm_policy import recipients
 
     to = recipients(data['site_id'], 1)
     return _send_smtp_email(subject_mail, html_message, to)
@@ -569,7 +569,7 @@ def send_mail_for_dg_fuel_under_level(data):
     """
 
     subject_mail = "Fuel Level Alarm Testing"
-    from wareApp.alarm_policy import recipients
+    from wareApp.mqtt.services.alarm_policy import recipients
 
     to = recipients(data['site_id'], 4)
     return _send_smtp_email(subject_mail, html_message, to)

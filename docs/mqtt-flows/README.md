@@ -850,7 +850,7 @@ and its next occurrence is e-mailed again.
 
 | File | Function / role |
 | --- | --- |
-| `wareApp/alarm_policy.py` | recipients, setting / mode / manual_threshold, should_email, decide_email |
+| `wareApp/mqtt/services/alarm_policy.py` | recipients, setting / mode / manual_threshold, should_email, decide_email |
 | `wareApp/mqtt/services/notifications.py` | notify, ALLOWED_NOTIFICATIONS, QUEUE_ERRORS fallback |
 | `wareApp/tasks.py` | send_notification (retries 5x on exceptions) |
 | `wareApp/sendmail.py` | _send_smtp_email, _smtp_config, send_alarm_email, send_alarm_for_high/low_voltage, send_mail_for_pf_fluctuation, send_mail_fire_alarm_user |
