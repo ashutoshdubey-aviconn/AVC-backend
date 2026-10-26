@@ -64,5 +64,17 @@ source virtualwarehouse/bin/activate
 python scripts/spam_recovery.py --n 1000 --threads 20
 ```
 
-Follow-up
-- Want me to add an `alertmanager` webhook example or a simple local health-check that sends a webhook when threshold is exceeded? Reply with your preference.
+## Documentation
+
+All documentation is in [`docs/`](docs/):
+
+| Folder | Contents |
+| --- | --- |
+| [`docs/mqtt-flows/`](docs/mqtt-flows/README.md) | Every MQTT topic and alarm flow, with draw.io diagrams |
+| [`docs/deploy/`](docs/deploy/README.md) | Systemd units, test and main server rollouts |
+| [`docs/operations/`](docs/operations/) | Server operations, production change logs, incident notes |
+| [`docs/load-data/`](docs/load-data/) | LoadData flow and optimization |
+| [`docs/dg-fuel/`](docs/dg-fuel/) | DG fuel architecture, multi-unit flow, roadmap |
+| [`docs/roadmaps/`](docs/roadmaps/) | Refactor plans and TODO |
+| [`docs/monitoring/`](docs/monitoring/README.md) | Server metrics collector |
+| `docs/*.md` | Alarm feature plan, Celery monitoring, MQTT / Celery architecture |

@@ -531,7 +531,7 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 | Test-server readiness: all tests green (SQLite + PostgreSQL), `0095`, rollout runbook | done | (this commit) |
 
 `python run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
-also pass on PostgreSQL. Rollout: `deploy/TEST_SERVER_ROLLOUT.md`.
+also pass on PostgreSQL. Rollout: `docs/deploy/TEST_SERVER_ROLLOUT.md`.
 
 ### 5.1 Duplicate report on the local `warehouse_server` copy (2026-10-19)
 

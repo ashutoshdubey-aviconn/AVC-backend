@@ -1,5 +1,7 @@
 # Deployment units (Phase M)
 
+(The unit files, drop-ins and scripts described here are in the `deploy/` folder.)
+
 All workers use the single Celery app `warehouse` (`celery -A warehouse`).
 The legacy units started `celery -A tasks` (root `tasks.py`, app `root_mqtt`)
 and also enqueued the listener with `ExecStartPost ... call tasks.mqtt_client1`.

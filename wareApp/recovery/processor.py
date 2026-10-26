@@ -14,11 +14,9 @@ Author:
 """
 
 import json
-import re
 import logging
 from datetime import datetime
 import traceback
-import time
 from django.db.models import Sum
 from django.db import transaction
 
