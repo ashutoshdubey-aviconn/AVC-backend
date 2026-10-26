@@ -9,7 +9,7 @@ from django.db.models import F, FloatField, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from wareApp import alarm_policy
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
     AisleGroup,
     AlarmNotifications,

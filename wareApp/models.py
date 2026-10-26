@@ -591,7 +591,7 @@ class AlarmNotifications(models.Model):
     last_notified_at = models.DateTimeField(blank=True, null=True)
     # The alarm's value in its last e-mail (volts, PF, kWh, °C, litres): a
     # repeat is e-mailed again only when it is ALARM_REPEAT_TOLERANCE_PERCENT
-    # worse than this (wareApp/alarm_policy.py).
+    # worse than this (wareApp/mqtt/services/alarm_policy.py).
     notified_value = models.FloatField(blank=True, null=True)
     # Power / DG alarms (voltage, power factor, fuel).
     power_source = models.CharField(max_length=50, blank=True, null=True)

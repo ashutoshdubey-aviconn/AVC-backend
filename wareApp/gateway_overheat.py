@@ -22,7 +22,7 @@ from django.core.cache import cache
 from django.db.models import F
 from django.utils import timezone
 
-from wareApp import alarm_policy
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import AlarmNotifications, Site
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email

@@ -227,7 +227,7 @@ ALARM_ACTIVITY_THRESHOLD_KWH = config("ALARM_ACTIVITY_THRESHOLD_KWH", default=0.
 # After recovery, re-evaluate alarms only for days within this many days.
 ALARM_REEVALUATE_DAYS = config("ALARM_REEVALUATE_DAYS", default=7, cast=int)
 # Alarm settings per site and type live in the AlarmSetting table, recipients
-# in AlarmRecipient (wareApp/alarm_policy.py). A repeat is e-mailed again only
+# in AlarmRecipient (wareApp/mqtt/services/alarm_policy.py). A repeat is e-mailed again only
 # when its value is this much worse than the last e-mail; an alarm not seen for
 # ALARM_REPEAT_CLEAR_HOURS has cleared and is e-mailed again when it returns.
 ALARM_REPEAT_TOLERANCE_PERCENT = config("ALARM_REPEAT_TOLERANCE_PERCENT", default=5, cast=float)

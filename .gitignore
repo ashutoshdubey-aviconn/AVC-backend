@@ -57,3 +57,6 @@ monitoring/backups/
 # Old code copies (contain credentials); kept on disk only
 wareApp/backups/
 reports/
+
+# Local working files (scratch scripts, exports) - never commit
+.work/

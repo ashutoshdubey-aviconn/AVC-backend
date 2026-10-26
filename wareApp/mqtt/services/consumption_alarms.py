@@ -24,7 +24,7 @@ Rules (decided 2026-10-20):
   ``nl_operation_hours``. A High Consumption alarm on the same day names it
   as the cause.
 
-Per site and type an AlarmSetting (wareApp/alarm_policy.py) can override these
+Per site and type an AlarmSetting (wareApp/mqtt/services/alarm_policy.py) can override these
 rules (decided 2026-10-27): Off = not raised; Manual = its threshold in kWh per
 day (Bypassed, High, Low); Auto = from the baseline only (Bypassed x
 ALARM_BYPASS_DEFAULT_PERCENT, High x the site's or default percent, Low below
@@ -40,7 +40,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 
-from wareApp import alarm_policy
+from wareApp.mqtt.services import alarm_policy
 from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading
 from wareApp.mqtt.services.baseline import baseline_info, effective_hours, is_emergency_supply
 from wareApp.mqtt.services.notifications import notify

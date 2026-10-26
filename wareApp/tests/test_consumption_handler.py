@@ -19,7 +19,7 @@ class ConsumptionHandlerTests(SimpleTestCase):
 
     def setUp(self):
         # No AlarmSetting rows (no database here).
-        no_setting = patch("wareApp.alarm_policy.setting", return_value=None)
+        no_setting = patch("wareApp.mqtt.services.alarm_policy.setting", return_value=None)
         no_setting.start()
         self.addCleanup(no_setting.stop)
         self.mark_sync_healthy = patch("wareApp.mqtt.consumption.mark_sync_healthy")
