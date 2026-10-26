@@ -279,7 +279,9 @@ class PfThresholdWarningTests(SimpleTestCase):
             r_phase_pf_threshold=None, y_phase_pf_threshold=0.85, b_phase_pf_threshold=0.85,
         )
         values = {"power_factors": (0.5, 0.5, 0.5), "status": "ON", "power_source": "Mains Supply", "meter_number": 1}
-        with self.assertLogs("wareApp.mqtt.load", level="WARNING") as logs:
+        with self.assertLogs("wareApp.mqtt.load", level="WARNING") as logs, patch(
+            "wareApp.alarm_policy.setting", return_value=None
+        ):
             for _ in range(5):
                 load._record_power_factor_alarm(site, values)
         self.assertEqual(len(logs.records), 1)

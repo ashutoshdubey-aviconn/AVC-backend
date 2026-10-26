@@ -41,12 +41,12 @@ class _MailGate:
         self.suppressed = 0
         self.decisions = []  # one entry per notify() call, in order
 
-    def __call__(self, send_function, title, site_id, details):
+    def __call__(self, send_function, title, site_id, details, *rest):
         wanted = site_id in self.email_sites
         if self.apply and wanted and self.sent < self.max_emails:
             self.sent += 1
             self.decisions.append("e-mail")
-            return self.real_notify(send_function, title, site_id, details)
+            return self.real_notify(send_function, title, site_id, details, *rest)
         if wanted and self.apply:
             self.suppressed += 1
             self.decisions.append("limit reached")

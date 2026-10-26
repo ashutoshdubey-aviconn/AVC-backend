@@ -226,6 +226,20 @@ ALARM_BYPASS_DEFAULT_PERCENT = config("ALARM_BYPASS_DEFAULT_PERCENT", default=10
 ALARM_ACTIVITY_THRESHOLD_KWH = config("ALARM_ACTIVITY_THRESHOLD_KWH", default=0.01, cast=float)
 # After recovery, re-evaluate alarms only for days within this many days.
 ALARM_REEVALUATE_DAYS = config("ALARM_REEVALUATE_DAYS", default=7, cast=int)
+# Alarm settings per site and type live in the AlarmSetting table, recipients
+# in AlarmRecipient (wareApp/alarm_policy.py). A repeat is e-mailed again only
+# when its value is this much worse than the last e-mail; an alarm not seen for
+# ALARM_REPEAT_CLEAR_HOURS has cleared and is e-mailed again when it returns.
+ALARM_REPEAT_TOLERANCE_PERCENT = config("ALARM_REPEAT_TOLERANCE_PERCENT", default=5, cast=float)
+ALARM_REPEAT_CLEAR_HOURS = config("ALARM_REPEAT_CLEAR_HOURS", default=24, cast=int)
+# Auto-mode thresholds (AlarmSetting mode Auto): 230 V +/- 10 %, PF 0.9, and
+# Low Consumption below baseline less this percent.
+ALARM_VOLTAGE_AUTO_HIGH = config("ALARM_VOLTAGE_AUTO_HIGH", default=253, cast=float)
+ALARM_VOLTAGE_AUTO_LOW = config("ALARM_VOLTAGE_AUTO_LOW", default=207, cast=float)
+ALARM_PF_AUTO_THRESHOLD = config("ALARM_PF_AUTO_THRESHOLD", default=0.9, cast=float)
+ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT = config(
+    "ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT", default=90, cast=float
+)
 
 # --- DG fuel providers -----------------------------------------------------------
 

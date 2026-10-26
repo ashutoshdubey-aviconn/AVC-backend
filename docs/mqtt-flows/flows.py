@@ -536,7 +536,9 @@ e-mailed; repeats only update `last_seen` / `occurrences`.
                    "slow mail server never blocks MQTT processing.",
         "nodes": {
             "alarm": ("alarm stored by a handler\n(flows 7, 8, 9, 12)", "ext", 1, 0),
-            "notify": ("notify(send_function, args)", "process", 1, 1),
+            "rep": ("repeat within tolerance of\nthe last e-mailed value?\n(alarm_policy.should_email)", "decision", 1, 1),
+            "quiet": ("counted on the alarm,\nno e-mail", "skip", 0, 1),
+            "notify": ("notify(send_function, args)", "process", 2, 1),
             "commit": ("after the DB commit:\nqueue available?", "decision", 1, 2),
             "q": ("notifications queue\n(persistent)", "queue", 0, 3),
             "direct": ("send directly\n(fallback, logged)", "process", 2, 3),
@@ -544,20 +546,22 @@ e-mailed; repeats only update `last_seen` / `occurrences`.
             "send": ("sendmail.[function]\n-> _send_smtp_email", "process", 1, 5),
             "over": ("ALARM_EMAIL_OVERRIDE_TO\nset?", "decision", 1, 6),
             "test": ("only to override address\n(+ 'TEST REDIRECT' banner)", "alarm", 0, 7),
-            "real": ("real recipients /\nALARM_EMAIL_DEFAULT_TO", "alarm", 2, 7),
+            "real": ("software team (all sites)\n+ site's ground team\n(AlarmRecipient, AlarmSetting)", "alarm", 2, 7),
             "smtp": ("SMTP (EMAIL_* in .env)\n'Email sent' / 'Email failed'", "ext", 1, 8),
         },
         "edges": [
-            ("alarm", "notify"), ("notify", "commit"), ("commit", "q", "yes"),
+            ("alarm", "rep"), ("rep", "quiet", "yes"), ("rep", "notify", "no / first"), ("notify", "commit"), ("commit", "q", "yes"),
             ("commit", "direct", "no"), ("q", "worker"), ("worker", "send"), ("direct", "send"),
             ("send", "over"), ("over", "test", "yes"), ("over", "real", "no"),
             ("test", "smtp"), ("real", "smtp"),
         ],
         "files": [
+            ("wareApp/alarm_policy.py", "recipients, setting / mode / manual_threshold, should_email, decide_email"),
             ("wareApp/mqtt/services/notifications.py", "notify, ALLOWED_NOTIFICATIONS, QUEUE_ERRORS fallback"),
             ("wareApp/tasks.py", "send_notification (retries 5x on exceptions)"),
             ("wareApp/sendmail.py", "_send_smtp_email, _smtp_config, send_alarm_email, send_alarm_for_high/low_voltage, send_mail_for_pf_fluctuation, send_mail_fire_alarm_user"),
-            ("Settings", "MQTT_ASYNC_NOTIFICATIONS, ALARM_EMAIL_OVERRIDE_TO, ALARM_EMAIL_DEFAULT_TO, EMAIL_HOST / PORT / USE_TLS / HOST_USER / HOST_PASSWORD"),
+            ("Admin tables", "AlarmRecipient (Software / Ground team, ground sites), AlarmSetting (per site + type: Auto / Manual / Off, threshold, groups, tolerance)"),
+            ("Settings", "ALARM_REPEAT_TOLERANCE_PERCENT, ALARM_REPEAT_CLEAR_HOURS, ALARM_EMAIL_OVERRIDE_TO, ALARM_EMAIL_DEFAULT_TO (until recipients exist), MQTT_ASYNC_NOTIFICATIONS, EMAIL_*"),
         ],
         "details": """
 `notify()` queues the e-mail after the alarm's transaction commits (an alarm that
@@ -568,6 +572,19 @@ worker accepts only allow-listed function names. `_send_smtp_email` uses the
 every alarm goes only to that address with the intended recipients shown in a
 banner. Each send logs `Email sent: subject=… to=…` or `Email failed: … error=…`.
 A failed send (SMTP refused) is not retried today.
+
+**Recipients** (Django admin, `AlarmRecipient`): the software team receives every
+site's alarms, a ground-team member only those of the sites linked to them.
+`AlarmSetting` (per site and alarm type) can switch either group off for that
+type. Until any recipient exists, `ALARM_EMAIL_DEFAULT_TO` is used.
+
+**Repeats**: an alarm's value in its last e-mail is kept on the alarm
+(`notified_value`). A repeat - the next occurrence today, or the same alarm the
+next day - is e-mailed only when its value is more than
+`ALARM_REPEAT_TOLERANCE_PERCENT` (5 %, per site and type in `AlarmSetting`)
+worse; otherwise it is only counted. An alarm not seen for
+`ALARM_REPEAT_CLEAR_HOURS` (24 h; daily alarms: a day without it) has cleared,
+and its next occurrence is e-mailed again.
 """,
     },
     # ------------------------------------------------------------------ 11
@@ -842,6 +859,12 @@ same type numbers. The old table is read-only and will be dropped later. The sit
 alarm page (`alarmList/`, `alarmListDetail/`) now lists every type; its counts add
 up `occurrences`.
 Priority labels in the alarm list: 0 High, 1 Medium, 2 Low.
+
+**Configuration per site and type** (Django admin, `AlarmSetting`): **Auto** - the
+system threshold (consumption from the aisle's baseline, voltage 253 / 207 V,
+PF 0.9, overheat 85 °C); **Manual** - a typed-in threshold (V, PF, kWh per day or
+°C); **Off** - not raised. Without a row an alarm keeps its rule from the site
+fields. Who is e-mailed and when a repeat is e-mailed again: flow 10.
 """,
     },
     # ------------------------------------------------------------------ 16

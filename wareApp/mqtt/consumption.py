@@ -9,6 +9,7 @@ from django.db.models import F, FloatField, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from wareApp import alarm_policy
 from wareApp.models import (
     AisleGroup,
     AlarmNotifications,
@@ -105,7 +106,7 @@ def _cap_warehouse_saving_values(site, values):
 
 def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     match = METER_READING_ISSUE_PATTERN.search(str(message))
-    if not match:
+    if not match or alarm_policy.is_off(site.id, 10):
         return
 
     meter_id = match.group("meter_id")
@@ -166,6 +167,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
             ["Aisle group", aisle_group_name, False],
             ["Issue", "New meter reading is smaller than the previous one", True],
         ],
+        10,  # Meter Reading Issue
     )
 
     logger.warning(

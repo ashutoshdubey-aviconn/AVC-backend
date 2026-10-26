@@ -22,6 +22,7 @@ from django.core.cache import cache
 from django.db.models import F
 from django.utils import timezone
 
+from wareApp import alarm_policy
 from wareApp.models import AlarmNotifications, Site
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email
@@ -85,6 +86,12 @@ def record_overheat(alert):
     Returns a short outcome text. Raises Site.DoesNotExist for unknown sites.
     """
     site = Site.objects.get(id=alert.site_id)
+    if alarm_policy.is_off(site.id, GATEWAY_OVERHEAT_ALARM_TYPE):
+        return "off"
+    threshold = alarm_policy.manual_threshold(site.id, GATEWAY_OVERHEAT_ALARM_TYPE) or DEFAULT_THRESHOLD_C
+    temperature = alert.temperature
+    if temperature is not None and temperature < threshold:
+        return "below threshold"
     gateway_key = f"{alert.site_id}:{alert.gateway_no}"
     store_every = getattr(settings, "GATEWAY_OVERHEAT_STORE_SECONDS", 60)
     if not cache.add(f"gateway-overheat-store:{gateway_key}", 1, store_every):
@@ -118,9 +125,15 @@ def record_overheat(alert):
             to_do=detail,
         )
 
+    # E-mail at most once per GATEWAY_OVERHEAT_EMAIL_SECONDS, and a repeat only
+    # when it is hotter than the last e-mail by more than the tolerance.
+    issue = dict(object_type=GATEWAY_OBJECT_TYPE, object_id=_gateway_number(alert.gateway_no))
+    worse, last_value = alarm_policy.decide_email(
+        site, GATEWAY_OVERHEAT_ALARM_TYPE, temperature, True, **issue
+    )
     email_every = getattr(settings, "GATEWAY_OVERHEAT_EMAIL_SECONDS", 3600)
     email_key = f"gateway-overheat-email:{gateway_key}"
-    emailed = cache.add(email_key, 1, email_every)
+    emailed = worse and cache.add(email_key, 1, email_every)
     if emailed:
         delivered = notify(
             send_alarm_email,
@@ -131,13 +144,23 @@ def record_overheat(alert):
                 ["CPU temperature", f"{alert.temperature} °C", True],
                 ["CPU frequency", alert.cpu_status, False],
                 ["Fan PWM", alert.fan_pwm, False],
-                ["Threshold", f"{DEFAULT_THRESHOLD_C} °C", False],
+                ["Threshold", f"{threshold} °C", False],
             ],
+            GATEWAY_OVERHEAT_ALARM_TYPE,
         )
         if delivered is False:
             # Not sent: let the next alert of this gateway try again.
             cache.delete(email_key)
             emailed = False
+        elif temperature is not None:
+            AlarmNotifications.objects.filter(
+                site_id=site, Alarm_type=GATEWAY_OVERHEAT_ALARM_TYPE,
+                created_time__gte=day_start, **issue,
+            ).update(notified_value=temperature)
+    elif last_value is not None and not repeated:
+        AlarmNotifications.objects.filter(
+            site_id=site, Alarm_type=GATEWAY_OVERHEAT_ALARM_TYPE, created_time__gte=day_start, **issue,
+        ).update(notified_value=last_value)
     logger.warning(
         "Gateway overheat %s: site=%s gateway_no=%s temperature=%s fan_pwm=%s emailed=%s",
         "repeated" if repeated else "stored",

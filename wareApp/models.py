@@ -186,6 +186,9 @@ class Site(models.Model):
             models.Index(fields=["customer", "is_live"], name="idx_customer_is_live"),
         ]
 
+    def __str__(self):
+        return f"{self.site_name} ({self.id})" if self.site_name else f"Site {self.id}"
+
 
 class CustomerSiteManager(models.Model):
     customer = models.ForeignKey(
@@ -586,6 +589,10 @@ class AlarmNotifications(models.Model):
     last_seen = models.DateTimeField(blank=True, null=True)
     occurrences = models.PositiveIntegerField(default=1)
     last_notified_at = models.DateTimeField(blank=True, null=True)
+    # The alarm's value in its last e-mail (volts, PF, kWh, °C, litres): a
+    # repeat is e-mailed again only when it is ALARM_REPEAT_TOLERANCE_PERCENT
+    # worse than this (wareApp/alarm_policy.py).
+    notified_value = models.FloatField(blank=True, null=True)
     # Power / DG alarms (voltage, power factor, fuel).
     power_source = models.CharField(max_length=50, blank=True, null=True)
     r_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
@@ -629,6 +636,81 @@ class AlarmNotifications(models.Model):
 
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))
+
+
+class AlarmRecipient(models.Model):
+    """Who receives alarm e-mails.
+
+    Software team members receive every site's alarms. Ground team members
+    receive only the alarms of the sites linked to them. Which alarm types go
+    to which group is set per site and type in AlarmSetting (default: both).
+    """
+
+    SOFTWARE = 1
+    GROUND = 2
+    GROUPS = ((SOFTWARE, "Software team"), (GROUND, "Ground team"))
+
+    name = models.CharField(max_length=100, blank=True)
+    email = models.EmailField()
+    group = models.PositiveSmallIntegerField(choices=GROUPS)
+    sites = models.ManyToManyField(
+        Site,
+        blank=True,
+        related_name="alarm_recipients",
+        help_text="Ground team: the sites this person receives alarms for. "
+        "Software team: leave empty (every site).",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["email", "group"], name="uniq_alarm_recipient_group")
+        ]
+
+    def __str__(self):
+        return f"{self.name or self.email} ({self.get_group_display()})"
+
+
+class AlarmSetting(models.Model):
+    """How one alarm type behaves on one site.
+
+    Auto: the system's threshold (baseline, nominal voltage, default PF ...).
+    Manual: ``threshold`` (kWh, volts, PF or °C depending on the type).
+    Off: the alarm is not raised. Without a row the alarm works as before
+    (site fields and defaults).
+    """
+
+    AUTO = 1
+    MANUAL = 2
+    OFF = 3
+    MODES = ((AUTO, "Auto"), (MANUAL, "Manual"), (OFF, "Off"))
+
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="alarm_settings")
+    alarm_type = models.PositiveIntegerField(choices=AlarmNotifications.alarm_type)
+    mode = models.PositiveSmallIntegerField(choices=MODES, default=AUTO)
+    threshold = models.FloatField(
+        blank=True,
+        null=True,
+        help_text="Manual mode: High/Low Voltage in V (all phases), PF Bad Value as "
+        "a power factor, High/Low Consumption and Bypassed in kWh per day, "
+        "Gateway Overheat in °C.",
+    )
+    email_software = models.BooleanField(default=True, help_text="E-mail the software team")
+    email_ground = models.BooleanField(default=True, help_text="E-mail the site's ground team")
+    repeat_tolerance_percent = models.FloatField(
+        blank=True,
+        null=True,
+        help_text="A repeat is e-mailed again only when it is this much worse than the "
+        "last e-mailed value (empty: ALARM_REPEAT_TOLERANCE_PERCENT, default 5).",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["site", "alarm_type"], name="uniq_alarm_setting_site_type")
+        ]
+
+    def __str__(self):
+        return f"{self.site} - {self.get_alarm_type_display()}: {self.get_mode_display()}"
 
 
 class SensorData(models.Model):

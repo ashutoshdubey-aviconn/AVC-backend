@@ -8,6 +8,12 @@ from wareApp.mqtt import load
 
 
 class LoadHandlerTests(SimpleTestCase):
+    def setUp(self):
+        # No AlarmSetting rows: the site fields decide (no database here).
+        no_setting = patch("wareApp.alarm_policy.setting", return_value=None)
+        no_setting.start()
+        self.addCleanup(no_setting.stop)
+
     message = (
         "Load_Power:14,R_Volt:230,Y_Volt:231,B_Volt:232,R_Current:1,Y_Current:2,"
         "B_Current:3,Power_Source:1,Status:ON,Meter_Number:2,Time:now"
@@ -35,7 +41,7 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(values["power_factors"], (0.8, 0.9, 1.0))
 
     def test_creates_first_load_power_record(self):
-        site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=False)
+        site = SimpleNamespace(id=156, show_voltage_alarms=False, is_pf_visible=False)
         entries = Mock(exists=Mock(return_value=False))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
@@ -46,7 +52,7 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(create.call_args.kwargs["Supply_Source"], "1")
 
     def test_updates_existing_load_power_record(self):
-        site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=False)
+        site = SimpleNamespace(id=156, show_voltage_alarms=False, is_pf_visible=False)
         entries = Mock(exists=Mock(return_value=True))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
@@ -57,7 +63,7 @@ class LoadHandlerTests(SimpleTestCase):
         self.assertEqual(entries.update.call_args.kwargs["Status"], "ON")
 
     def test_does_not_evaluate_power_factor_for_first_load_record(self):
-        site = SimpleNamespace(show_voltage_alarms=False, is_pf_visible=True)
+        site = SimpleNamespace(id=156, show_voltage_alarms=False, is_pf_visible=True)
         entries = Mock(exists=Mock(return_value=False))
         with patch(
             "wareApp.mqtt.load.SiteLoadPower.objects.filter", return_value=entries
@@ -97,6 +103,7 @@ class LoadHandlerTests(SimpleTestCase):
     def test_high_voltage_alarm_requires_sustained_readings_and_notifies(self):
         site = SimpleNamespace(
             id=156,
+            show_voltage_alarms=True,
             r_phase_voltage_threshold_max=220,
             y_phase_voltage_threshold_max=220,
             b_phase_voltage_threshold_max=220,
@@ -121,7 +128,7 @@ class LoadHandlerTests(SimpleTestCase):
             "wareApp.mqtt.load.SiteLoadParameters.objects.filter",
             return_value=history,
         ), patch("wareApp.mqtt.load.raise_power_alarm") as raise_alarm:
-            load._record_voltage_alarm(site, values, parameter_type=0)
+            load._record_voltage_alarm(site, values, 0, load._voltage_thresholds(site, 0))
 
         create_parameter.assert_called_once()
         history.order_by.return_value.values.assert_called_once_with(
@@ -152,6 +159,7 @@ class LoadHandlerTests(SimpleTestCase):
     def test_low_voltage_alarm_needs_five_low_readings(self):
         site = SimpleNamespace(
             id=156,
+            show_voltage_alarms=True,
             r_phase_voltage_threshold_max=220,
             y_phase_voltage_threshold_max=220,
             b_phase_voltage_threshold_max=220,
@@ -169,7 +177,7 @@ class LoadHandlerTests(SimpleTestCase):
         with patch("wareApp.mqtt.load.SiteLoadParameters.objects.create"), patch(
             "wareApp.mqtt.load.SiteLoadParameters.objects.filter", return_value=history
         ), patch("wareApp.mqtt.load.raise_power_alarm") as raise_alarm:
-            load._record_voltage_alarm(site, values, parameter_type=1)
+            load._record_voltage_alarm(site, values, 1, load._voltage_thresholds(site, 1))
 
         raise_alarm.assert_not_called()
 

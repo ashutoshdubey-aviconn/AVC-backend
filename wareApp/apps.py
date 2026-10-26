@@ -8,4 +8,5 @@ class WareappConfig(AppConfig):
     def ready(self):
         # Register cache-invalidation signal receivers in every process
         # (web and workers) so admin edits drop cached site configuration.
+        from wareApp import alarm_policy  # noqa: F401
         from wareApp.mqtt.services import site_cache  # noqa: F401

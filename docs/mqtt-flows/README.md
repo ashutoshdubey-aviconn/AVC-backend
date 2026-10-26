@@ -786,6 +786,8 @@ Diagram to open and edit in draw.io: [`drawio/10-alarm-email.drawio`](drawio/10-
 ```mermaid
 flowchart TD
     alarm[["alarm stored by a handler<br/>(flows 7, 8, 9, 12)"]]
+    rep{"repeat within tolerance of<br/>the last e-mailed value?<br/>(alarm_policy.should_email)"}
+    quiet["counted on the alarm,<br/>no e-mail"]
     notify["notify(send_function, args)"]
     commit{"after the DB commit:<br/>queue available?"}
     q[/"notifications queue<br/>(persistent)"/]
@@ -794,9 +796,11 @@ flowchart TD
     send["sendmail.[function]<br/>-> _send_smtp_email"]
     over{"ALARM_EMAIL_OVERRIDE_TO<br/>set?"}
     test["only to override address<br/>(+ 'TEST REDIRECT' banner)"]
-    real["real recipients /<br/>ALARM_EMAIL_DEFAULT_TO"]
+    real["software team (all sites)<br/>+ site's ground team<br/>(AlarmRecipient, AlarmSetting)"]
     smtp[["SMTP (EMAIL_* in .env)<br/>'Email sent' / 'Email failed'"]]
-    alarm --> notify
+    alarm --> rep
+    rep -->|"yes"| quiet
+    rep -->|"no / first"| notify
     notify --> commit
     commit -->|"yes"| q
     commit -->|"no"| direct
@@ -809,13 +813,15 @@ flowchart TD
     test --> smtp
     real --> smtp
     classDef decision fill:#fff2cc,stroke:#d6b656
-    class commit,over decision
+    class rep,commit,over decision
     classDef queue fill:#e1d5e7,stroke:#9673a6
     class q queue
     classDef alarm fill:#f8cecc,stroke:#b85450
     class test,real alarm
     classDef ext fill:#ffffff,stroke:#666,stroke-dasharray:4
     class alarm,smtp ext
+    classDef skip fill:#eee,stroke:#999,color:#555
+    class quiet skip
     classDef process fill:#dae8fc,stroke:#6c8ebf
     class notify,direct,worker,send process
 ```
@@ -829,12 +835,27 @@ every alarm goes only to that address with the intended recipients shown in a
 banner. Each send logs `Email sent: subject=… to=…` or `Email failed: … error=…`.
 A failed send (SMTP refused) is not retried today.
 
+**Recipients** (Django admin, `AlarmRecipient`): the software team receives every
+site's alarms, a ground-team member only those of the sites linked to them.
+`AlarmSetting` (per site and alarm type) can switch either group off for that
+type. Until any recipient exists, `ALARM_EMAIL_DEFAULT_TO` is used.
+
+**Repeats**: an alarm's value in its last e-mail is kept on the alarm
+(`notified_value`). A repeat - the next occurrence today, or the same alarm the
+next day - is e-mailed only when its value is more than
+`ALARM_REPEAT_TOLERANCE_PERCENT` (5 %, per site and type in `AlarmSetting`)
+worse; otherwise it is only counted. An alarm not seen for
+`ALARM_REPEAT_CLEAR_HOURS` (24 h; daily alarms: a day without it) has cleared,
+and its next occurrence is e-mailed again.
+
 | File | Function / role |
 | --- | --- |
+| `wareApp/alarm_policy.py` | recipients, setting / mode / manual_threshold, should_email, decide_email |
 | `wareApp/mqtt/services/notifications.py` | notify, ALLOWED_NOTIFICATIONS, QUEUE_ERRORS fallback |
 | `wareApp/tasks.py` | send_notification (retries 5x on exceptions) |
 | `wareApp/sendmail.py` | _send_smtp_email, _smtp_config, send_alarm_email, send_alarm_for_high/low_voltage, send_mail_for_pf_fluctuation, send_mail_fire_alarm_user |
-| `Settings` | MQTT_ASYNC_NOTIFICATIONS, ALARM_EMAIL_OVERRIDE_TO, ALARM_EMAIL_DEFAULT_TO, EMAIL_HOST / PORT / USE_TLS / HOST_USER / HOST_PASSWORD |
+| `Admin tables` | AlarmRecipient (Software / Ground team, ground sites), AlarmSetting (per site + type: Auto / Manual / Off, threshold, groups, tolerance) |
+| `Settings` | ALARM_REPEAT_TOLERANCE_PERCENT, ALARM_REPEAT_CLEAR_HOURS, ALARM_EMAIL_OVERRIDE_TO, ALARM_EMAIL_DEFAULT_TO (until recipients exist), MQTT_ASYNC_NOTIFICATIONS, EMAIL_* |
 
 ## 11. LoadData (queue 2): load graph data
 <a id="loaddata"></a>
@@ -1187,6 +1208,12 @@ same type numbers. The old table is read-only and will be dropped later. The sit
 alarm page (`alarmList/`, `alarmListDetail/`) now lists every type; its counts add
 up `occurrences`.
 Priority labels in the alarm list: 0 High, 1 Medium, 2 Low.
+
+**Configuration per site and type** (Django admin, `AlarmSetting`): **Auto** - the
+system threshold (consumption from the aisle's baseline, voltage 253 / 207 V,
+PF 0.9, overheat 85 °C); **Manual** - a typed-in threshold (V, PF, kWh per day or
+°C); **Off** - not raised. Without a row an alarm keeps its rule from the site
+fields. Who is e-mailed and when a repeat is e-mailed again: flow 10.
 
 | File | Function / role |
 | --- | --- |
