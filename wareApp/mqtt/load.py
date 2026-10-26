@@ -1,10 +1,13 @@
 import logging
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 
+from wareApp import alarm_policy
 from wareApp.models import (
     AlarmNotifications,
+    AlarmSetting,
     PowerFactorData,
     SiteLoadParameters,
     SiteLoadPower,
@@ -21,8 +24,65 @@ from wareApp.sendmail import (
 
 logger = logging.getLogger(__name__)
 
-# Voltage / PF alarms: at most one occurrence and e-mail per source per 30 min.
+# Voltage / PF alarms: at most one occurrence per source per 30 min; a repeat
+# is e-mailed only when it got worse (wareApp/alarm_policy.py).
 ALARM_REPEAT = timedelta(minutes=30)
+
+
+def _site_phase_thresholds(site, names):
+    values = tuple(getattr(site, f"{phase}_phase_{names}", None) for phase in "ryb")
+    return None if any(value is None for value in values) else values
+
+
+def _voltage_thresholds(site, parameter_type):
+    """R/Y/B thresholds for High (0) / Low (1) Voltage, or None (not checked).
+
+    AlarmSetting Off: not checked; Auto: ALARM_VOLTAGE_AUTO_HIGH / _LOW on every
+    phase; Manual: its threshold on every phase, else the site's phase fields.
+    Without a setting: the site's fields when show_voltage_alarms is on.
+    """
+    mode = alarm_policy.mode(site.id, parameter_type)
+    if mode == AlarmSetting.OFF:
+        return None
+    if mode == AlarmSetting.AUTO:
+        value = settings.ALARM_VOLTAGE_AUTO_HIGH if parameter_type == 0 else settings.ALARM_VOLTAGE_AUTO_LOW
+        return (value,) * 3
+    if mode == AlarmSetting.MANUAL:
+        manual = alarm_policy.manual_threshold(site.id, parameter_type)
+        if manual is not None:
+            return (manual,) * 3
+    elif not site.show_voltage_alarms:
+        return None
+    return _site_phase_thresholds(
+        site, "voltage_threshold_max" if parameter_type == 0 else "voltage_threshold_min"
+    )
+
+
+def _pf_thresholds(site, values):
+    """R/Y/B power-factor thresholds, or None (not checked); same modes as voltage."""
+    mode = alarm_policy.mode(site.id, AlarmNotifications.PF_BAD_VALUE)
+    if mode == AlarmSetting.OFF:
+        return None
+    if mode == AlarmSetting.AUTO:
+        return (settings.ALARM_PF_AUTO_THRESHOLD,) * 3
+    if mode == AlarmSetting.MANUAL:
+        manual = alarm_policy.manual_threshold(site.id, AlarmNotifications.PF_BAD_VALUE)
+        if manual is not None:
+            return (manual,) * 3
+    elif not site.is_pf_visible:
+        return None
+    thresholds = _site_phase_thresholds(site, "pf_threshold")
+    if thresholds is None and cache.add(f"pf-thresholds-missing-log:{site.id}", 1, 3600):
+        # Once per site per hour instead of on every load packet.
+        logger.warning(
+            "PF alarm skipped, PF thresholds not configured (logged once per hour): site=%s site_name=%s source=%s meter=%s thresholds r/y/b=%s/%s/%s",
+            site.id,
+            getattr(site, "site_name", ""),
+            values.get("power_source"),
+            values.get("meter_number"),
+            *(getattr(site, f"{phase}_phase_pf_threshold", None) for phase in "ryb"),
+        )
+    return thresholds
 
 
 def _parse_load_message(message):
@@ -55,31 +115,19 @@ def _parse_load_message(message):
     return values
 
 
-def _voltage_alarm_data(site, values, maximum):
+def _voltage_alarm_data(site, values, thresholds):
     return {
         "r_volts": round(values["r_volt"], 2),
         "y_volts": round(values["y_volt"], 2),
         "b_volts": round(values["b_volt"], 2),
-        "r_volt_threshold": (
-            site.r_phase_voltage_threshold_max
-            if maximum
-            else site.r_phase_voltage_threshold_min
-        ),
-        "y_volt_threshold": (
-            site.y_phase_voltage_threshold_max
-            if maximum
-            else site.y_phase_voltage_threshold_min
-        ),
-        "b_volt_threshold": (
-            site.b_phase_voltage_threshold_max
-            if maximum
-            else site.b_phase_voltage_threshold_min
-        ),
+        "r_volt_threshold": thresholds[0],
+        "y_volt_threshold": thresholds[1],
+        "b_volt_threshold": thresholds[2],
         "site_id": site.id,
     }
 
 
-def _record_voltage_alarm(site, values, parameter_type):
+def _record_voltage_alarm(site, values, parameter_type, thresholds):
     SiteLoadParameters.objects.create(
         site_id=site,
         power_source=values["power_source"],
@@ -101,19 +149,6 @@ def _record_voltage_alarm(site, values, parameter_type):
     )
     if len(recent) <= 6:
         return
-    thresholds = (
-        (
-            site.r_phase_voltage_threshold_max,
-            site.y_phase_voltage_threshold_max,
-            site.b_phase_voltage_threshold_max,
-        )
-        if parameter_type == 0
-        else (
-            site.r_phase_voltage_threshold_min,
-            site.y_phase_voltage_threshold_min,
-            site.b_phase_voltage_threshold_min,
-        )
-    )
     if parameter_type == 0:
         violated = all(
             item["r_phase"] > thresholds[0]
@@ -130,40 +165,29 @@ def _record_voltage_alarm(site, values, parameter_type):
         )
     if not violated:
         return
-    # One row per site / source / type / day; at most one occurrence and
-    # e-mail per 30 minutes (services/alarms.py).
+    # One row per site / source / type / day; at most one occurrence per 30
+    # minutes, e-mailed when new or worse (services/alarms.py).
     send = send_alarm_for_high_voltage if parameter_type == 0 else send_alarm_for_low_voltage
+    volts = (values["r_volt"], values["y_volt"], values["b_volt"])
     raise_power_alarm(
         site,
         parameter_type,
         power_source=values["power_source"],
         priority=AlarmNotifications.PRIORITY_HIGH,
-        values={"r_phase": values["r_volt"], "y_phase": values["y_volt"], "b_phase": values["b_volt"]},
+        values={"r_phase": volts[0], "y_phase": volts[1], "b_phase": volts[2]},
         repeat_every=ALARM_REPEAT,
-        email=(send, _voltage_alarm_data(site, values, maximum=parameter_type == 0)),
+        email=(send, _voltage_alarm_data(site, values, thresholds)),
+        severity=max(volts) if parameter_type == 0 else min(volts),
+        worse_when_higher=parameter_type == 0,
     )
 
 
 def _record_power_factor_alarm(site, values):
     factors = values.get("power_factors")
-    if not factors or not site.is_pf_visible or values["status"] != "ON":
+    if not factors or values["status"] != "ON":
         return
-    thresholds = (
-        site.r_phase_pf_threshold,
-        site.y_phase_pf_threshold,
-        site.b_phase_pf_threshold,
-    )
-    if any(threshold is None for threshold in thresholds):
-        # Once per site per hour instead of on every load packet.
-        if cache.add(f"pf-thresholds-missing-log:{site.id}", 1, 3600):
-            logger.warning(
-                "PF alarm skipped, PF thresholds not configured (logged once per hour): site=%s site_name=%s source=%s meter=%s thresholds r/y/b=%s/%s/%s",
-                site.id,
-                getattr(site, "site_name", ""),
-                values.get("power_source"),
-                values.get("meter_number"),
-                *thresholds,
-            )
+    thresholds = _pf_thresholds(site, values)
+    if thresholds is None:
         return
     if not any(value < threshold for value, threshold in zip(factors, thresholds)):
         return
@@ -196,6 +220,8 @@ def _record_power_factor_alarm(site, values):
                 "power_source": values["power_source"],
             },
         ),
+        severity=min(factors),
+        worse_when_higher=False,
     )
 
 
@@ -210,11 +236,11 @@ def handle_load_message(site, location_id, gateway_id, message):
             Meter_Number=values["meter_number"],
         )
         record_exists = entries.exists()
-        if site.show_voltage_alarms and all(
-            values[key] > 0 for key in ("r_volt", "y_volt", "b_volt")
-        ):
-            _record_voltage_alarm(site, values, parameter_type=0)
-            _record_voltage_alarm(site, values, parameter_type=1)
+        if all(values[key] > 0 for key in ("r_volt", "y_volt", "b_volt")):
+            for parameter_type in (0, 1):
+                thresholds = _voltage_thresholds(site, parameter_type)
+                if thresholds is not None:
+                    _record_voltage_alarm(site, values, parameter_type, thresholds)
 
         update_values = {
             "Associated_Site": site,

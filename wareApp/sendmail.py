@@ -432,16 +432,17 @@ def send_mail_for_pf_fluctuation(data):
         "PF Fluctuation Alarm",
         data["site_id"],
         [("Power source", data.get("power_source"), False), row("r"), row("y"), row("b")],
+        2,  # PF Bad Value
     )
 
 
-def send_alarm_email(alarm_name, site_id, details):
+def send_alarm_email(alarm_name, site_id, details, alarm_type=None):
     """Generic alarm email: ``details`` is a list of (label, value, highlight).
 
-    Recipients: ALARM_EMAIL_OVERRIDE_TO when set (test servers), otherwise
-    ALARM_EMAIL_DEFAULT_TO; with neither configured nothing is sent.
+    Recipients: the software team and the site's ground team as set for
+    ``alarm_type`` (wareApp/alarm_policy.py); ALARM_EMAIL_OVERRIDE_TO replaces
+    them on test servers. With nobody configured nothing is sent.
     """
-    from django.conf import settings as django_settings
 
     site = Site.objects.filter(id=site_id).first()
     site_name = site.site_name if site else f"site {site_id}"
@@ -466,7 +467,9 @@ def send_alarm_email(alarm_name, site_id, details):
         </body>
         </html>
     """
-    to = list(getattr(django_settings, "ALARM_EMAIL_DEFAULT_TO", []) or [])
+    from wareApp.alarm_policy import recipients
+
+    to = recipients(site_id, alarm_type)
     return _send_smtp_email(f"{alarm_name} - {site_name}", html_message, to)
 
 
@@ -501,7 +504,9 @@ def send_alarm_for_high_voltage(data):
     """
 
     subject_mail = "High Voltage Alarm Testing"
-    to = ['abhishek.mehra@aviconn.in','mandeep.kahlon@aviconncorp.com']
+    from wareApp.alarm_policy import recipients
+
+    to = recipients(data['site_id'], 0)
     return _send_smtp_email(subject_mail, html_message, to)
 
 
@@ -536,7 +541,9 @@ def send_alarm_for_low_voltage(data):
     """
 
     subject_mail = "Low Voltage Alarm Testing"
-    to = ['abhishek.mehra@aviconn.in', 'mandeep.kahlon@aviconncorp.com']
+    from wareApp.alarm_policy import recipients
+
+    to = recipients(data['site_id'], 1)
     return _send_smtp_email(subject_mail, html_message, to)
 
 
@@ -562,7 +569,9 @@ def send_mail_for_dg_fuel_under_level(data):
     """
 
     subject_mail = "Fuel Level Alarm Testing"
-    to = ['abhishek.mehra@aviconn.in','mandeep.kahlon@aviconncorp.com']
+    from wareApp.alarm_policy import recipients
+
+    to = recipients(data['site_id'], 4)
     return _send_smtp_email(subject_mail, html_message, to)
 
 

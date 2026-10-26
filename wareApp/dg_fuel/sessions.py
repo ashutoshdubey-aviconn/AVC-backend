@@ -554,7 +554,9 @@ def attempt_fetch_for_unit(
                         ["DG fuel used (L)", str(unit.dg_fuel_consumption), False],
                         ["Vehicle / device", str(vehicle_number), False],
                     ],
+                    AlarmNotifications.DG_RUNNING_WITHOUT_LOAD,
                 ),
+                severity=as_float(unit.dg_fuel_consumption),
             )
 
         try:
@@ -582,7 +584,9 @@ def attempt_fetch_for_unit(
                             ["Tank capacity (L)", str(tank_capacity), False],
                             ["Vehicle / device", str(vehicle_number), False],
                         ],
+                        AlarmNotifications.FUEL_DRAIN,
                     ),
+                    severity=as_float(unit.dg_fuel_consumption),
                 )
         except Exception:
             pass
