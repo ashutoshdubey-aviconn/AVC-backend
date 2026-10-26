@@ -540,7 +540,7 @@ e-mailed; repeats only update `last_seen` / `occurrences`.
             "q": ("notifications queue\n(persistent)", "queue", 0, 3),
             "direct": ("send directly\n(fallback, logged)", "process", 2, 3),
             "worker": ("mqtt-notifications\nsend_notification\n(allow-listed functions)", "process", 0, 4),
-            "send": ("sendmail.<function>\n-> _send_smtp_email", "process", 1, 5),
+            "send": ("sendmail.[function]\n-> _send_smtp_email", "process", 1, 5),
             "over": ("ALARM_EMAIL_OVERRIDE_TO\nset?", "decision", 1, 6),
             "test": ("only to override address\n(+ 'TEST REDIRECT' banner)", "alarm", 0, 7),
             "real": ("real recipients /\nALARM_EMAIL_DEFAULT_TO", "alarm", 2, 7),
