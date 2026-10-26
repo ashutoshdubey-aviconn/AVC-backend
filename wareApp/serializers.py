@@ -4,7 +4,7 @@ import binascii
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import CustomerInfo, MeterDisconnectionEvent, NewAlarmsNotifications, Site, User
+from .models import AlarmNotifications, CustomerInfo, MeterDisconnectionEvent, Site, User
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -79,9 +79,25 @@ class SiteSerializer(serializers.ModelSerializer):
                   "live_date"]
 
 class AlarmListSerializer(serializers.ModelSerializer):
+    """One alarm row for the site alarm detail list.
+
+    Keeps the keys of the former NewAlarmsNotifications list (the dashboard reads
+    them) and adds the aisle, reason and repeat count of the single alarm table.
+    """
+
+    get_alarm_type_display = serializers.CharField(source="get_Alarm_type_display", read_only=True)
+    get_alarm_priority_display = serializers.CharField(source="get_Alarm_priority_display", read_only=True)
+    created = serializers.DateTimeField(source="created_time", read_only=True)
+    aisle_group = serializers.CharField(source="aisle_group.aisleGroupName", default=None, read_only=True)
+    issue = serializers.CharField(source="to_do", default=None, read_only=True)
+
     class Meta:
-        model = NewAlarmsNotifications
-        fields = ["get_alarm_type_display","power_source", "get_alarm_priority_display", "r_phase", "y_phase", "b_phase", "fuel_level", "run_hours", "created", "is_active"]
+        model = AlarmNotifications
+        fields = [
+            "get_alarm_type_display", "power_source", "get_alarm_priority_display",
+            "r_phase", "y_phase", "b_phase", "fuel_level", "run_hours", "created",
+            "is_active", "aisle_group", "issue", "occurrences", "last_seen",
+        ]
 
 class MeterDisconnectionEventSerializer(serializers.ModelSerializer):
     class Meta:

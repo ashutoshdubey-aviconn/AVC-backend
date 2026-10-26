@@ -9,7 +9,6 @@ from wareApp.models import (
     DailySiteReading,
     DgUnitConsumption,
     DGFuelAlertsData,
-    NewAlarmsNotifications,
 )
 from wareApp.dg_fuel.sessions import (
     _main_database_alias,

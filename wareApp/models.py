@@ -499,6 +499,56 @@ class SiteBaseline(models.Model):
 
 
 class AlarmNotifications(models.Model):
+    """Every alarm of every kind (one table since 2026-10, see docs/mqtt-flows).
+
+    One row per issue per day: a repeat updates ``last_seen`` / ``occurrences``
+    (and the latest measured values) instead of adding a row. ``last_notified_at``
+    throttles the e-mail of alarms that repeat (voltage, PF: every 30 min).
+    Scope of the issue: ``aisle_group`` (consumption alarms), ``power_source``
+    (voltage / PF / DG) or ``object_type`` + ``object_id`` (meter, gateway).
+    Power / DG alarms were stored in ``NewAlarmsNotifications`` until migration
+    0099 copied them here with the same type numbers.
+    """
+
+    # Alarm types: one list for all sources, numbers unchanged from the two
+    # former tables (power / DG 0-6 and 9 from NewAlarmsNotifications).
+    HIGH_VOLTAGE = 0
+    LOW_VOLTAGE = 1
+    PF_BAD_VALUE = 2
+    DG_OVERTIME = 3
+    DG_FUEL_UNDER_LEVEL = 4
+    MAINS_HIGHER_CONSUMPTION = 5
+    FUEL_DRAIN = 6
+    HIGH_CONSUMPTION = 7
+    LOW_CONSUMPTION = 8
+    DG_RUNNING_WITHOUT_LOAD = 9
+    METER_READING_ISSUE = 10
+    BYPASSED = 11
+    OPERATION_HOURS_INCREASED = 12
+    GATEWAY_OVERHEAT = 13
+    alarm_type = (
+        (HIGH_VOLTAGE, "High Voltage"),
+        (LOW_VOLTAGE, "Low Voltage"),
+        (PF_BAD_VALUE, "PF Bad Value Alarm"),
+        (DG_OVERTIME, "DG Overtime"),
+        (DG_FUEL_UNDER_LEVEL, "DG Fuel Under Level"),
+        (MAINS_HIGHER_CONSUMPTION, "Mains Higher Consumption"),
+        (FUEL_DRAIN, "Fuel Drain"),
+        (HIGH_CONSUMPTION, "High Consumption"),
+        (LOW_CONSUMPTION, "Low Consumption"),
+        (DG_RUNNING_WITHOUT_LOAD, "DG Running Without Load"),
+        (METER_READING_ISSUE, "Meter Reading Issue"),
+        (BYPASSED, "Bypassed"),
+        (OPERATION_HOURS_INCREASED, "Operation Hours Increased"),
+        (GATEWAY_OVERHEAT, "Gateway Overheat"),
+    )
+    POWER_TYPES = frozenset({0, 1, 2, 3, 4, 5, 6, 9})
+    CONSUMPTION_TYPES = frozenset({7, 8, 10, 11, 12})
+    GATEWAY_TYPES = frozenset({13})
+
+    PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW = 0, 1, 2
+    alarm_priorities = ((0, "High"), (1, "Medium"), (2, "Low"))
+
     created_by = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -523,25 +573,8 @@ class AlarmNotifications(models.Model):
     aisle_group = models.ForeignKey(
         "AisleGroup", on_delete=models.CASCADE, null=True, blank=True
     )
-    alarm_type = (
-        (0, "Low_balance"),
-        (1, "Power_Cut"),
-        (2, "Pending Balance"),
-        (3, "Pending Request"),
-        (4, "Zero balance"),
-        (5, "Box opened"),
-        (6, "Internet_Gone"),
-        (7, "High Consumption"),
-        (8, "Low Consumption"),
-        (9, "No DG Run"),
-        (10, "Meter Reading Issue"),
-        (11, "Bypassed"),
-        (12, "Operation Hours Increased"),
-        (13, "Gateway Overheat"),
-    )
     Alarm_type = models.PositiveIntegerField(choices=alarm_type)
     create_DateTime = models.DateTimeField(auto_now=False, auto_now_add=True)
-    alarm_priorities = ((0, "Normal"), (1, "High"))
     Alarm_priority = models.PositiveIntegerField(choices=alarm_priorities, default=0)
     created_time = models.DateTimeField(default=timezone.now)
     to_do = models.CharField(max_length=200, blank=True, null=True)
@@ -549,9 +582,17 @@ class AlarmNotifications(models.Model):
     cloud_time = models.DateTimeField(auto_now=False, auto_now_add=True)
     is_active = models.BooleanField(default=True)
     # A repeat of an issue that is already active today updates these
-    # instead of adding another row (see mqtt/consumption.py).
+    # instead of adding another row.
     last_seen = models.DateTimeField(blank=True, null=True)
     occurrences = models.PositiveIntegerField(default=1)
+    last_notified_at = models.DateTimeField(blank=True, null=True)
+    # Power / DG alarms (voltage, power factor, fuel).
+    power_source = models.CharField(max_length=50, blank=True, null=True)
+    r_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
+    y_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
+    b_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
+    fuel_level = models.FloatField(blank=True, null=True)
+    run_hours = models.FloatField(blank=True, null=True)
 
     class Meta:
         indexes = [
@@ -560,8 +601,31 @@ class AlarmNotifications(models.Model):
                 fields=["site_id", "aisle_group", "Alarm_type", "created_time"],
                 name="idx_alarm_site_aisle_type_time",
             ),
+            # Power / DG alarm lookup: site + source + type + time range.
+            models.Index(
+                fields=["site_id", "power_source", "Alarm_type", "created_time"],
+                name="idx_alarmn_site_src_type_time",
+            ),
         ]
 
+    @property
+    def source(self):
+        """'power', 'gateway' or 'consumption' (what raised the alarm)."""
+        if self.Alarm_type in self.POWER_TYPES:
+            return "power"
+        if self.Alarm_type in self.GATEWAY_TYPES:
+            return "gateway"
+        return "consumption"
+
+    def save(self, *args, **kwargs):
+        for name in ("r_phase", "y_phase", "b_phase"):
+            value = getattr(self, name)
+            if value is not None:
+                try:
+                    setattr(self, name, round(float(value), 2))
+                except (TypeError, ValueError):
+                    setattr(self, name, None)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return "Notification for {}".format(str(self.site_id))
@@ -1040,6 +1104,12 @@ class DGFuelAlertsData(models.Model):
 
 
 class NewAlarmsNotifications(models.Model):
+    """Superseded by AlarmNotifications (migration 0099 copied every row there).
+
+    Kept read-only for one release so the copy can be checked; nothing writes
+    to it any more. Drop it in a later migration.
+    """
+
     site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
     ALARM_TYPE = (
         (0, "High Voltage"),

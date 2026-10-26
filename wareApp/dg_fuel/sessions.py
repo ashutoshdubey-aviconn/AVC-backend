@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db import connections
 from django.utils import timezone as dj_timezone
 
-from wareApp.mqtt.services.notifications import notify
+from wareApp.mqtt.services.alarms import raise_power_alarm
 from wareApp.sendmail import send_alarm_email
 from wareApp.dg_fuel.normalization import as_float
 from wareApp.fuel_providers import (
@@ -29,7 +29,7 @@ from wareApp.models import (
     DGFuelAlertsData,
     DgUnitConsumption,
     HourlySiteReading,
-    NewAlarmsNotifications,
+    AlarmNotifications,
     Site,
 )
 
@@ -540,21 +540,21 @@ def attempt_fetch_for_unit(
 
     if fuel_fetch_success:
         if unit.unit_consumption is not None and unit.unit_consumption <= 0:
-            NewAlarmsNotifications.objects.create(
-                site_id=site,
-                alarm_type=9,
-                alarm_priority=0,
-                created=dj_timezone.now(),
-            )
-            notify(
-                send_alarm_email,
-                "DG Running Without Load",
-                site.id,
-                [
-                    ["DG unit consumption (kWh)", str(unit.unit_consumption), True],
-                    ["DG fuel used (L)", str(unit.dg_fuel_consumption), False],
-                    ["Vehicle / device", str(vehicle_number), False],
-                ],
+            raise_power_alarm(
+                site,
+                AlarmNotifications.DG_RUNNING_WITHOUT_LOAD,
+                priority=AlarmNotifications.PRIORITY_HIGH,
+                values={"fuel_level": unit.dg_fuel_consumption},
+                email=(
+                    send_alarm_email,
+                    "DG Running Without Load",
+                    site.id,
+                    [
+                        ["DG unit consumption (kWh)", str(unit.unit_consumption), True],
+                        ["DG fuel used (L)", str(unit.dg_fuel_consumption), False],
+                        ["Vehicle / device", str(vehicle_number), False],
+                    ],
+                ),
             )
 
         try:
@@ -568,22 +568,21 @@ def attempt_fetch_for_unit(
                     epoch_time=str(int(time.time())),
                     created=dj_timezone.now(),
                 )
-                NewAlarmsNotifications.objects.create(
-                    site_id=site,
-                    alarm_type=6,
-                    alarm_priority=1,
-                    created=dj_timezone.now(),
-                    fuel_level=unit.dg_fuel_consumption,
-                )
-                notify(
-                    send_alarm_email,
-                    "Fuel Drain / Suspicious Fuel Alarm",
-                    site.id,
-                    [
-                        ["DG fuel used (L)", str(unit.dg_fuel_consumption), True],
-                        ["Tank capacity (L)", str(tank_capacity), False],
-                        ["Vehicle / device", str(vehicle_number), False],
-                    ],
+                raise_power_alarm(
+                    site,
+                    AlarmNotifications.FUEL_DRAIN,
+                    priority=AlarmNotifications.PRIORITY_MEDIUM,
+                    values={"fuel_level": unit.dg_fuel_consumption},
+                    email=(
+                        send_alarm_email,
+                        "Fuel Drain / Suspicious Fuel Alarm",
+                        site.id,
+                        [
+                            ["DG fuel used (L)", str(unit.dg_fuel_consumption), True],
+                            ["Tank capacity (L)", str(tank_capacity), False],
+                            ["Vehicle / device", str(vehicle_number), False],
+                        ],
+                    ),
                 )
         except Exception:
             pass

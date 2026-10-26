@@ -70,6 +70,7 @@ class LoadHandlerTests(SimpleTestCase):
 
     def test_power_factor_record_uses_zero_for_non_violating_phases(self):
         site = SimpleNamespace(
+            id=156,
             is_pf_visible=True,
             r_phase_pf_threshold=0.9,
             y_phase_pf_threshold=0.9,
@@ -81,13 +82,13 @@ class LoadHandlerTests(SimpleTestCase):
             "power_source": "1",
             "meter_number": 2,
         }
-        existing_alarms = Mock(exists=Mock(return_value=True))
-
         with patch("wareApp.mqtt.load.PowerFactorData.objects.create") as create, patch(
-            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
-            return_value=existing_alarms,
-        ):
+            "wareApp.mqtt.load.raise_power_alarm"
+        ) as raise_alarm:
             load._record_power_factor_alarm(site, values)
+
+        self.assertEqual(raise_alarm.call_args.args[1], 2)  # PF Bad Value
+        self.assertEqual(raise_alarm.call_args.kwargs["repeat_every"], load.ALARM_REPEAT)
 
         self.assertEqual(create.call_args.kwargs["r_phase_pf"], 0.8)
         self.assertEqual(create.call_args.kwargs["y_phase_pf"], 0.0)
@@ -114,29 +115,29 @@ class LoadHandlerTests(SimpleTestCase):
         history.order_by.return_value.values.return_value = [
             {"r_phase": 230, "y_phase": 230, "b_phase": 230} for _ in range(7)
         ]
-        existing_alarms = Mock(exists=Mock(return_value=False))
-
         with patch(
             "wareApp.mqtt.load.SiteLoadParameters.objects.create"
         ) as create_parameter, patch(
             "wareApp.mqtt.load.SiteLoadParameters.objects.filter",
             return_value=history,
-        ), patch(
-            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
-            return_value=existing_alarms,
-        ), patch(
-            "wareApp.mqtt.load.NewAlarmsNotifications.objects.create"
-        ) as create_alarm, patch(
-            "wareApp.mqtt.load.send_alarm_for_high_voltage"
-        ) as notify:
+        ), patch("wareApp.mqtt.load.raise_power_alarm") as raise_alarm:
             load._record_voltage_alarm(site, values, parameter_type=0)
 
         create_parameter.assert_called_once()
         history.order_by.return_value.values.assert_called_once_with(
             "r_phase", "y_phase", "b_phase"
         )
-        create_alarm.assert_called_once()
-        notify.assert_called_once_with(
+        raise_alarm.assert_called_once()
+        args, kwargs = raise_alarm.call_args
+        self.assertEqual(args, (site, 0))  # High Voltage
+        self.assertEqual(kwargs["power_source"], "1")
+        self.assertEqual(kwargs["priority"], 0)
+        self.assertEqual(kwargs["repeat_every"], load.ALARM_REPEAT)
+        self.assertEqual(kwargs["values"], {"r_phase": 230.0, "y_phase": 230.0, "b_phase": 230.0})
+        send, data = kwargs["email"]
+        self.assertIs(send, load.send_alarm_for_high_voltage)
+        self.assertEqual(
+            data,
             {
                 "r_volts": 230.0,
                 "y_volts": 230.0,
@@ -145,10 +146,10 @@ class LoadHandlerTests(SimpleTestCase):
                 "y_volt_threshold": 220,
                 "b_volt_threshold": 220,
                 "site_id": 156,
-            }
+            },
         )
 
-    def test_low_voltage_alarm_dedupes_existing_notification(self):
+    def test_low_voltage_alarm_needs_five_low_readings(self):
         site = SimpleNamespace(
             id=156,
             r_phase_voltage_threshold_max=220,
@@ -158,37 +159,19 @@ class LoadHandlerTests(SimpleTestCase):
             y_phase_voltage_threshold_min=180,
             b_phase_voltage_threshold_min=180,
         )
-        values = {
-            "r_volt": 170.0,
-            "y_volt": 170.0,
-            "b_volt": 170.0,
-            "power_source": "1",
-            "meter_number": 2,
-        }
+        values = {"r_volt": 170.0, "y_volt": 170.0, "b_volt": 170.0, "power_source": "1", "meter_number": 2}
         history = Mock()
+        # Only 4 of the latest 5 readings are low: no alarm.
         history.order_by.return_value.values.return_value = [
-            {"r_phase": 170, "y_phase": 170, "b_phase": 170} for _ in range(7)
-        ]
-        existing_alarms = Mock(exists=Mock(return_value=True))
+            {"r_phase": 170, "y_phase": 170, "b_phase": 170} for _ in range(4)
+        ] + [{"r_phase": 200, "y_phase": 200, "b_phase": 200} for _ in range(3)]
 
-        with patch(
-            "wareApp.mqtt.load.SiteLoadParameters.objects.create"
-        ) as create_parameter, patch(
-            "wareApp.mqtt.load.SiteLoadParameters.objects.filter",
-            return_value=history,
-        ), patch(
-            "wareApp.mqtt.load.NewAlarmsNotifications.objects.filter",
-            return_value=existing_alarms,
-        ), patch(
-            "wareApp.mqtt.load.NewAlarmsNotifications.objects.create"
-        ) as create_alarm, patch(
-            "wareApp.mqtt.load.send_alarm_for_low_voltage"
-        ) as notify:
+        with patch("wareApp.mqtt.load.SiteLoadParameters.objects.create"), patch(
+            "wareApp.mqtt.load.SiteLoadParameters.objects.filter", return_value=history
+        ), patch("wareApp.mqtt.load.raise_power_alarm") as raise_alarm:
             load._record_voltage_alarm(site, values, parameter_type=1)
 
-        create_parameter.assert_called_once()
-        create_alarm.assert_not_called()
-        notify.assert_not_called()
+        raise_alarm.assert_not_called()
 
     def test_processing_task_resolves_site_and_calls_handler(self):
         site = SimpleNamespace(id=156)

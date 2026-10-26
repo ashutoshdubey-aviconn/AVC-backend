@@ -4,15 +4,15 @@ from datetime import datetime, timedelta
 from django.core.cache import cache
 
 from wareApp.models import (
-    NewAlarmsNotifications,
+    AlarmNotifications,
     PowerFactorData,
     SiteLoadParameters,
     SiteLoadPower,
 )
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.payloads import KeyValuePayload
+from wareApp.mqtt.services.alarms import raise_power_alarm
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
-from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import (
     send_alarm_for_high_voltage,
     send_alarm_for_low_voltage,
@@ -20,6 +20,9 @@ from wareApp.sendmail import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Voltage / PF alarms: at most one occurrence and e-mail per source per 30 min.
+ALARM_REPEAT = timedelta(minutes=30)
 
 
 def _parse_load_message(message):
@@ -127,28 +130,18 @@ def _record_voltage_alarm(site, values, parameter_type):
         )
     if not violated:
         return
-    if NewAlarmsNotifications.objects.filter(
-        site_id=site,
-        alarm_type=parameter_type,
+    # One row per site / source / type / day; at most one occurrence and
+    # e-mail per 30 minutes (services/alarms.py).
+    send = send_alarm_for_high_voltage if parameter_type == 0 else send_alarm_for_low_voltage
+    raise_power_alarm(
+        site,
+        parameter_type,
         power_source=values["power_source"],
-        created__gte=datetime.now() - timedelta(minutes=30),
-    ).exists():
-        return
-    NewAlarmsNotifications.objects.create(
-        site_id=site,
-        alarm_type=parameter_type,
-        power_source=values["power_source"],
-        created=datetime.now(),
-        alarm_priority=0,
-        r_phase=values["r_volt"],
-        y_phase=values["y_volt"],
-        b_phase=values["b_volt"],
+        priority=AlarmNotifications.PRIORITY_HIGH,
+        values={"r_phase": values["r_volt"], "y_phase": values["y_volt"], "b_phase": values["b_volt"]},
+        repeat_every=ALARM_REPEAT,
+        email=(send, _voltage_alarm_data(site, values, maximum=parameter_type == 0)),
     )
-    data = _voltage_alarm_data(site, values, maximum=parameter_type == 0)
-    if parameter_type == 0:
-        notify(send_alarm_for_high_voltage, data)
-    else:
-        notify(send_alarm_for_low_voltage, data)
 
 
 def _record_power_factor_alarm(site, values):
@@ -183,35 +176,26 @@ def _record_power_factor_alarm(site, values):
         b_phase_pf=factors[2] if factors[2] < thresholds[2] else 0.0,
         created=datetime.now(),
     )
-    if NewAlarmsNotifications.objects.filter(
-        site_id=site,
+    raise_power_alarm(
+        site,
+        AlarmNotifications.PF_BAD_VALUE,
         power_source=values["power_source"],
-        alarm_type=2,
-        created__gte=datetime.now() - timedelta(minutes=30),
-    ).exists():
-        return
-    NewAlarmsNotifications.objects.create(
-        site_id=site,
-        power_source=values["power_source"],
-        alarm_type=2,
-        alarm_priority=1,
-        created=datetime.now(),
-        r_phase=factors[0],
-        y_phase=factors[1],
-        b_phase=factors[2],
-    )
-    notify(
-        send_mail_for_pf_fluctuation,
-        {
-            "r_pf": factors[0],
-            "y_pf": factors[1],
-            "b_pf": factors[2],
-            "r_pf_threshold": thresholds[0],
-            "y_pf_threshold": thresholds[1],
-            "b_pf_threshold": thresholds[2],
-            "site_id": site.id,
-            "power_source": values["power_source"],
-        },
+        priority=AlarmNotifications.PRIORITY_MEDIUM,
+        values={"r_phase": factors[0], "y_phase": factors[1], "b_phase": factors[2]},
+        repeat_every=ALARM_REPEAT,
+        email=(
+            send_mail_for_pf_fluctuation,
+            {
+                "r_pf": factors[0],
+                "y_pf": factors[1],
+                "b_pf": factors[2],
+                "r_pf_threshold": thresholds[0],
+                "y_pf_threshold": thresholds[1],
+                "b_pf_threshold": thresholds[2],
+                "site_id": site.id,
+                "power_source": values["power_source"],
+            },
+        ),
     )
 
 

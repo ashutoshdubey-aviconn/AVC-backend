@@ -238,7 +238,6 @@ admin.site.register(CustomerInfo)
 admin.site.register(Image)
 admin.site.register(BlockInfo)
 admin.site.register(AisleInfo)
-admin.site.register(AlarmNotifications)
 admin.site.register(Panel)
 admin.site.register(MeterSource)
 admin.site.register(HomeGatewayId)
@@ -254,7 +253,6 @@ admin.site.register(DGAlertsData)
 admin.site.register(DgFuelConsumptionData)
 admin.site.register(CustomerSiteManager)
 admin.site.register(SiteLoadParameters)
-admin.site.register(NewAlarmsNotifications)
 admin.site.register(MeterDisconnectionEvent)
 
 
@@ -385,3 +383,30 @@ class MqttDeadLetterAdmin(admin.ModelAdmin):
     list_filter = ["message_type", "is_resolved"]
     search_fields = ["gateway_id", "error", "payload"]
     readonly_fields = ["message_type", "site_id", "gateway_id", "payload", "error", "created_at"]
+
+
+@admin.register(AlarmNotifications)
+class AlarmNotificationsAdmin(admin.ModelAdmin):
+    """The single alarm table (consumption, meter, gateway, power and DG)."""
+
+    list_display = [
+        "id", "site_id", "Alarm_type", "Alarm_priority", "aisle_group", "power_source",
+        "created_time", "last_seen", "occurrences", "is_active",
+    ]
+    list_filter = ["Alarm_type", "Alarm_priority", "is_active"]
+    search_fields = ["site_id__site_name", "to_do", "power_source"]
+    list_select_related = ["site_id", "aisle_group"]
+    date_hierarchy = "created_time"
+
+
+@admin.register(NewAlarmsNotifications)
+class NewAlarmsNotificationsAdmin(admin.ModelAdmin):
+    """Former power / DG alarm table: copied into AlarmNotifications, read-only."""
+
+    list_display = ["id", "site_id", "alarm_type", "power_source", "created"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
