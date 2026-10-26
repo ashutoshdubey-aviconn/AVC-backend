@@ -267,14 +267,15 @@ class BatchMatchesSinglePacketTests(TestCase):
         self.assertEqual(len(batch.published), 1)
         self.assertIn("stored=1 skipped=2", summary)
 
-    def test_stale_history_starts_fresh_without_recovery(self):
+    def test_stale_aisle_is_inactive_and_keeps_its_synced_total(self):
         def prepare(w):
-            # A1: newest row is months old (gateway no longer holds that history).
+            # A1: newest hourly row is months old; its daily total comes from sync.
             HourlySiteReading.objects.create(
                 associated_Site=w.site, aisle_group=w.aisles["A1"], leg_id=w.legs["A1"],
                 unit_consumption=2.0, reading_from=datetime(2026, 8, 1, 10),
                 reading_to=datetime(2026, 8, 1, 10, 59, 59), is_visible=True,
             )
+            w.daily("A1", 2, 242.16)
             w.hourly("A2", 2, 5, 3.0)  # A2: normal 06:00-09:00 gap
             w.daily("A2", 2, 3.0)
 
@@ -287,15 +288,20 @@ class BatchMatchesSinglePacketTests(TestCase):
                     ("A2", packet(2, 10, 1.5, 2.0)),
                 ],
             )
-        # Only A2 asks for recovery; A1 is stored again from this hour.
+        # Only A2 asks for recovery; A1 stores nothing and keeps its synced total.
         self.assertEqual(len(batch.published), 1)
-        self.assertIn("stored=2 skipped=1", summary)
-        restarted = [m for m in logs.output if "restarted without recovery" in m]
-        self.assertEqual(len(restarted), 2)  # once per aisle: A1 of the single and of the batch site
-        a1 = HourlySiteReading.objects.filter(
-            associated_Site=batch.site, leg_id=batch.legs["A1"], reading_from__gte=datetime(2026, 10, 2)
-        )
-        self.assertEqual([r.unit_consumption for r in a1], [2.5])
+        self.assertIn("stored=0 skipped=3", summary)
+        inactive = [m for m in logs.output if "aisle inactive" in m]
+        self.assertEqual(len(inactive), 2)  # once per aisle and day: A1 of each site
+        for world in (single, batch):
+            self.assertFalse(HourlySiteReading.objects.filter(
+                associated_Site=world.site, leg_id=world.legs["A1"], reading_from__gte=datetime(2026, 10, 1)
+            ).exists())
+            self.assertEqual(
+                list(DailySiteReading.objects.filter(associated_Site=world.site, leg_id=world.legs["A1"])
+                     .values_list("unit_consumption", flat=True)),
+                [242.16],
+            )
 
     @override_settings(MQTT_RECOVERY_STALE_DAYS=0)
     def test_stale_check_can_be_switched_off(self):
