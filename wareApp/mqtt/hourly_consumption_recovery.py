@@ -78,11 +78,19 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 scope, HOURLY_CONSUMPTION, status_slots, message
             )
             written = upsert_slots(
+                # A range, not reading_from__in: with USE_TZ=False each IN value is
+                # cast to timestamptz and the index cannot use the list (662 hours:
+                # 336 ms vs 0.6 ms). Rows in the range but not in the slots are ignored.
                 HourlySiteReading.objects.filter(
                     associated_Site=site,
                     leg_id=aisle_group_id,
-                    reading_from__in=[start for start, _ in slots],
-                ),
+                    reading_from__range=(
+                        min(start for start, _ in slots),
+                        max(start for start, _ in slots),
+                    ),
+                )
+                if slots
+                else HourlySiteReading.objects.none(),
                 key_of=lambda row: (row.reading_from, row.reading_to),
                 slots=slots,
                 update_fields=[

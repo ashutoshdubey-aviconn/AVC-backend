@@ -290,6 +290,26 @@ class RecoveryWriteTests(MqttDbTestCase):
             HourlySiteReading.objects.get(reading_from=datetime(2026, 10, 2, 2)).unit_consumption, 0.9
         )
 
+    def test_hours_inside_the_range_but_not_sent_are_left_alone(self):
+        self.hourly(2, 9.0)  # 2026-10-02 02:00, not in the payload
+        hours = ["2026-10-02 01:00:00.000", "2026-10-02 03:00:00.000"]
+        hourly_consumption_recovery.handle_hourly_consumption_recovery_message(
+            self.site, self.site.id, "gw-1", self.hourly_message(hours, ["0.5", "0.7"])
+        )
+        values = dict(HourlySiteReading.objects.values_list("reading_from", "unit_consumption"))
+        self.assertEqual(
+            values,
+            {datetime(2026, 10, 2, 1): 0.5, datetime(2026, 10, 2, 2): 9.0, datetime(2026, 10, 2, 3): 0.7},
+        )
+
+    def test_recovery_without_hours_writes_nothing(self):
+        result = hourly_consumption_recovery.handle_hourly_consumption_recovery_message(
+            self.site, self.site.id, "gw-1",
+            f"Aisle_group_id : {self.leg}; Recovery_Hours : ,; Unit_consumptions : ,; GW_total_cumulative : 0",
+        )
+        self.assertIn("0 h received", result)
+        self.assertFalse(HourlySiteReading.objects.exists())
+
     def test_daily_recovery_never_lowers_a_known_value(self):
         self.daily(20.0, day=1)
         message = (
