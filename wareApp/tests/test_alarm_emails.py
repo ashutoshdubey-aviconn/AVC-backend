@@ -48,6 +48,10 @@ class AlarmEmailTests(TestCase):
         self.assertEqual(FakeSMTP.sent[0][1], ["user@example.com"])
 
     @override_settings(ALARM_EMAIL_OVERRIDE_TO=[], ALARM_EMAIL_DEFAULT_TO=[])
+    @patch.multiple(
+        "wareApp.mqtt.services.alarm_recipients",
+        SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={},
+    )
     def test_generic_alarm_without_recipients_is_not_sent(self):
         self.assertFalse(
             sendmail.send_alarm_email("Low Consumption Alarm", self.site.id, [["Leg", "735", False]])
