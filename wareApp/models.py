@@ -530,6 +530,10 @@ class AlarmNotifications(models.Model):
     BYPASSED = 11
     OPERATION_HOURS_INCREASED = 12
     GATEWAY_OVERHEAT = 13
+    # Data missing (zero-consumption cases 3, 5, 6; wareApp/mqtt/services/gateway_health.py).
+    METER_DISCONNECTED = 14
+    GATEWAY_DISCONNECTED = 15
+    GATEWAY_SERVICE_ISSUE = 16
     alarm_type = (
         (HIGH_VOLTAGE, "High Voltage"),
         (LOW_VOLTAGE, "Low Voltage"),
@@ -545,10 +549,13 @@ class AlarmNotifications(models.Model):
         (BYPASSED, "Bypassed"),
         (OPERATION_HOURS_INCREASED, "Operation Hours Increased"),
         (GATEWAY_OVERHEAT, "Gateway Overheat"),
+        (METER_DISCONNECTED, "Meter Disconnected"),
+        (GATEWAY_DISCONNECTED, "Gateway Disconnected"),
+        (GATEWAY_SERVICE_ISSUE, "Gateway Service / Modbus Issue"),
     )
     POWER_TYPES = frozenset({0, 1, 2, 3, 4, 5, 6, 9})
-    CONSUMPTION_TYPES = frozenset({7, 8, 10, 11, 12})
-    GATEWAY_TYPES = frozenset({13})
+    CONSUMPTION_TYPES = frozenset({7, 8, 10, 11, 12, 14})
+    GATEWAY_TYPES = frozenset({13, 15, 16})
 
     PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW = 0, 1, 2
     alarm_priorities = ((0, "High"), (1, "Medium"), (2, "Low"))
@@ -1412,6 +1419,11 @@ class HomeGatewayStatus(models.Model):
         max_digits=20, decimal_places=15, null=True, blank=True
     )
     status = models.BooleanField(default=True)
+    # Gateway health (wareApp/mqtt/services/gateway_health.py): last PINGREQ /
+    # connection seen in the Mosquitto log, and last data packet (consumption,
+    # recovery, load, LoadData) seen by our MQTT listeners.
+    last_ping_at = models.DateTimeField(blank=True, null=True)
+    last_data_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"

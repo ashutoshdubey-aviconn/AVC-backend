@@ -12,6 +12,7 @@ from wareApp.mqtt.routing import (
     subscribe,
 )
 from wareApp.mqtt.envelope import MqttEnvelope
+from wareApp.mqtt.services import gateway_activity
 from wareApp.mqtt.topics import TopicParseError
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ def run_mqtt_client1():
             if envelope.message_type not in QUEUE_ONE_MESSAGE_TYPES:
                 logger.warning("Ignoring unexpected queue1 topic: %s", msg.topic)
                 return
+            gateway_activity.seen(envelope.site_id, envelope.gateway_id, envelope.message_type)
 
             _queue_one_message_for_processing(
                 envelope.site_id, envelope.gateway_id, envelope.payload, envelope
@@ -126,6 +128,7 @@ def run_mqtt_client2():
             if envelope.message_type != "LoadData":
                 logger.warning("Ignoring unexpected queue2 topic: %s", msg.topic)
                 return
+            gateway_activity.seen(envelope.site_id, envelope.gateway_id, envelope.message_type)
 
             from wareApp import tasks
 

@@ -251,6 +251,15 @@ def flush_consumption_batch():
 
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
+def check_gateway_health():
+    """Raise / clear Meter Disconnected, Gateway Disconnected, Service / Modbus alarms."""
+    from wareApp.mqtt.services import gateway_health
+
+    return f"gateway health: {gateway_health.evaluate()}"
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "LoadData")
     if site is None:
