@@ -509,8 +509,9 @@ class AlarmNotifications(models.Model):
     throttles the e-mail of alarms that repeat (voltage, PF: every 30 min).
     Scope of the issue: ``aisle_group`` (consumption alarms), ``power_source``
     (voltage / PF / DG) or ``object_type`` + ``object_id`` (meter, gateway).
-    Power / DG alarms were stored in ``NewAlarmsNotifications`` until migration
-    0099 copied them here with the same type numbers.
+    Power / DG alarms were stored in a second table (NewAlarmsNotifications)
+    until migration 0099 copied them here with the same type numbers; 0103
+    dropped that table.
     """
 
     # Alarm types: one list for all sources, numbers unchanged from the two
@@ -1156,65 +1157,6 @@ class DGFuelAlertsData(models.Model):
         ]
 
 
-class NewAlarmsNotifications(models.Model):
-    """Superseded by AlarmNotifications (migration 0099 copied every row there).
-
-    Kept read-only for one release so the copy can be checked; nothing writes
-    to it any more. Drop it in a later migration.
-    """
-
-    site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
-    ALARM_TYPE = (
-        (0, "High Voltage"),
-        (1, "Low Voltage"),
-        (2, "PF Bad Value Alarm"),
-        (3, "DG Overtime"),
-        (4, "DG Fuel Under Level"),
-        (5, "Mains Higher Consumption"),
-        (6, "Fuel Drain"),
-    )
-    alarm_type = models.PositiveIntegerField(choices=ALARM_TYPE, blank=True, null=True)
-    ALARM_PRIORITY = ((0, "High"), (1, "Medium"), (2, "Low"))
-    alarm_priority = models.PositiveIntegerField(
-        choices=ALARM_PRIORITY, blank=True, null=True
-    )
-    power_source = models.CharField(max_length=50, blank=True, null=True)
-    r_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
-    y_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
-    b_phase = models.DecimalField(decimal_places=2, max_digits=6, blank=True, null=True)
-    fuel_level = models.FloatField(blank=True, null=True)
-    run_hours = models.FloatField(blank=True, null=True)
-    created = models.DateTimeField(blank=True, null=True)
-    off_time = models.DateTimeField(blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-
-
-    def save(self, *args, **kwargs):
-        def _safe_round(val):
-            try:
-                if val is None:
-                    return None
-                return round(float(val), 2)
-            except Exception:
-                return None
-
-        self.r_phase = _safe_round(self.r_phase)
-        self.y_phase = _safe_round(self.y_phase)
-        self.b_phase = _safe_round(self.b_phase)
-        super(NewAlarmsNotifications, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return "Notification for {}".format(str(self.site_id))
-
-    class Meta:
-        indexes = [
-            models.Index(
-                fields=["site_id", "power_source", "alarm_type", "created"],
-                name="idx_alarm_site_src_type_time",
-            )
-        ]
-
-
 class SiteLoadParameters(models.Model):
     site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
     PARAMETER_TYPE = ((0, "Voltage High"), (1, "Voltage Low"), (2, "Power Factor"))
@@ -1333,12 +1275,15 @@ class RecoveryMonitor(models.Model):
                 fields=["site", "recovery_type", "status"],
                 name="idx_recovery_site_status",
             ),
+            # Latest monitor of an aisle / source: filter + newest first in
+            # one index (was a backward scan over every monitor, ~11 ms).
             models.Index(
-                fields=["site", "leg_id", "recovery_type"], name="idx_recovery_site_leg"
+                fields=["site", "leg_id", "recovery_type", "requested_at"],
+                name="idx_recovery_site_leg_time",
             ),
             models.Index(
-                fields=["site", "power_source", "recovery_type"],
-                name="idx_recovery_site_source",
+                fields=["site", "power_source", "recovery_type", "requested_at"],
+                name="idx_recovery_site_src_time",
             ),
             models.Index(
                 fields=["requested_at", "is_active"], name="idx_recovery_active_time"

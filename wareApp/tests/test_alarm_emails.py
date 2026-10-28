@@ -56,7 +56,7 @@ class AlarmEmailTests(TestCase):
     @override_settings(ALARM_EMAIL_OVERRIDE_TO=[], ALARM_EMAIL_DEFAULT_TO=[])
     @patch.multiple(
         "wareApp.mqtt.services.alarm_recipients",
-        SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={},
+        SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={}, LOCATION_TEAMS={},
     )
     def test_generic_alarm_without_recipients_is_not_sent(self):
         self.assertFalse(

@@ -1,14 +1,14 @@
 """One alarm table: recorder, site alarm APIs and the 0099 data copy."""
 
-import importlib
 from datetime import datetime, timedelta
 from unittest import mock
 
-from django.apps import apps as django_apps
-from django.test import TestCase
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase
 from rest_framework.test import APIClient
 
-from wareApp.models import AisleGroup, AlarmNotifications, NewAlarmsNotifications, Site, User
+from wareApp.models import AisleGroup, AlarmNotifications, Site, User
 from wareApp.mqtt.services import alarms
 
 TWO_HOURS_AGO = timedelta(hours=2)
@@ -119,29 +119,52 @@ class SiteAlarmApiTests(TestCase):
         self.assertTrue(body["data"][0]["issue"].startswith("Bypassed"))
 
 
-class MigrationCopyTests(TestCase):
-    """migration 0099: copy_power_alarms / remove_power_alarms."""
+class MigrationCopyTests(TransactionTestCase):
+    """Migrations 0099 (copy the power alarms) and 0103 (drop the old table),
+    run against the real historical schema."""
 
-    def setUp(self):
-        self.migration = importlib.import_module("wareApp.migrations.0099_alarms_one_table")
-        self.site = Site.objects.create(site_name="Old power site", site_type=1)
-        when = datetime(2026, 10, 1, 10, 0)
-        NewAlarmsNotifications.objects.create(
-            site_id=self.site, alarm_type=2, alarm_priority=1, power_source="Mains Supply",
-            created=when, r_phase=0.81, y_phase=0.9, b_phase=0.9,
-        )
-        NewAlarmsNotifications.objects.create(
-            site_id=self.site, alarm_type=9, alarm_priority=0, created=None, fuel_level=12.5, is_active=False,
-        )
+    before = [("wareApp", "0098_alarm_type_gateway_overheat")]
+    copied = [("wareApp", "0099_alarms_one_table")]
+    before_drop = [("wareApp", "0102_alarm_recipients_in_file")]
+    latest = [("wareApp", "0103_drop_new_alarms_table")]
 
-    def test_copy_keeps_type_numbers_and_values_once(self):
-        self.migration.copy_power_alarms(django_apps, None)
-        self.migration.copy_power_alarms(django_apps, None)  # never copies twice
-        rows = {r.Alarm_type: r for r in AlarmNotifications.objects.all()}
+    def migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(target)
+        return executor.loader.project_state(target).apps
+
+    def tearDown(self):
+        self.migrate(self.latest)
+
+    def old_rows(self):
+        apps = self.migrate(self.before)
+        Site = apps.get_model("wareApp", "Site")
+        Old = apps.get_model("wareApp", "NewAlarmsNotifications")
+        site = Site.objects.create(site_name="Old power site", site_type=1)
+        Old.objects.create(
+            site_id=site, alarm_type=2, alarm_priority=1, power_source="Mains Supply",
+            created=datetime(2026, 10, 1, 10, 0), r_phase=0.81, y_phase=0.9, b_phase=0.9,
+        )
+        Old.objects.create(site_id=site, alarm_type=9, alarm_priority=0, created=None, fuel_level=12.5, is_active=False)
+
+    def test_0099_copies_once_with_type_numbers_and_values(self):
+        self.old_rows()
+        apps = self.migrate(self.copied)
+        Alarm = apps.get_model("wareApp", "AlarmNotifications")
+        rows = {r.Alarm_type: r for r in Alarm.objects.all()}
         self.assertEqual(set(rows), {2, 9})
         self.assertEqual((rows[2].power_source, float(rows[2].r_phase), rows[2].Alarm_priority), ("Mains Supply", 0.81, 1))
         self.assertEqual(rows[2].created_time, datetime(2026, 10, 1, 10, 0))
         self.assertEqual((rows[9].fuel_level, rows[9].is_active), (12.5, False))
         self.assertEqual(rows[9].created_time, datetime(2026, 10, 1, 10, 0))  # undated: oldest date
-        self.migration.remove_power_alarms(django_apps, None)
-        self.assertFalse(AlarmNotifications.objects.exists())
+
+    def test_0103_refuses_to_drop_when_rows_were_not_copied(self):
+        self.old_rows()
+        apps = self.migrate(self.before_drop)
+        apps.get_model("wareApp", "AlarmNotifications").objects.all().delete()
+        with self.assertRaisesMessage(RuntimeError, "run migration 0099's copy"):
+            self.migrate(self.latest)
+        apps = self.migrate(self.before_drop)
+        self.assertEqual(apps.get_model("wareApp", "NewAlarmsNotifications").objects.count(), 2)
+        apps.get_model("wareApp", "NewAlarmsNotifications").objects.all().delete()

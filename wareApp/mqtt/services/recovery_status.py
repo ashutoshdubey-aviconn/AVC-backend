@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 
 from wareApp.models import HourlySiteReading, RecoveryMonitor, SupplyLoadTimeShare
@@ -115,12 +116,18 @@ class RecoveryStatusService:
         )
 
     # ------------------------------------------------------------ helpers
+    # Newest first, written as DESC NULLS LAST (requested_at is never null, so
+    # the order is the same): plain DESC let PostgreSQL walk the
+    # (requested_at, is_active) index backwards through every monitor when the
+    # scope had no match (~8 ms); this uses the site/scope index (< 0.3 ms).
+    NEWEST_FIRST = (F("requested_at").desc(nulls_last=True), "-id")
+
     def _latest_monitor(self, scope, recovery_type):
         return (
             RecoveryMonitor.objects.filter(
                 site=self.site, recovery_type=recovery_type, **scope.monitor_filter()
             )
-            .order_by("-requested_at", "-id")
+            .order_by(*self.NEWEST_FIRST)
             .first()
         )
 
@@ -227,7 +234,7 @@ class RecoveryStatusService:
                     status__in=OPEN_STATUSES,
                     **scope.monitor_filter(),
                 )
-                .order_by("-requested_at", "-id")
+                .order_by(*self.NEWEST_FIRST)
                 .first()
             )
         if monitor is None:
