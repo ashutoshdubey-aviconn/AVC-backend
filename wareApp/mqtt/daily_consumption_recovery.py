@@ -141,7 +141,7 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 aisle_group.aisleGroupName,
                 "; ".join(alarms),
             )
-        if baseline_missing:
+        if baseline_missing and written.changed:
             logger.warning(
                 "Queue1 daily recovery baseline missing (stored with baseline 0): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s days=%s [%s]",
                 location_id,

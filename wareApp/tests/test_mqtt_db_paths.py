@@ -6,6 +6,7 @@ silently add database round trips.
 """
 
 from datetime import date, datetime
+from unittest import mock
 
 from django.core.cache import cache
 from django.db import connection
@@ -257,6 +258,37 @@ class RecoveryWriteTests(MqttDbTestCase):
         # bulk INSERT for the 38 rows, gap verification (+ savepoints).
         # Was one autocommitted UPDATE/INSERT per hour (~45-85 statements).
         self.assertLessEqual(len(queries), 16)
+
+    def test_resent_identical_hourly_recovery_writes_nothing(self):
+        """Site 125's gateway re-sent the same 26 days every ~40 s."""
+        hours = [
+            f"2026-10-{1 + hour // 24:02d} {hour % 24:02d}:00:00.000" for hour in range(38)
+        ]
+        message = self.hourly_message(hours, ["0.09"] * 38)
+        handle = hourly_consumption_recovery.handle_hourly_consumption_recovery_message
+        handle(self.site, self.site.id, "gw-1", message)
+
+        with mock.patch.object(hourly_consumption_recovery, "evaluate_days", return_value=[]) as evaluate, \
+                CaptureQueriesContext(connection) as queries:
+            result = handle(self.site, self.site.id, "gw-1", message)
+
+        writes = [q["sql"] for q in queries if q["sql"].startswith(("UPDATE \"wareApp_hourly", "INSERT INTO \"wareApp_hourly"))]
+        self.assertEqual(writes, [])
+        evaluate.assert_called_once_with(self.site, self.aisle, [])  # no day changed
+        self.assertIn("38 h received", result)
+
+    def test_resent_recovery_with_one_changed_hour_updates_only_that_hour(self):
+        hours = [f"2026-10-02 {hour:02d}:00:00.000" for hour in range(1, 4)]
+        handle = hourly_consumption_recovery.handle_hourly_consumption_recovery_message
+        handle(self.site, self.site.id, "gw-1", self.hourly_message(hours, ["0.5", "0.6", "0.7"]))
+        with self.assertLogs("wareApp.mqtt.hourly_consumption_recovery", "INFO") as logs:
+            handle(self.site, self.site.id, "gw-1", self.hourly_message(hours, ["0.5", "0.9", "0.7"]))
+        summary = [line for line in logs.output if "hourly recovery bulk write" in line][0]
+        self.assertIn("updated=1 [2026-10-02 02:00", summary)
+        self.assertIn("unchanged=2", summary)
+        self.assertEqual(
+            HourlySiteReading.objects.get(reading_from=datetime(2026, 10, 2, 2)).unit_consumption, 0.9
+        )
 
     def test_daily_recovery_never_lowers_a_known_value(self):
         self.daily(20.0, day=1)

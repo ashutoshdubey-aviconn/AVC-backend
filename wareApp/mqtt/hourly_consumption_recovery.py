@@ -111,7 +111,10 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             leg_id=aisle_group_id,
             describe=lambda keys: hour_ranges([start for start, _ in keys]),
         )
-        alarms = evaluate_days(site, aisle_group, [start.date() for start, _ in slots])
+        # Only days whose hours changed; a re-sent identical recovery changes none.
+        alarms = evaluate_days(
+            site, aisle_group, sorted({start.date() for start, _ in written.changed})
+        )
         if alarms:
             logger.info(
                 "Queue1 hourly recovery alarms: site=%s leg_id=%s aisle_group_name=%s %s",
@@ -120,7 +123,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 aisle_group.aisleGroupName,
                 "; ".join(alarms),
             )
-        if baselines.missing_days:
+        if baselines.missing_days and written.changed:
             logger.warning(
                 "Queue1 hourly recovery baseline missing (stored with baseline 0): site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s days=%s [%s]",
                 location_id,
@@ -133,7 +136,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
         error_hours = [slot.start for slot in status_slots if slot.is_error]
         logger.info(
             "Queue1 hourly recovery bulk write: site=%s home_gateway_id=%s leg_id=%s aisle_group_name=%s "
-            "received=%s h [%s] created=%s [%s] updated=%s [%s] error404=%s [%s] monitor_status=%s",
+            "received=%s h [%s] created=%s [%s] updated=%s [%s] unchanged=%s error404=%s [%s] monitor_status=%s",
             location_id,
             home_gateway_id,
             aisle_group_id,
@@ -144,6 +147,7 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             hour_ranges([start for start, _ in written.created]),
             len(written.updated),
             hour_ranges([start for start, _ in written.updated]),
+            len(written.unchanged),
             len(error_hours),
             hour_ranges(error_hours),
             monitor.status,
