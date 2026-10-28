@@ -23,7 +23,7 @@ from wareApp.mqtt.payloads import KeyValuePayload
 from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
 from wareApp.mqtt.services.notifications import notify
 from wareApp.mqtt.services.baseline import BaselineMemo
-from wareApp.mqtt.services.consumption_alarms import evaluate_daily_alarms
+from wareApp.mqtt.services.consumption_alarms import check_intraday_bypass, evaluate_daily_alarms
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
     release_recovery_request,
@@ -587,6 +587,11 @@ def handle_consumption_message(
             ).first()
             if yesterday:
                 _consumption_alarms(site, aisle_group, yesterday)
+        if observed_at.date() == datetime.now().date():
+            # Bypassed during the day: today's running total.
+            today_total = daily_entries.values_list("unit_consumption", flat=True).first()
+            if today_total is not None:
+                check_intraday_bypass(site, aisle_group, observed_at.date(), today_total)
 
         logger.info(
             "Queue1 consumption daily reading updated: site=%s home_gateway_id=%s aisle_group=%s aisle_group_name=%s unit_consumption=%s observed_date=%s",

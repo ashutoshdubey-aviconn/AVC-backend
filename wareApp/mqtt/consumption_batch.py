@@ -42,6 +42,7 @@ from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import missing_hours
 from wareApp.mqtt.services import idempotency
 from wareApp.mqtt.services import site_cache as site_config
+from wareApp.mqtt.services.consumption_alarms import check_intraday_bypass
 from wareApp.mqtt.services.cooldown import (
     recovery_request_allowed,
     release_recovery_request,
@@ -585,6 +586,7 @@ def process_consumption_batch(packets, publish_recovery):
             _bulk("SensorAisleUnitConsumption", "BULK CREATE", sensor_rows, touched, lambda: SensorAisleUnitConsumption.objects.bulk_create(
                 sensor_rows, batch_size=BULK_BATCH_SIZE))
 
+            today = datetime.now().date()
             for state in ok_states:
                 for day in sorted(state.alarm_days):
                     yesterday = (
@@ -594,6 +596,10 @@ def process_consumption_batch(packets, publish_recovery):
                     )
                     if yesterday:
                         single._consumption_alarms(state.site, state.aisle, yesterday)
+                # Bypassed during the day: today's running total.
+                today_rows = state.daily.get(today, [])
+                if today_rows:
+                    check_intraday_bypass(state.site, state.aisle, today, today_rows[0].unit_consumption or 0.0)
                 if state.last_stored is not None:
                     mark_sync_healthy(state.site, state.home_gateway_id, state.aisle, state.last_stored)
     except BaseException:

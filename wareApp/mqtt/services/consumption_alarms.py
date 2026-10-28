@@ -33,12 +33,18 @@ setting the rules above apply unchanged.
 
 E-mail: an alarm that also fired the day before is e-mailed again only when
 its consumption is more than the repeat tolerance worse than the last e-mail.
+
+Bypassed is also checked during the day (decided 2026-10-28): as soon as an
+aisle's running total for today reaches its bypass threshold the alarm is
+raised (check_intraday_bypass, called by the live consumption path). It is
+still one alarm per aisle per day, so the day-end check then finds it.
 """
 
 import logging
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 
 from wareApp.mqtt.services import alarm_policy
 from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading
@@ -92,6 +98,18 @@ def _threshold(site, alarm_type, legacy, auto):
     if mode == AlarmSetting.AUTO:
         return auto()
     return legacy()
+
+
+def _bypass_auto(baseline):
+    percent = getattr(settings, "ALARM_BYPASS_DEFAULT_PERCENT", 100)
+    return (baseline * percent / 100, f"{percent:g} % of baseline") if baseline else (None, None)
+
+
+def bypass_threshold_for(site, baseline):
+    """``(threshold_kwh, how)`` of the Bypassed alarm (setting, site field or baseline)."""
+    return _threshold(
+        site, BYPASSED, lambda: _bypass_threshold(site, baseline), lambda: _bypass_auto(baseline)
+    )
 
 
 def _activity_threshold():
@@ -225,11 +243,7 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     ]
     stored = []
 
-    def bypass_auto():
-        percent = getattr(settings, "ALARM_BYPASS_DEFAULT_PERCENT", 100)
-        return (baseline * percent / 100, f"{percent:g} % of baseline") if baseline else (None, None)
-
-    bypass, bypass_how = _threshold(site, BYPASSED, lambda: _bypass_threshold(site, baseline), bypass_auto)
+    bypass, bypass_how = bypass_threshold_for(site, baseline)
     if bypass is not None and consumption >= bypass:
         if _record(
             site, aisle_group, day, BYPASSED, "Bypassed Alarm",
@@ -304,6 +318,41 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
                 worse_when_higher=False,
             ):
                 stored.append("Low Consumption")
+    return stored
+
+
+def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
+    """Raise Bypassed as soon as today's running total reaches the threshold.
+
+    Called by the live consumption path for today's daily row. Returns True
+    when the alarm was stored now. A cache flag skips aisles already done today.
+    """
+    done_key = f"bypass-intraday:{site.id}:{aisle_group.id}:{day:%Y%m%d}"
+    if cache.get(done_key):
+        return False
+    info = baseline_info(site.id, aisle_group.attached_leg_id, day)
+    if info is None:
+        return False
+    baseline, _, baseline_from = info
+    if baseline_from and day < baseline_from:
+        return False
+    threshold, how = bypass_threshold_for(site, baseline)
+    if threshold is None or consumption < threshold:
+        return False
+    now = now or datetime.now()
+    stored = _record(
+        site, aisle_group, day, BYPASSED, "Bypassed Alarm",
+        f"Bypassed (during the day, {now:%H:%M}): consumption so far={consumption:.2f}, "
+        f"threshold={threshold:.2f} ({how}), baseline={baseline:.2f}.",
+        [
+            ["Consumption so far (kWh)", f"{consumption:.2f} at {now:%H:%M}", True],
+            ["Daily baseline (kWh)", f"{baseline:.2f}", False],
+            ["Bypass threshold (kWh)", f"{threshold:.2f} ({how})", False],
+            ["Note", "Raised during the day: the day is not over yet", False],
+        ],
+        value=consumption,
+    )
+    cache.set(done_key, 1, 26 * 60 * 60)
     return stored
 
 
