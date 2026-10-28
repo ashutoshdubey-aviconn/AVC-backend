@@ -32,6 +32,7 @@ class RecipientTests(TestCase):
             "wareApp.mqtt.services.alarm_recipients",
             SOFTWARE_TEAM=["dev1@example.com", " dev2@example.com "],
             GROUND_TEAM_ALL_SITES=[],
+            LOCATION_TEAMS={},
             GROUND_TEAM={self.site.id: ["ground-a@example.com", "dev1@example.com"]},
         )
         lists.start()
@@ -61,11 +62,32 @@ class RecipientTests(TestCase):
             AlarmSetting.objects.create(site=self.other, alarm_type=7, email_ground=False)
             self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com", "dev2@example.com"])
 
+    def test_location_team_by_keyword_in_location_or_name(self):
+        ggn = Site.objects.create(site_name="FM MCF-1", site_type=1, location="GGN Farukhnagar")
+        bhw = Site.objects.create(site_name="Myntra Bhiwandi Phase-2", site_type=1, location="")
+        nowhere = Site.objects.create(site_name="Unknown", site_type=1, location="")
+        teams = {
+            "Gurgaon": {"match": ["gurgaon", "ggn"], "emails": ["ggn-team@example.com"]},
+            "Mumbai / Bhiwandi": {"match": ["bhiwandi"], "emails": ["bhw-team@example.com"]},
+        }
+        with mock.patch("wareApp.mqtt.services.alarm_recipients.LOCATION_TEAMS", teams):
+            alarm_policy.clear_cache()
+            self.assertEqual(alarm_policy.site_location(ggn.id), "Gurgaon")
+            self.assertEqual(alarm_policy.site_location(bhw.id), "Mumbai / Bhiwandi")  # from the name
+            self.assertIsNone(alarm_policy.site_location(nowhere.id))
+            self.assertEqual(
+                alarm_policy.recipients(ggn.id, 7),
+                ["dev1@example.com", "dev2@example.com", "ggn-team@example.com"],
+            )
+            self.assertEqual(alarm_policy.recipients(nowhere.id, 7), ["dev1@example.com", "dev2@example.com"])
+            AlarmSetting.objects.create(site=ggn, alarm_type=7, email_ground=False)
+            self.assertEqual(alarm_policy.recipients(ggn.id, 7), ["dev1@example.com", "dev2@example.com"])
+
     @override_settings(ALARM_EMAIL_DEFAULT_TO=["old@example.com"])
     def test_former_list_is_used_while_all_lists_are_empty(self):
         with mock.patch.multiple(
             "wareApp.mqtt.services.alarm_recipients",
-            SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={},
+            SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={}, LOCATION_TEAMS={},
         ):
             self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["old@example.com"])
 

@@ -33,7 +33,6 @@ from .models import (
     MonthlyLoadSharePercentage,
     MonthlyMinMaxLoadData,
     MqttDeadLetter,
-    NewAlarmsNotifications,
     Panel,
     PowerFactorData,
     RawLoadData,
@@ -413,16 +412,3 @@ class AlarmNotificationsAdmin(admin.ModelAdmin):
     search_fields = ["site_id__site_name", "to_do", "power_source"]
     list_select_related = ["site_id", "aisle_group"]
     date_hierarchy = "created_time"
-
-
-@admin.register(NewAlarmsNotifications)
-class NewAlarmsNotificationsAdmin(admin.ModelAdmin):
-    """Former power / DG alarm table: copied into AlarmNotifications, read-only."""
-
-    list_display = ["id", "site_id", "alarm_type", "power_source", "created"]
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
