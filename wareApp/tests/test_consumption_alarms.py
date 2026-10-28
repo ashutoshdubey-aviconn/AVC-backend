@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 
 from wareApp.models import AisleGroup, AlarmNotifications, DailySiteReading, HourlySiteReading, Site, SiteBaseline
-from wareApp.mqtt.services.consumption_alarms import evaluate_daily_alarms, evaluate_days
+from wareApp.mqtt.services.consumption_alarms import check_intraday_bypass, evaluate_daily_alarms, evaluate_days
 
 DAY = date(2026, 10, 15)
 
@@ -173,3 +173,46 @@ class RecoveryReevaluatesAlarmsTests(TestCase):
 
         evaluate.assert_called_once()
         self.assertEqual(sorted(evaluate.call_args.args[2]), [date(2026, 10, 14), date(2026, 10, 15)])
+
+
+@patch("wareApp.mqtt.services.consumption_alarms.notify")
+class IntradayBypassTests(TestCase):
+    """Bypassed raised during the day when the running total crosses the baseline."""
+
+    def setUp(self):
+        cache.clear()
+        self.site = Site.objects.create(site_name="Intraday site", site_type=1)
+        self.aisle = AisleGroup.objects.create(site=self.site, aisleGroupName="HDR-GF", is_active=True)
+        self.aisle.refresh_from_db()
+        SiteBaseline.objects.create(
+            associated_site_id=self.site, leg_id=self.aisle.attached_leg_id, baseline_value=200.0,
+            working_hours=24, baseline_from=date(2026, 1, 1),
+        )
+
+    def bypassed(self):
+        return list(AlarmNotifications.objects.filter(Alarm_type=11).values_list("created_time", flat=True))
+
+    def test_raised_once_when_the_running_total_crosses_the_baseline(self, notify):
+        at = datetime(2026, 10, 15, 16, 30)
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 150.0, now=at))
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 205.0, now=at))
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 240.0, now=at))
+        self.assertEqual(self.bypassed(), [datetime(2026, 10, 15)])
+        self.assertEqual(notify.call_count, 1)
+        self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
+        self.assertIn("during the day, 16:30", AlarmNotifications.objects.get().to_do)
+
+    def test_day_end_check_does_not_duplicate_or_add_high(self, notify):
+        check_intraday_bypass(self.site, self.aisle, DAY, 205.0)
+        reading = DailySiteReading.objects.create(
+            associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+            unit_consumption=260.0, reading_for=DAY, is_visible=True,
+        )
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, reading), [])
+        self.assertEqual(sorted(AlarmNotifications.objects.values_list("Alarm_type", flat=True)), [11])
+
+    def test_off_is_honoured(self, notify):
+        from wareApp.models import AlarmSetting
+        AlarmSetting.objects.create(site=self.site, alarm_type=11, mode=AlarmSetting.OFF)
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 500.0))
+        self.assertEqual(self.bypassed(), [])
