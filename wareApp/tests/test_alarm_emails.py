@@ -25,6 +25,12 @@ class FakeSMTP:
 
 
 @patch("wareApp.sendmail.smtplib.SMTP", FakeSMTP)
+# SMTP settings normally come from warehouse/.env, which CI does not have.
+@override_settings(
+    EMAIL_HOST="smtp.example.com", EMAIL_PORT=587, EMAIL_USE_TLS=True,
+    EMAIL_HOST_USER="alarms@example.com", EMAIL_HOST_PASSWORD="test",
+    DEFAULT_FROM_EMAIL="alarms@example.com",
+)
 class AlarmEmailTests(TestCase):
     def setUp(self):
         FakeSMTP.sent = []
