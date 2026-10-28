@@ -5,6 +5,10 @@ A recovery message can carry dozens of slots. Writing them one ``UPDATE`` /
 per slot on main (one WAL flush per row). Here a whole message is one
 ``SELECT``, at most one ``bulk_update`` and one ``bulk_create`` per 500 rows,
 inside the caller's transaction (a single commit).
+
+Slots whose stored values are already identical are left untouched
+(``unchanged``): a gateway that re-sends the same recovery (site 125 re-sent
+26 days every ~40 s) then costs one SELECT instead of ~600 row updates.
 """
 
 import time
@@ -22,6 +26,12 @@ class SlotWriteResult(NamedTuple):
     skipped: list
     update_ms: float = 0.0
     create_ms: float = 0.0
+    unchanged: tuple = ()
+
+    @property
+    def changed(self):
+        """Keys of slots that were created or updated."""
+        return [*self.created, *self.updated]
 
 
 def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_update=None):
@@ -36,7 +46,7 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
                       when it returns False the slot is left untouched.
 
     Returns a ``SlotWriteResult`` with the slot keys that were updated,
-    created and skipped.
+    created, skipped (guard) and unchanged (values already stored).
     """
     model = queryset.model
     existing = defaultdict(list)
@@ -44,7 +54,7 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
         existing[key_of(row)].append(row)
 
     to_update, to_create = [], []
-    updated, created, skipped = [], [], []
+    updated, created, skipped, unchanged = [], [], [], []
     for key, values in slots.items():
         rows = existing.get(key)
         if not rows:
@@ -53,6 +63,13 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
             continue
         if should_update is not None and not should_update(rows, values):
             skipped.append(key)
+            continue
+        if all(
+            getattr(row, field) == value
+            for row in rows
+            for field, value in values.items()
+        ):
+            unchanged.append(key)
             continue
         for row in rows:
             for field, value in values.items():
@@ -69,4 +86,4 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
         started = time.perf_counter()
         model.objects.bulk_create(to_create, batch_size=BULK_BATCH_SIZE)
         create_ms = (time.perf_counter() - started) * 1000
-    return SlotWriteResult(updated, created, skipped, update_ms, create_ms)
+    return SlotWriteResult(updated, created, skipped, update_ms, create_ms, tuple(unchanged))
