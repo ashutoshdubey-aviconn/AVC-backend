@@ -143,6 +143,60 @@ ALARMS = [
 ]
 
 
+# Progress per alarm type (checked 2026-10-28 on the test server; main runs older code).
+# type -> (progress, unit tests, verified on test server, main server, logs: where + what to search)
+L1 = "celerylogs1/celery_logs_of_server.log"
+L2 = "celerylogs2/celery_logs_of_server.log"
+MAIN_OLD = "Not deployed: main runs the older code (old table / rules); rollout not permitted yet"
+STATUS = {
+    0: ("Done - waiting for a live case", "test_load_handler, test_alarm_policy (Auto / Manual / Off, repeat rule)",
+        "No live High Voltage on test yet (no site above its maximum since the rules went live)", MAIN_OLD,
+        f"{L1}: 'Power alarm stored' / 'Power alarm repeated' / 'repeat not e-mailed' + type=0"),
+    1: ("Done - waiting for a live case", "test_load_handler (5 low readings), test_alarm_policy",
+        "No live Low Voltage on test yet", MAIN_OLD, f"{L1}: 'Power alarm stored' type=1"),
+    2: ("Done - working live", "test_load_handler, test_mqtt_services, test_alarm_policy",
+        "Live: 78 alarms since 20 Oct (latest 28 Oct 11:43). Repeat rule seen live: site 118 better PF counted, not e-mailed", MAIN_OLD,
+        f"{L1}: 'Power alarm stored|repeated' type=2, 'repeat not e-mailed (value ... within tolerance)'"),
+    3: ("Not implemented", "-", "-", "-", "-"),
+    4: ("Not implemented (old rows only)", "-", "-", "-", "-"),
+    5: ("Not implemented", "-", "-", "-", "-"),
+    6: ("Done - waiting for a live case", "test_dg_session_integration, test_dg_fuel_cases",
+        "No Fuel Drain on test yet (no DG run above 1.2 x tank)", MAIN_OLD,
+        "journalctl -u fetch-fuel-data and logges/dg_fuel.log: 'DG fuel cycle summary', 'Power alarm stored' type=6"),
+    7: ("Done - working live", "test_consumption_alarms, test_alarm_policy, test_replay_consumption_alarms",
+        "Live: 78 alarms since 20 Oct", MAIN_OLD, f"{L1}: 'Consumption alarm stored ... alarm=High Consumption Alarm emailed=True|False'"),
+    8: ("Done - opt-in, not enabled for any site", "test_consumption_alarms, test_alarm_policy (Auto low)",
+        "None (no site has it switched on)", MAIN_OLD, f"{L1}: 'Consumption alarm stored ... Low Consumption'"),
+    9: ("Done - working live", "test_dg_session_integration, test_dg_fuel_cases",
+        "Live: 56 alarms (latest 15 Sep 2026)", MAIN_OLD, "journalctl -u fetch-fuel-data, logges/dg_fuel.log: 'Power alarm stored' type=9"),
+    10: ("Done - working live", "test_consumption_handler (stored once, throttled, repeats counted)",
+         "Live: 53 alarms since 20 Oct (latest 28 Oct 14:30)", MAIN_OLD,
+         f"{L1}: 'Meter reading issue stored' / 'Meter reading issue repeated'"),
+    11: ("Done - working live (incl. during the day)", "test_consumption_alarms (IntradayBypassTests), test_alarm_policy",
+         "Live: 68 alarms since 20 Oct; intra-day raised 28 Oct 21:49 for sites 133 (3 aisles) and 135, e-mailed", MAIN_OLD,
+         f"{L1}: 'Consumption alarm stored ... Bypassed', to_do 'Bypassed (during the day, HH:MM)'"),
+    12: ("Done - waiting for a live case", "test_consumption_alarms (operation hours)",
+         "None on test yet (needs an NL aisle active outside its window)", MAIN_OLD, f"{L1}: 'Operation Hours Increased'"),
+    13: ("Done - working live", "test_gateway_overheat, test_alarm_policy (manual °C, Off)",
+         "Live: 7 alarms since 20 Oct (latest 28 Oct 11:42)", MAIN_OLD,
+         "journalctl -u gunicorn: 'Gateway overheat stored|repeated ... emailed='"),
+    14: ("Done - waiting for a live case", "test_gateway_health (MeterDisconnectedTests)",
+         "Simulated 28 Oct 17:00: raised, e-mailed, auto-cleared 17:05, restored line on next e-mail. Test gets no real meter events (gateways post them to main only)",
+         "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=14'; task line 'gateway health: raised=.. cleared=..'"),
+    15: ("Done - working live", "test_gateway_health (GatewayAlarmTests, CommandTests)",
+         "Live: site 94 gw 3 raised 28 Oct 19:05, auto-cleared 19:25; site 127 gw 1 raised 22:55 (active). Simulated full cycle 17:00-17:10",
+         "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=15'"),
+    16: ("Done - needs the broker-log cron", "test_gateway_health (pings but no data -> 16)",
+         "Dry run with main's broker log (28 Oct): 1 gateway would be 16 (avc_myn_bilaspursvng_000071_1). Not live: test gets data through a bridge, no gateway pings",
+         "Not deployed (needs root cron: manage.py gateway_health --broker-log)", f"{L2}: 'Gateway health alarm raised ... type=16'"),
+    "-": ("Existing (unchanged)", "test_fire_alarm_handler", "Live (fire pump e-mails)", "Live (old code)", f"{L1}: FIREALARM handler lines"),
+}
+
+STATUS_COLUMNS = [
+    ("Progress status", 22), ("Unit tests", 34), ("Verified on test server", 48), ("Main server", 30), ("Logs: where to look", 52),
+]
+
+
 def sample(name):
     return json.dumps(SAMPLES.get(name, {}).get("body", {}), indent=1, default=str)
 
@@ -230,6 +284,12 @@ FIELD_ROWS = [
 ]
 
 
+PROGRESS_FILL = [
+    ("Done - working live", "C6EFCE"), ("Done - opt-in", "FFF2CC"), ("Done - needs", "FFEB9C"),
+    ("Done - waiting", "DDEBF7"), ("Not implemented", "EDEDED"), ("Existing", "C6EFCE"),
+]
+
+
 def sheet(book, title, columns, rows, first=False):
     ws = book.active if first else book.create_sheet()
     ws.title = title
@@ -241,34 +301,54 @@ def sheet(book, title, columns, rows, first=False):
         cell.fill = header_fill
         cell.alignment = Alignment(wrap_text=True, vertical="center")
         ws.column_dimensions[get_column_letter(index)].width = width
-    status_fill = {
-        "Active (new)": "E2EFDA", "Defined, not raised": "EDEDED", "Active (opt-in)": "FFF2CC",
-    }
     for r, row in enumerate(rows, start=2):
         for c, value in enumerate(row, start=1):
             cell = ws.cell(row=r, column=c, value=value)
             cell.alignment = Alignment(wrap_text=True, vertical="top")
             cell.border = Border(top=thin, bottom=thin, left=thin, right=thin)
-        if title == "Alarm catalogue" and row[3] in status_fill:
-            for c in range(1, len(columns) + 1):
-                ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor=status_fill[row[3]])
-    ws.freeze_panes = "C2" if title == "Alarm catalogue" else "B2"
+        progress = row[2] if title == "Summary" else (row[5] if title == "Alarm catalogue" else "")
+        colour = next((fill for key, fill in PROGRESS_FILL if str(progress).startswith(key)), None)
+        if colour:
+            column = 3 if title == "Summary" else 6
+            ws.cell(row=r, column=column).fill = PatternFill("solid", fgColor=colour)
+    ws.freeze_panes = "C2" if title in ("Alarm catalogue", "Summary") else "B2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(rows) + 1}"
     return ws
 
 
+LOGS = [("Log", 46), ("Server path / command", 62), ("Shows", 70)]
+LOG_ROWS = [
+    ["Celery queue-1 log (consumption, load, power alarms, e-mails)", "~/django_project/celerylogs1/celery_logs_of_server.log\n grep -a 'Consumption alarm stored\\|Power alarm\\|Meter reading issue' ...",
+     "Alarms 0-2, 7, 8, 10, 11, 12 stored / repeated / not e-mailed; e-mail lines 'Alarm email redirected', 'Email sent', 'Email failed'"],
+    ["Celery queue-2 log (LoadData, gateway health checker)", "~/django_project/celerylogs2/celery_logs_of_server.log\n grep -a 'Gateway health alarm\\|gateway health:' ...",
+     "Alarms 14, 15, 16 raised / cleared; every 5-min check result 'gateway health: raised=.. still_active=.. cleared=..'"],
+    ["Fuel service", "journalctl -u fetch-fuel-data --since today\n~/django_project/logges/dg_fuel.log", "DG fuel cycle, alarms 6 and 9"],
+    ["Web / API (gunicorn)", "journalctl -u gunicorn --since today", "Gateway overheat (13) and meter-disconnection posts (input of 14)"],
+    ["Mosquitto broker (root only)", "/var/log/mosquitto/mosquitto.log", "Gateway pings (PINGREQ) used to tell 15 from 16"],
+    ["Recipient check", "cd ~/django_project && virtualwarehouse/bin/python manage.py alarm_recipients [--site ID]", "Who gets each site's alarm e-mails (location team)"],
+    ["Gateway health dry run", "virtualwarehouse/bin/python manage.py gateway_health --broker-log FILE --dry-run", "What 14 / 15 / 16 would raise now, without storing or e-mailing"],
+    ["Database", "AlarmNotifications (admin: /avcadmin/wareApp/alarmnotifications/)", "Every alarm row: type, site, issue, first / last seen, count, active"],
+]
+
+SUMMARY = [("Type", 6), ("Alarm", 30), ("Progress status", 34), ("Verified on test server", 70), ("Main server", 34)]
+
+
 def main():
     book = Workbook()
-    sheet(book, "Alarm catalogue", COLUMNS, ALARMS, first=True)
+    summary_rows = [[row[0], row[1], *[STATUS[row[0]][i] for i in (0, 2, 3)]] for row in ALARMS]
+    sheet(book, "Summary", SUMMARY, summary_rows, first=True)
+    rows = [row[:5] + list(STATUS[row[0]]) + row[5:] for row in ALARMS]
+    sheet(book, "Alarm catalogue", COLUMNS[:5] + STATUS_COLUMNS + COLUMNS[5:], rows)
     sheet(book, "Frontend APIs", APIS, API_ROWS)
     sheet(book, "Configuration", CONFIG, CONFIG_ROWS)
     sheet(book, "E-mail flow", FLOW, FLOW_ROWS)
     sheet(book, "Fields", FIELDS, FIELD_ROWS)
+    sheet(book, "Logs", LOGS, LOG_ROWS)
     book.save(HERE / "ALARM_CATALOGUE.xlsx")
     with open(HERE / "ALARM_CATALOGUE.csv", "w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow([name for name, _ in COLUMNS])
-        writer.writerows(ALARMS)
+        writer.writerow([name for name, _ in COLUMNS[:5] + STATUS_COLUMNS + COLUMNS[5:]])
+        writer.writerows(rows)
     print(f"{len(ALARMS)} alarms, {len(API_ROWS)} APIs -> {HERE / 'ALARM_CATALOGUE.xlsx'}, ALARM_CATALOGUE.csv")
 
 
