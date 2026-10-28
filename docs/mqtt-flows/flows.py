@@ -546,7 +546,7 @@ e-mailed; repeats only update `last_seen` / `occurrences`.
             "send": ("sendmail.[function]\n-> _send_smtp_email", "process", 1, 5),
             "over": ("ALARM_EMAIL_OVERRIDE_TO\nset?", "decision", 1, 6),
             "test": ("only to override address\n(+ 'TEST REDIRECT' banner)", "alarm", 0, 7),
-            "real": ("software team (all sites)\n+ site's ground team\n(AlarmRecipient, AlarmSetting)", "alarm", 2, 7),
+            "real": ("software team (all sites)\n+ site's ground team\n(alarm_recipients.py,\nAlarmSetting)", "alarm", 2, 7),
             "smtp": ("SMTP (EMAIL_* in .env)\n'Email sent' / 'Email failed'", "ext", 1, 8),
         },
         "edges": [
@@ -560,7 +560,8 @@ e-mailed; repeats only update `last_seen` / `occurrences`.
             ("wareApp/mqtt/services/notifications.py", "notify, ALLOWED_NOTIFICATIONS, QUEUE_ERRORS fallback"),
             ("wareApp/tasks.py", "send_notification (retries 5x on exceptions)"),
             ("wareApp/sendmail.py", "_send_smtp_email, _smtp_config, send_alarm_email, send_alarm_for_high/low_voltage, send_mail_for_pf_fluctuation, send_mail_fire_alarm_user"),
-            ("Admin tables", "AlarmRecipient (Software / Ground team, ground sites), AlarmSetting (per site + type: Auto / Manual / Off, threshold, groups, tolerance)"),
+            ("wareApp/mqtt/services/alarm_recipients.py", "SOFTWARE_TEAM (every site), GROUND_TEAM (site id -> addresses); edit, deploy, restart"),
+            ("Admin table", "AlarmSetting (per site + type: Auto / Manual / Off, threshold, e-mail groups, tolerance)"),
             ("Settings", "ALARM_REPEAT_TOLERANCE_PERCENT, ALARM_REPEAT_CLEAR_HOURS, ALARM_EMAIL_OVERRIDE_TO, ALARM_EMAIL_DEFAULT_TO (until recipients exist), MQTT_ASYNC_NOTIFICATIONS, EMAIL_*"),
         ],
         "details": """
@@ -573,10 +574,11 @@ every alarm goes only to that address with the intended recipients shown in a
 banner. Each send logs `Email sent: subject=… to=…` or `Email failed: … error=…`.
 A failed send (SMTP refused) is not retried today.
 
-**Recipients** (Django admin, `AlarmRecipient`): the software team receives every
-site's alarms, a ground-team member only those of the sites linked to them.
-`AlarmSetting` (per site and alarm type) can switch either group off for that
-type. Until any recipient exists, `ALARM_EMAIL_DEFAULT_TO` is used.
+**Recipients** (`wareApp/mqtt/services/alarm_recipients.py`): `SOFTWARE_TEAM`
+receives every site's alarms, `GROUND_TEAM[site_id]` only that site's. Edit the
+file, deploy and restart the workers. `AlarmSetting` (per site and alarm type)
+can switch either group off for that type. While both lists are empty,
+`ALARM_EMAIL_DEFAULT_TO` is used.
 
 **Repeats**: an alarm's value in its last e-mail is kept on the alarm
 (`notified_value`). A repeat - the next occurrence today, or the same alarm the

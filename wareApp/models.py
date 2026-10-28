@@ -638,41 +638,12 @@ class AlarmNotifications(models.Model):
         return "Notification for {}".format(str(self.site_id))
 
 
-class AlarmRecipient(models.Model):
-    """Who receives alarm e-mails.
-
-    Software team members receive every site's alarms. Ground team members
-    receive only the alarms of the sites linked to them. Which alarm types go
-    to which group is set per site and type in AlarmSetting (default: both).
-    """
-
-    SOFTWARE = 1
-    GROUND = 2
-    GROUPS = ((SOFTWARE, "Software team"), (GROUND, "Ground team"))
-
-    name = models.CharField(max_length=100, blank=True)
-    email = models.EmailField()
-    group = models.PositiveSmallIntegerField(choices=GROUPS)
-    sites = models.ManyToManyField(
-        Site,
-        blank=True,
-        related_name="alarm_recipients",
-        help_text="Ground team: the sites this person receives alarms for. "
-        "Software team: leave empty (every site).",
-    )
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["email", "group"], name="uniq_alarm_recipient_group")
-        ]
-
-    def __str__(self):
-        return f"{self.name or self.email} ({self.get_group_display()})"
-
-
 class AlarmSetting(models.Model):
     """How one alarm type behaves on one site.
+
+    Who is e-mailed: wareApp/mqtt/services/alarm_recipients.py (software team,
+    ground team per site); ``email_software`` / ``email_ground`` switch a group
+    off for this site and type.
 
     Auto: the system's threshold (baseline, nominal voltage, default PF ...).
     Manual: ``threshold`` (kWh, volts, PF or °C depending on the type).
