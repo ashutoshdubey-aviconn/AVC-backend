@@ -1,0 +1,46 @@
+from datetime import datetime
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+from django.test import SimpleTestCase
+
+from wareApp import tasks
+from wareApp.mqtt import daily_consumption_recovery
+
+
+class DailyConsumptionRecoveryTests(SimpleTestCase):
+    message = (
+        "Aisle_group_id : 967; Recovery_Dates : 2026-10-01,; "
+        "Unit_consumptions : 12.5,; GW_Total_cumulative : 0"
+    )
+
+    def test_parser_reads_gateway_payload(self):
+        aisle_group_id, dates, consumptions = (
+            daily_consumption_recovery._parse_daily_recovery_message(self.message)
+        )
+
+        self.assertEqual(aisle_group_id, "967")
+        self.assertEqual(dates, ["2026-10-01"])
+        self.assertEqual(consumptions, ["12.5"])
+
+    def test_parser_keeps_final_value_without_a_trailing_comma(self):
+        message = self.message.replace("12.5,;", "12.5;")
+
+        _, dates, consumptions = (
+            daily_consumption_recovery._parse_daily_recovery_message(message)
+        )
+
+        self.assertEqual(dates, ["2026-10-01"])
+        self.assertEqual(consumptions, ["12.5"])
+
+    def test_processing_task_resolves_site_and_calls_handler(self):
+        site = SimpleNamespace(id=156)
+
+        with patch("wareApp.tasks.site_config.site", return_value=site), patch(
+            "wareApp.mqtt.handlers.handle_daily_consumption_recovery_message"
+        ) as handle:
+            tasks.process_daily_consumption_recovery_message.run(
+                156, "gateway-01", self.message
+            )
+
+        handle.assert_called_once_with(site, 156, "gateway-01", self.message)

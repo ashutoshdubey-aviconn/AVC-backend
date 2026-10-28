@@ -1,0 +1,15 @@
+# Rotation for the queue-1 MQTT units' log (same policy as celerylogs2).
+# Install: sudo cp deploy/logrotate/celerylogs1 /etc/logrotate.d/celerylogs1
+/home/ubuntu/django_project/celerylogs1/*.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+    maxsize 100M
+    dateext
+    dateformat -%Y-%m-%d
+    create 0640 ubuntu ubuntu
+    su ubuntu ubuntu
+}

@@ -1,17 +1,10 @@
-
-from django.core import exceptions
-from rest_framework import serializers
-from .models import User, CustomerInfo, Site, NewAlarmsNotifications
-from django.contrib.auth import authenticate
-from rest_framework.authtoken.models import Token
 import base64
+import binascii
 
+from django.contrib.auth import authenticate
+from rest_framework import serializers
 
-class TokenSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Token
-        fields = ["key", "user"]
-
+from .models import AlarmNotifications, CustomerInfo, MeterDisconnectionEvent, Site, User
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -19,25 +12,19 @@ class LoginSerializer(serializers.Serializer):
 
     
     def validate(self, data):
-        print("dataa")
+        # The client sends the password base64-encoded. Never log or print it.
         username = data.get("username", "")
-        password = base64.b64decode(data.get("password", ""))#data.get("password", "")
-        print(password)
+        try:
+            password = base64.b64decode(data.get("password", ""), validate=True)
+        except (binascii.Error, ValueError):
+            raise serializers.ValidationError("invalid data")
 
-        if username and password:
-            user = authenticate(username=username, password=password)
-            print("user", user)
-            if user:
-                data["user"] = user
-            else:
-                print('user authentication fails')
-                msg = 'invalid credentials. try again'
-                raise serializers.ValidationError(msg)
-        else:
-            print('username & password doesnt exist')
-            msg = "invalid data"
-            raise serializers.ValidationError(msg)
-
+        if not username or not password:
+            raise serializers.ValidationError("invalid data")
+        user = authenticate(username=username, password=password)
+        if not user:
+            raise serializers.ValidationError("invalid credentials. try again")
+        data["user"] = user
         return data
 
 
@@ -62,13 +49,6 @@ class CustomerInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerInfo
         fields = ["address", "total_sites", "customer"]
-
-
-class CustomerWarehouseDetailSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Site
-        fields = ["id", "site_name", "site_manager_number"]
 
 
 class SiteSerializer(serializers.ModelSerializer):
@@ -99,6 +79,47 @@ class SiteSerializer(serializers.ModelSerializer):
                   "live_date"]
 
 class AlarmListSerializer(serializers.ModelSerializer):
+    """One alarm row for the site alarm detail list.
+
+    Keeps the keys of the former NewAlarmsNotifications list (the dashboard reads
+    them) and adds the aisle, reason and repeat count of the single alarm table.
+    """
+
+    get_alarm_type_display = serializers.CharField(source="get_Alarm_type_display", read_only=True)
+    get_alarm_priority_display = serializers.CharField(source="get_Alarm_priority_display", read_only=True)
+    created = serializers.DateTimeField(source="created_time", read_only=True)
+    aisle_group = serializers.CharField(source="aisle_group.aisleGroupName", default=None, read_only=True)
+    issue = serializers.CharField(source="to_do", default=None, read_only=True)
+
     class Meta:
-        model = NewAlarmsNotifications
-        fields = ["get_alarm_type_display","power_source", "get_alarm_priority_display", "r_phase", "y_phase", "b_phase", "fuel_level", "run_hours", "created", "is_active"]
+        model = AlarmNotifications
+        fields = [
+            "get_alarm_type_display", "power_source", "get_alarm_priority_display",
+            "r_phase", "y_phase", "b_phase", "fuel_level", "run_hours", "created",
+            "is_active", "aisle_group", "issue", "occurrences", "last_seen",
+        ]
+
+class MeterDisconnectionEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MeterDisconnectionEvent
+        fields = [
+            "id",
+            "logged_site_id",
+            "meter_id",
+            "meter_number",
+            "meter_name",
+            "status",
+            "port_id",
+            "detection_window_start",
+            "detection_window_end",
+            "last_seen_at",
+            "source_log_path",
+            "raw_log_line",
+            "synced_to_cloud",
+            "synced_at",
+            "cloud_response",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+

@@ -4,6 +4,35 @@ import datetime
 from django.db import migrations, models
 
 
+def _add_updated_by(apps, schema_editor):
+    table_name = "wareApp_fireequipmentssystem"
+    with schema_editor.connection.cursor() as cursor:
+        columns = {
+            column.name for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)
+        }
+        if "updatedBy" in columns:
+            return
+    schema_editor.execute(
+        'ALTER TABLE "wareApp_fireequipmentssystem" ADD COLUMN "updatedBy" varchar(25);'
+    )
+
+
+def _drop_updated_by(apps, schema_editor):
+    table_name = "wareApp_fireequipmentssystem"
+    with schema_editor.connection.cursor() as cursor:
+        columns = {
+            column.name for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)
+        }
+        if "updatedBy" not in columns:
+            return
+    try:
+        schema_editor.execute(
+            'ALTER TABLE "wareApp_fireequipmentssystem" DROP COLUMN "updatedBy";'
+        )
+    except Exception:
+        pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,10 +40,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='fireequipmentssystem',
-            name='updatedBy',
-            field=models.CharField(blank=True, max_length=25, null=True),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddField(
+                    model_name='fireequipmentssystem',
+                    name='updatedBy',
+                    field=models.CharField(blank=True, max_length=25, null=True),
+                ),
+            ],
+            database_operations=[
+                migrations.RunPython(_add_updated_by, _drop_updated_by),
+            ],
         ),
         migrations.AlterField(
             model_name='monthlyloadsharepercentage',
