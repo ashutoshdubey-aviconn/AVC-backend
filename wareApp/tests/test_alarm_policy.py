@@ -31,6 +31,7 @@ class RecipientTests(TestCase):
         lists = mock.patch.multiple(
             "wareApp.mqtt.services.alarm_recipients",
             SOFTWARE_TEAM=["dev1@example.com", " dev2@example.com "],
+            GROUND_TEAM_ALL_SITES=[],
             GROUND_TEAM={self.site.id: ["ground-a@example.com", "dev1@example.com"]},
         )
         lists.start()
@@ -49,10 +50,22 @@ class RecipientTests(TestCase):
         AlarmSetting.objects.create(site=self.site, alarm_type=7, email_ground=False)
         self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["dev1@example.com", "dev2@example.com"])
 
+    def test_all_sites_ground_member_gets_every_site(self):
+        with mock.patch(
+            "wareApp.mqtt.services.alarm_recipients.GROUND_TEAM_ALL_SITES", ["lead@example.com"]
+        ):
+            self.assertEqual(
+                alarm_policy.recipients(self.other.id, 7),
+                ["dev1@example.com", "dev2@example.com", "lead@example.com"],
+            )
+            AlarmSetting.objects.create(site=self.other, alarm_type=7, email_ground=False)
+            self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com", "dev2@example.com"])
+
     @override_settings(ALARM_EMAIL_DEFAULT_TO=["old@example.com"])
-    def test_former_list_is_used_while_both_lists_are_empty(self):
+    def test_former_list_is_used_while_all_lists_are_empty(self):
         with mock.patch.multiple(
-            "wareApp.mqtt.services.alarm_recipients", SOFTWARE_TEAM=[], GROUND_TEAM={}
+            "wareApp.mqtt.services.alarm_recipients",
+            SOFTWARE_TEAM=[], GROUND_TEAM_ALL_SITES=[], GROUND_TEAM={},
         ):
             self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["old@example.com"])
 

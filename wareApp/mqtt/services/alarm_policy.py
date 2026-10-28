@@ -4,8 +4,9 @@
   (no row: the alarm works as before, from the site fields and defaults).
 * ``is_off`` / ``manual_threshold``: what the setting says.
 * ``recipients(site_id, alarm_type)``: software team (every site) and the site's
-  ground team from alarm_recipients.py, as enabled for the type. While both
-  lists are empty the former ALARM_EMAIL_DEFAULT_TO list is used.
+  ground team (all-sites members + that site's) from alarm_recipients.py, as
+  enabled for the type. While all lists are empty the former
+  ALARM_EMAIL_DEFAULT_TO list is used.
 * ``should_email(last_value, value, worse_when_higher, ...)``: a repeat of an
   alarm is e-mailed again only when its value is more than the tolerance
   (ALARM_REPEAT_TOLERANCE_PERCENT, default 5 %) worse than the last e-mailed
@@ -80,12 +81,13 @@ def recipients(site_id, alarm_type=None):
     """E-mail addresses for one alarm of a site (software + ground team)."""
     row = setting(site_id, alarm_type) if alarm_type is not None else None
     software = alarm_recipients.SOFTWARE_TEAM if (row.email_software if row else True) else []
+    all_sites = getattr(alarm_recipients, "GROUND_TEAM_ALL_SITES", [])
     ground = (
-        alarm_recipients.GROUND_TEAM.get(int(site_id), [])
+        [*all_sites, *alarm_recipients.GROUND_TEAM.get(int(site_id), [])]
         if (row.email_ground if row else True)
         else []
     )
-    if not alarm_recipients.SOFTWARE_TEAM and not alarm_recipients.GROUND_TEAM:
+    if not (alarm_recipients.SOFTWARE_TEAM or all_sites or alarm_recipients.GROUND_TEAM):
         # Nobody configured yet: keep the former single list.
         return list(getattr(settings, "ALARM_EMAIL_DEFAULT_TO", []) or [])
     return list(dict.fromkeys(address.strip() for address in [*software, *ground] if address.strip()))
