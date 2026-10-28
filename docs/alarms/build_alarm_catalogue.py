@@ -2,7 +2,7 @@
 
     python3 docs/alarms/build_alarm_catalogue.py
 
-Sheets: Alarm catalogue (one row per alarm type), Frontend APIs (with real
+Sheets: Summary, Alarm catalogue (one row per alarm type, with its models), Models, Frontend APIs (with real
 responses captured on the test server, api_samples_test_server.json),
 Configuration, E-mail flow, Fields. Edit this file when an alarm changes.
 """
@@ -192,6 +192,55 @@ STATUS = {
     "-": ("Existing (unchanged)", "test_fire_alarm_handler", "Live (fire pump e-mails)", "Live (old code)", f"{L1}: FIREALARM handler lines"),
 }
 
+# type -> models (tables) the alarm reads / writes; every alarm writes AlarmNotifications.
+ALARM_ROW = "AlarmNotifications (the alarm)"
+SETTING = "AlarmSetting (Auto / Manual / Off)"
+MODELS_BY_TYPE = {
+    0: f"{ALARM_ROW}; {SETTING}; SiteLoadParameters (voltage readings); Site (thresholds, show_voltage_alarms)",
+    1: f"{ALARM_ROW}; {SETTING}; SiteLoadParameters; Site",
+    2: f"{ALARM_ROW}; {SETTING}; PowerFactorData (low phases); SiteLoadPower (live load row); Site (PF thresholds, is_pf_visible)",
+    3: "AlarmNotifications (type defined only)", 4: "AlarmNotifications (old rows)", 5: "AlarmNotifications (type defined only)",
+    6: f"{ALARM_ROW}; {SETTING}; DgUnitConsumption (DG run + fuel); DGFuelAlertsData ('suspicious_fuel'); Site (dg_fuel_tank_capacity)",
+    7: f"{ALARM_ROW}; {SETTING}; DailySiteReading; HourlySiteReading; SiteBaseline; AisleGroup; Site",
+    8: f"{ALARM_ROW}; {SETTING}; DailySiteReading; SiteBaseline; AisleGroup; Site (min_threshold_value)",
+    9: f"{ALARM_ROW}; {SETTING}; DgUnitConsumption; DailySiteReading (DG energy)",
+    10: f"{ALARM_ROW}; {SETTING}; AisleGroup (meter / leg)",
+    11: f"{ALARM_ROW}; {SETTING}; DailySiteReading (running total); HourlySiteReading; SiteBaseline; AisleGroup; Site (bypass_consumption_units)",
+    12: f"{ALARM_ROW}; {SETTING}; HourlySiteReading (active hours); AisleGroup; Site (NL hours / window)",
+    13: f"{ALARM_ROW}; {SETTING}; Site; HomeGatewayId (gateway number)",
+    14: f"{ALARM_ROW}; {SETTING}; MeterDisconnectionEvent (gateway's meter events); Site (is_live)",
+    15: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus (last_data_at, last_ping_at, status); HomeGatewayId; SiteConsumptionPing; Site (is_live)",
+    16: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus; HomeGatewayId; Site",
+    "-": "FirePumpAlarm (pump state); Email_History (sent e-mails); no AlarmNotifications row",
+}
+
+MODELS = [("Model", 24), ("Table", 30), ("Purpose", 48), ("Fields used by alarms", 60), ("Written by", 40), ("Used by alarms", 18)]
+MODEL_ROWS = [
+    ["AlarmNotifications", "wareApp_alarmnotifications", "Every alarm of every type: one row per issue per day (outages 14-16: one per outage)",
+     "Alarm_type, Alarm_priority, site_id, aisle_group, object_type / object_id (meter, gateway), power_source, to_do (issue), created_time, last_seen, occurrences, is_active, off_time, notified_value, last_notified_at, r/y/b_phase, fuel_level",
+     "All alarm handlers and checkers", "0-16"],
+    ["AlarmSetting", "wareApp_alarmsetting", "Per site + alarm type configuration (Django admin)",
+     "site, alarm_type, mode (Auto / Manual / Off), threshold, email_software, email_ground, repeat_tolerance_percent", "Admin users", "all"],
+    ["Site", "wareApp_site", "Site and its alarm fields",
+     "is_live, location (location team), show_voltage_alarms, r/y/b voltage max/min, is_pf_visible, r/y/b PF thresholds, high_consumption_units, high_consumption_baseline_percent, bypass_consumption_units, min_threshold_value, nl_operation_hours / start / end, dg_fuel_tank_capacity",
+     "Admin users", "all"],
+    ["AisleGroup", "wareApp_aislegroup", "Aisle (leg / meter) of a site", "aisleGroupName, attached_leg_id, is_active, power_source", "Admin users", "7, 8, 10, 11, 12"],
+    ["SiteBaseline", "wareApp_sitebaseline", "Daily baseline per leg (kWh)", "associated_site_id, leg_id, baseline_value, working_hours, baseline_from", "Admin / baseline tools", "7, 8, 11"],
+    ["HourlySiteReading", "wareApp_hourlysitereading", "Hourly consumption per aisle", "associated_Site, leg_id, aisle_group, reading_from, unit_consumption, hourly_baseline_value", "MQTT consumption + recovery", "7, 11, 12"],
+    ["DailySiteReading", "wareApp_dailysitereading", "Daily consumption per aisle (= sum of hourly)", "associated_Site, leg_id, reading_for, unit_consumption, daily_baseline_value", "MQTT consumption + recovery", "7, 8, 9, 11"],
+    ["SiteLoadParameters", "wareApp_siteloadparameters", "Phase voltages per load packet (high / low check)", "site_id, power_source, parameter_type (0 high, 1 low), r/y/b_phase, created", "MQTT load", "0, 1"],
+    ["PowerFactorData", "wareApp_powerfactordata", "Low power-factor readings", "site, supply_source, meter_number, r/y/b_phase_pf, created", "MQTT load", "2"],
+    ["SiteLoadPower", "wareApp_siteloadpower", "Live load row per site, source and meter", "Supply_Source, Meter_Number, volts, currents, PF, Status", "MQTT load", "2 (first packet check)"],
+    ["DgUnitConsumption", "wareApp_dgunitconsumption", "DG run per aisle and day with fetched fuel", "site, aisle_group, unit_consumption, dg_fuel_consumption, fetch_fuel_data", "fetch-fuel-data service", "6, 9"],
+    ["DGFuelAlertsData", "wareApp_dgfuelalertsdata", "Fuel events: refuel, theft, suspicious_fuel", "site, vehicle_number, alert_name, fuel_consumption, epoch_time", "fetch-fuel-data service", "6"],
+    ["HomeGatewayId", "wareApp_homegatewayid", "Gateway registry", "hgw_id (…_<number>), connected_to (site)", "Admin users", "13, 15, 16"],
+    ["HomeGatewayStatus", "wareApp_homegatewaystatus", "Gateway online state", "home_gateway, status (data in the last hour), last_data_at, last_ping_at (new)", "MQTT listeners (data), gateway_health --broker-log (pings), checker (status)", "15, 16"],
+    ["SiteConsumptionPing", "wareApp_siteconsumptionping", "Last consumption packet per site + gateway", "site, home_gateway_id, consumption_ping_time", "MQTT listeners (was: monitoring_dashboard.py cron)", "15 (dashboard)"],
+    ["MeterDisconnectionEvent", "wareApp_meterdisconnectionevent", "Meter disconnect / reconnect events reported by gateways", "logged_site_id, meter_id, meter_number, meter_name, status, port_id, detection_window_start / end", "Gateways via meter-disconnections/ingest/", "14"],
+    ["FirePumpAlarm", "wareApp_firepumpalarm", "Fire pump state per device", "Site, deviceName, mode, motor status", "MQTT FIREALARM", "fire"],
+    ["Email_History", "wareApp_email_history", "Fire e-mails already sent (throttle)", "fire_site, deviceName, email_for, created", "MQTT FIREALARM", "fire"],
+]
+
 STATUS_COLUMNS = [
     ("Progress status", 22), ("Unit tests", 34), ("Verified on test server", 48), ("Main server", 30), ("Logs: where to look", 52),
 ]
@@ -337,17 +386,19 @@ def main():
     book = Workbook()
     summary_rows = [[row[0], row[1], *[STATUS[row[0]][i] for i in (0, 2, 3)]] for row in ALARMS]
     sheet(book, "Summary", SUMMARY, summary_rows, first=True)
-    rows = [row[:5] + list(STATUS[row[0]]) + row[5:] for row in ALARMS]
-    sheet(book, "Alarm catalogue", COLUMNS[:5] + STATUS_COLUMNS + COLUMNS[5:], rows)
+    header = COLUMNS[:5] + STATUS_COLUMNS + COLUMNS[5:16] + [("Models (tables)", 50)] + COLUMNS[16:]
+    rows = [row[:5] + list(STATUS[row[0]]) + row[5:16] + [MODELS_BY_TYPE[row[0]]] + row[16:] for row in ALARMS]
+    sheet(book, "Alarm catalogue", header, rows)
     sheet(book, "Frontend APIs", APIS, API_ROWS)
     sheet(book, "Configuration", CONFIG, CONFIG_ROWS)
     sheet(book, "E-mail flow", FLOW, FLOW_ROWS)
     sheet(book, "Fields", FIELDS, FIELD_ROWS)
+    sheet(book, "Models", MODELS, MODEL_ROWS)
     sheet(book, "Logs", LOGS, LOG_ROWS)
     book.save(HERE / "ALARM_CATALOGUE.xlsx")
     with open(HERE / "ALARM_CATALOGUE.csv", "w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow([name for name, _ in COLUMNS[:5] + STATUS_COLUMNS + COLUMNS[5:]])
+        writer.writerow([name for name, _ in header])
         writer.writerows(rows)
     print(f"{len(ALARMS)} alarms, {len(API_ROWS)} APIs -> {HERE / 'ALARM_CATALOGUE.xlsx'}, ALARM_CATALOGUE.csv")
 
