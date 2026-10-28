@@ -353,6 +353,17 @@ if MQTT_CONSUMPTION_BATCH_SECONDS > 0:
         },
     }
 
+# Data-missing alarms 14 / 15 / 16 (wareApp/mqtt/services/gateway_health.py).
+GATEWAY_HEALTH_CHECK_SECONDS = config("GATEWAY_HEALTH_CHECK_SECONDS", default=300, cast=int)
+GATEWAY_HEALTH_DOWN_MINUTES = config("GATEWAY_HEALTH_DOWN_MINUTES", default=60, cast=int)
+GATEWAY_HEALTH_PING_FRESH_MINUTES = config("GATEWAY_HEALTH_PING_FRESH_MINUTES", default=15, cast=int)
+if GATEWAY_HEALTH_CHECK_SECONDS > 0:
+    CELERY_BEAT_SCHEDULE["check-gateway-health"] = {
+        "task": "wareApp.tasks.check_gateway_health",
+        "schedule": GATEWAY_HEALTH_CHECK_SECONDS,
+        "options": {"queue": "queue2_processing", "expires": max(GATEWAY_HEALTH_CHECK_SECONDS - 10, 10)},
+    }
+
 CELERY_TASK_QUEUES = (
     Queue("celery"),
     Queue("queue1"),

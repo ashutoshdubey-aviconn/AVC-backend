@@ -1198,6 +1198,9 @@ flowchart TD
 | AlarmNotifications | 2 | PF Bad Value | live load packets | 1 per source / day (+ count), max 1 / 30 min | yes | 20 |
 | AlarmNotifications | 9 | DG Running Without Load | fuel fetch after a DG run | 1 per site / day (+ count per DG unit fetch) | yes | 21 |
 | AlarmNotifications | 6 | Fuel Drain | fuel fetch after a DG run | 1 per site / day (+ count per DG unit fetch) | yes | 21 |
+| AlarmNotifications | 14 | Meter Disconnected | gateway's own meter event (meter-disconnections/ingest/) disconnected >= 1 h | 1 active row per meter until reconnected | when raised | - |
+| AlarmNotifications | 15 | Gateway Disconnected | no ping and no data >= 1 h (data-only while the broker log is not read) | 1 active row per gateway until data returns | when raised | - |
+| AlarmNotifications | 16 | Gateway Service / Modbus Issue | pings arrive, no consumption / recovery / load data >= 1 h | 1 active row per gateway until data returns | when raised | - |
 | (none) | - | Fire pump mode / motor on | FIREALARM packets | motor-on max 1 / 10 min | yes (customer) | 22 |
 
 Types defined but **not raised by the current code**: 3 DG Overtime, 4 DG Fuel
@@ -1210,6 +1213,15 @@ same type numbers. The old table is read-only and will be dropped later. The sit
 alarm page (`alarmList/`, `alarmListDetail/`) now lists every type; its counts add
 up `occurrences`.
 Priority labels in the alarm list: 0 High, 1 Medium, 2 Low.
+
+**Data-missing alarms 14 / 15 / 16** (`wareApp/mqtt/services/gateway_health.py`,
+checked every 5 min by Celery beat): the MQTT listeners record each gateway's last
+data packet (`HomeGatewayStatus.last_data_at`, `SiteConsumptionPing`);
+`manage.py gateway_health --broker-log /var/log/mosquitto/mosquitto.log` (root
+cron, the log is root-only) records pings (`last_ping_at`). An outage is one active
+row, e-mailed once; when the gateway / meter is back it is closed without an
+e-mail, and the next e-mail of that issue says when the previous outage ended.
+Manual threshold in AlarmSetting = hours.
 
 **Configuration per site and type** (Django admin, `AlarmSetting`): **Auto** - the
 system threshold (consumption from the aisle's baseline, voltage 253 / 207 V,
