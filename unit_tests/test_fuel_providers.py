@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 
 import django
 
-# fuel_providers reads Django settings (provider credentials).
+# fuel_providers reads Django settings (provider credentials). ENV=CI selects
+# the SQLite profile, so no warehouse/.env or database is needed (GitHub CI).
+os.environ.setdefault("ENV", "CI")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "warehouse.test_settings")
 django.setup()
 
