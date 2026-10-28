@@ -54,9 +54,14 @@ def handle_load_runtime_recovery_message(site, location_id, gateway_id, message)
         with transaction.atomic():
             monitor = status.record_response(scope, LOAD_RUNTIME, status_slots, message)
             written = upsert_slots(
+                # Range instead of reading_from__in (see hourly recovery).
                 SupplyLoadTimeShare.objects.filter(
-                    site=site, power_source=source, reading_from__in=list(slots)
-                ),
+                    site=site,
+                    power_source=source,
+                    reading_from__range=(min(slots), max(slots)),
+                )
+                if slots
+                else SupplyLoadTimeShare.objects.none(),
                 key_of=lambda row: row.reading_from,
                 slots=slots,
                 update_fields=["hourly_run_time"],
