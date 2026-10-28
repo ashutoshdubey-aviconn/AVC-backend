@@ -6,7 +6,6 @@ from .models import (
     AisleInfo,
     AisleSyncRecoveryStatus,
     AlarmNotifications,
-    AlarmRecipient,
     AlarmSetting,
     BlockInfo,
     CustomerInfo,
@@ -386,20 +385,6 @@ class MqttDeadLetterAdmin(admin.ModelAdmin):
     list_filter = ["message_type", "is_resolved"]
     search_fields = ["gateway_id", "error", "payload"]
     readonly_fields = ["message_type", "site_id", "gateway_id", "payload", "error", "created_at"]
-
-
-@admin.register(AlarmRecipient)
-class AlarmRecipientAdmin(admin.ModelAdmin):
-    """Software team: every site. Ground team: only the sites selected."""
-
-    list_display = ("email", "name", "group", "site_count", "is_active")
-    list_filter = ("group", "is_active")
-    search_fields = ("email", "name", "sites__site_name")
-    filter_horizontal = ("sites",)
-
-    @admin.display(description="Sites")
-    def site_count(self, obj):
-        return "all" if obj.group == AlarmRecipient.SOFTWARE else obj.sites.count()
 
 
 @admin.register(AlarmSetting)

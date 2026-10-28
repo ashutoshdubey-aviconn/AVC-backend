@@ -11,7 +11,6 @@ from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
     AisleGroup,
     AlarmNotifications,
-    AlarmRecipient,
     AlarmSetting,
     DailySiteReading,
     Site,
@@ -23,34 +22,39 @@ from wareApp.mqtt.services.consumption_alarms import evaluate_daily_alarms
 
 
 class RecipientTests(TestCase):
+    """Lists from wareApp/mqtt/services/alarm_recipients.py."""
+
     def setUp(self):
         cache.clear()
         self.site = Site.objects.create(site_name="Site A", site_type=1)
         self.other = Site.objects.create(site_name="Site B", site_type=1)
-        AlarmRecipient.objects.create(email="dev1@example.com", group=AlarmRecipient.SOFTWARE)
-        AlarmRecipient.objects.create(email="dev2@example.com", group=AlarmRecipient.SOFTWARE, is_active=False)
-        ground = AlarmRecipient.objects.create(email="ground-a@example.com", group=AlarmRecipient.GROUND)
-        ground.sites.add(self.site)
-        AlarmRecipient.objects.create(email="ground-none@example.com", group=AlarmRecipient.GROUND)
+        lists = mock.patch.multiple(
+            "wareApp.mqtt.services.alarm_recipients",
+            SOFTWARE_TEAM=["dev1@example.com", " dev2@example.com "],
+            GROUND_TEAM={self.site.id: ["ground-a@example.com", "dev1@example.com"]},
+        )
+        lists.start()
+        self.addCleanup(lists.stop)
 
     def test_software_gets_every_site_and_ground_only_its_sites(self):
-        self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["dev1@example.com", "ground-a@example.com"])
-        self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com"])
+        self.assertEqual(
+            alarm_policy.recipients(self.site.id, 7),
+            ["dev1@example.com", "dev2@example.com", "ground-a@example.com"],
+        )
+        self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com", "dev2@example.com"])
 
     def test_groups_can_be_switched_off_per_site_and_type(self):
         AlarmSetting.objects.create(site=self.site, alarm_type=2, email_software=False)
-        self.assertEqual(alarm_policy.recipients(self.site.id, 2), ["ground-a@example.com"])
-        self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["dev1@example.com", "ground-a@example.com"])
-
-    def test_admin_changes_apply_at_once(self):
-        self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com"])
-        AlarmRecipient.objects.get(email="ground-none@example.com").sites.add(self.other)
-        self.assertEqual(alarm_policy.recipients(self.other.id, 7), ["dev1@example.com", "ground-none@example.com"])
+        self.assertEqual(alarm_policy.recipients(self.site.id, 2), ["ground-a@example.com", "dev1@example.com"])
+        AlarmSetting.objects.create(site=self.site, alarm_type=7, email_ground=False)
+        self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["dev1@example.com", "dev2@example.com"])
 
     @override_settings(ALARM_EMAIL_DEFAULT_TO=["old@example.com"])
-    def test_former_list_is_used_until_someone_is_configured(self):
-        AlarmRecipient.objects.all().delete()
-        self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["old@example.com"])
+    def test_former_list_is_used_while_both_lists_are_empty(self):
+        with mock.patch.multiple(
+            "wareApp.mqtt.services.alarm_recipients", SOFTWARE_TEAM=[], GROUND_TEAM={}
+        ):
+            self.assertEqual(alarm_policy.recipients(self.site.id, 7), ["old@example.com"])
 
 
 class RepeatRuleTests(TestCase):
