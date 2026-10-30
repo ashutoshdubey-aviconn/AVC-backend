@@ -260,6 +260,15 @@ def check_gateway_health():
 
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
+def check_consumption_spikes():
+    """Raise / update Consumption Spike alarms (type 17) for today and yesterday."""
+    from wareApp.mqtt.services import spike_alarms
+
+    return spike_alarms.scan()
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "LoadData")
     if site is None:

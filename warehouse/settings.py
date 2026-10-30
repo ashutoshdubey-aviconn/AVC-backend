@@ -366,6 +366,15 @@ if GATEWAY_HEALTH_CHECK_SECONDS > 0:
         "options": {"queue": "queue2_processing", "expires": max(GATEWAY_HEALTH_CHECK_SECONDS - 10, 10)},
     }
 
+# Consumption Spike alarm 17 (wareApp/mqtt/services/spike_alarms.py).
+CONSUMPTION_SPIKE_CHECK_SECONDS = config("CONSUMPTION_SPIKE_CHECK_SECONDS", default=300, cast=int)
+if CONSUMPTION_SPIKE_CHECK_SECONDS > 0:
+    CELERY_BEAT_SCHEDULE["check-consumption-spikes"] = {
+        "task": "wareApp.tasks.check_consumption_spikes",
+        "schedule": CONSUMPTION_SPIKE_CHECK_SECONDS,
+        "options": {"queue": "queue2_processing", "expires": max(CONSUMPTION_SPIKE_CHECK_SECONDS - 10, 10)},
+    }
+
 CELERY_TASK_QUEUES = (
     Queue("celery"),
     Queue("queue1"),
