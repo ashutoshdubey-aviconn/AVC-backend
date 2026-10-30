@@ -71,7 +71,7 @@ ALARMS = [
      "DG_FUEL_POLL_INTERVAL_SECONDS=300", SITE_APIS, "Severity = litres used."],
     [7, "High Consumption", "Consumption", "Active", "Medium", "aisle + day",
      "Daily reading (sum of the aisle's hourly readings)",
-     "Day's consumption >= threshold. Not raised when Bypassed fired for that aisle and day (Bypassed covers >= 100 %).",
+     "Day's consumption >= threshold. Not raised when Bypassed fired for that aisle and day (Bypassed covers >= 100 %). Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
      "Site.high_consumption_units, else baseline x Site.high_consumption_baseline_percent (default 75 %).",
      "Yes", CONFIG_STD + " Manual = kWh per day; Auto = baseline x percent.",
      "Day end: first reading after midnight; re-checked after recovery rewrites a past day (up to 7 days)",
@@ -97,7 +97,7 @@ ALARMS = [
      "wareApp/mqtt/consumption.py -> _notify_meter_reading_issue", "-", SITE_APIS, "Zero-consumption case 1."],
     [11, "Bypassed", "Consumption", "Active", "Medium", "aisle + day",
      "Live consumption (running total of today) and the daily reading",
-     "Consumption >= the aisle's own daily baseline x 100 % (no saving). Raised DURING the day as soon as today's running total crosses it, and checked again at day end. Supersedes High Consumption.",
+     "Consumption >= the aisle's own daily baseline x 100 % (no saving). Raised DURING the day as soon as today's running total crosses it, and checked again at day end. Supersedes High Consumption. Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
      "Baseline x ALARM_BYPASS_DEFAULT_PERCENT (100 %); Site.bypass_consumption_units overrides.",
      "Yes", CONFIG_STD + " Manual = kWh per day.", "Every consumption batch (~1 min) for today; day end for complete days",
      REPEAT_DAILY, "No", RECIPIENTS,
@@ -126,7 +126,7 @@ ALARMS = [
      "Zero-consumption case 3. Live sites only."],
     [15, "Gateway Disconnected", "Data missing", "Active (new)", "High", "gateway outage",
      "Last data packet per gateway (our MQTT listeners -> HomeGatewayStatus.last_data_at) and last ping (Mosquitto log -> last_ping_at)",
-     "No data AND no ping for >= 1 h. Without fresh ping information (broker log not read in the last 15 min) a gateway silent >= 1 h counts as disconnected.",
+     "No data AND no ping for >= 1 h. Without fresh ping information (broker log not read in the last 15 min) a gateway silent >= 1 h counts as disconnected. Not checked while no gateway at all sends data (our side down); silence counts from our own listener restart at the earliest (1 h grace), and a restart never clears an open alarm.",
      "1 hour", "Yes", CONFIG_STD + " Manual = hours.", "Every 5 min (Celery beat check_gateway_health)",
      REPEAT_OUTAGE, "Yes, when data returns", RECIPIENTS,
      "services/gateway_activity.py -> seen, flush; services/gateway_health.py -> evaluate_gateways; manage.py gateway_health --broker-log (root cron)",
@@ -137,6 +137,15 @@ ALARMS = [
      "1 hour", "Yes", CONFIG_STD + " Manual = hours.", "Every 5 min (Celery beat)", REPEAT_OUTAGE, "Yes, when data returns", RECIPIENTS,
      "services/gateway_health.py -> evaluate_gateways", "Needs the broker log read (root cron) to tell it from 15", SITE_APIS + ", gateway-status/",
      "Zero-consumption case 6. On test (bridge, no gateway pings) only 15 can be raised."],
+    [17, "Consumption Spike", "Consumption", "Active (new)", "Medium", "aisle + day",
+     "Hourly readings (today and yesterday), Meter Reading Issue alarms, gateway alarms, our listener restarts",
+     "An hour that is not real use: (a) meter jump - one hour above the aisle's whole daily baseline; (b) catch-up - first hour after a data gap, > 3 x the day's median hour and > 2 x the normal hour. The alarm names the CAUSE: 'meter reset or replaced' (gateway reported a lower reading the same day), 'meter jump', or 'catch-up: carries N missing hours, gap cause: Gateway Disconnected / our server was down / no readings stored'.",
+     "Daily baseline (jump); 3 x median and 2 x baseline/24 (catch-up)", "On / Off", CONFIG_STD + " (threshold not used)",
+     "Every 5 min (Celery beat check_consumption_spikes) over today and yesterday",
+     "One alarm per aisle per day; ONE e-mail per site per scan listing all new spike aisles with their cause; later spikes the same day update the alarm text.",
+     "No (kept for manual spreading)", RECIPIENTS,
+     "wareApp/mqtt/services/spike_alarms.py -> scan, cause; consumption_alarms.py -> find_spikes",
+     "CONSUMPTION_SPIKE_CHECK_SECONDS=300", SITE_APIS, "Spike hours are excluded from Bypassed / High. Added 2026-10-30."],
     ["-", "Fire pump mode / motor on", "Fire", "Active (e-mail only)", "-", "device event",
      "MQTT .../out/FIREALARM/localstate", "Pump mode changes and motor-on events e-mail the customer; no alarm row in AlarmNotifications.",
      "-", "No", "-", "Real time; motor-on at most every 10 min", "Customer e-mail per event", "-", "Customer addresses in sendmail", "wareApp/mqtt/fire_alarm.py; sendmail.send_mail_fire_alarm_user", "-", "fireAlarm/", ""],
@@ -189,6 +198,9 @@ STATUS = {
     16: ("Done - needs the broker-log cron", "test_gateway_health (pings but no data -> 16)",
          "Dry run with main's broker log (28 Oct): 1 gateway would be 16 (avc_myn_bilaspursvng_000071_1). Not live: test gets data through a bridge, no gateway pings",
          "Not deployed (needs root cron: manage.py gateway_health --broker-log)", f"{L2}: 'Gateway health alarm raised ... type=16'"),
+    17: ("Done - working live", "test_spike_alarms (meter reset, jump, catch-up causes, one e-mail per site, Off)",
+         "Live 30 Oct: site 138 meter reset (3,290 + 3,162 kWh, ERROR!!! same day); site 114 catch-up at 10:00 on 20 aisles after a gateway gap. 2 tiny false ones before the minimum-size rule, closed",
+         "Not deployed", f"{L2}: 'spike scan: raised=.. updated=..'"),
     "-": ("Existing (unchanged)", "test_fire_alarm_handler", "Live (fire pump e-mails)", "Live (old code)", f"{L1}: FIREALARM handler lines"),
 }
 
@@ -211,6 +223,7 @@ MODELS_BY_TYPE = {
     14: f"{ALARM_ROW}; {SETTING}; MeterDisconnectionEvent (gateway's meter events); Site (is_live)",
     15: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus (last_data_at, last_ping_at, status); HomeGatewayId; SiteConsumptionPing; Site (is_live)",
     16: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus; HomeGatewayId; Site",
+    17: f"{ALARM_ROW}; {SETTING}; HourlySiteReading (hours); SiteBaseline; AisleGroup; MonitoringMarker (our restarts); AlarmNotifications 10 / 15 / 16 (cause)",
     "-": "FirePumpAlarm (pump state); Email_History (sent e-mails); no AlarmNotifications row",
 }
 
@@ -236,6 +249,7 @@ MODEL_ROWS = [
     ["HomeGatewayId", "wareApp_homegatewayid", "Gateway registry", "hgw_id (…_<number>), connected_to (site)", "Admin users", "13, 15, 16"],
     ["HomeGatewayStatus", "wareApp_homegatewaystatus", "Gateway online state", "home_gateway, status (data in the last hour), last_data_at, last_ping_at (new)", "MQTT listeners (data), gateway_health --broker-log (pings), checker (status)", "15, 16"],
     ["SiteConsumptionPing", "wareApp_siteconsumptionping", "Last consumption packet per site + gateway", "site, home_gateway_id, consumption_ping_time", "MQTT listeners (was: monitoring_dashboard.py cron)", "15 (dashboard)"],
+    ["MonitoringMarker", "wareApp_monitoringmarker", "Named times shared by processes (new, 0106)", "name (mqtt_listener_started_at, broker_log_read_at), at", "MQTT listeners (start), gateway_health --broker-log", "15, 16, 17"],
     ["MeterDisconnectionEvent", "wareApp_meterdisconnectionevent", "Meter disconnect / reconnect events reported by gateways", "logged_site_id, meter_id, meter_number, meter_name, status, port_id, detection_window_start / end", "Gateways via meter-disconnections/ingest/", "14"],
     ["FirePumpAlarm", "wareApp_firepumpalarm", "Fire pump state per device", "Site, deviceName, mode, motor status", "MQTT FIREALARM", "fire"],
     ["Email_History", "wareApp_email_history", "Fire e-mails already sent (throttle)", "fire_site, deviceName, email_for, created", "MQTT FIREALARM", "fire"],
@@ -301,6 +315,8 @@ CONFIG_ROWS = [
     ["warehouse/.env", "ALARM_VOLTAGE_AUTO_HIGH / _LOW / ALARM_PF_AUTO_THRESHOLD", "253 / 207 / 0.9", "Power Auto thresholds."],
     ["warehouse/.env", "GATEWAY_HEALTH_DOWN_MINUTES / _CHECK_SECONDS / _PING_FRESH_MINUTES", "60 / 300 / 15", "Alarms 14 / 15 / 16."],
     ["warehouse/.env", "ALARM_FEED_MAX_AGE_DAYS", "30", "The super-admin list shows issues seen in the last 30 days."],
+    ["warehouse/.env", "GATEWAY_HEALTH_ALL_SILENT_MINUTES", "15", "No gateway at all with data this long: the gateway check is skipped (our side is down)."],
+    ["warehouse/.env", "CONSUMPTION_SPIKE_CHECK_SECONDS", "300", "Consumption Spike scan interval (0 = off)."],
 ]
 
 FLOW = [("Step", 6), ("What happens", 110)]

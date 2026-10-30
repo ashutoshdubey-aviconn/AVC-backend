@@ -534,6 +534,7 @@ class AlarmNotifications(models.Model):
     METER_DISCONNECTED = 14
     GATEWAY_DISCONNECTED = 15
     GATEWAY_SERVICE_ISSUE = 16
+    CONSUMPTION_SPIKE = 17
     alarm_type = (
         (HIGH_VOLTAGE, "High Voltage"),
         (LOW_VOLTAGE, "Low Voltage"),
@@ -552,9 +553,10 @@ class AlarmNotifications(models.Model):
         (METER_DISCONNECTED, "Meter Disconnected"),
         (GATEWAY_DISCONNECTED, "Gateway Disconnected"),
         (GATEWAY_SERVICE_ISSUE, "Gateway Service / Modbus Issue"),
+        (CONSUMPTION_SPIKE, "Consumption Spike"),
     )
     POWER_TYPES = frozenset({0, 1, 2, 3, 4, 5, 6, 9})
-    CONSUMPTION_TYPES = frozenset({7, 8, 10, 11, 12, 14})
+    CONSUMPTION_TYPES = frozenset({7, 8, 10, 11, 12, 14, 17})
     GATEWAY_TYPES = frozenset({13, 15, 16})
 
     PRIORITY_HIGH, PRIORITY_MEDIUM, PRIORITY_LOW = 0, 1, 2

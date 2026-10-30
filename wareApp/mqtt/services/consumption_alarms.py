@@ -130,26 +130,45 @@ def spike_hours(site, aisle_group, day, daily_baseline):
       a meter jump).
     * A catch-up hour: the first hour after a data gap (no reading the hour
       before) that is more than CATCH_UP_FACTOR x the median of the day's
-      other hours - it carries the gap's consumption. A normal-sized hour
-      after a gap (e.g. our own server was down) still counts.
+      other hours and more than 2 x the aisle's normal hour (daily baseline /
+      24; 1 kWh without a baseline) - it carries the gap's consumption. A
+      normal-sized hour after a gap (e.g. our own server was down) still counts.
     """
     start = datetime.combine(day, time.min)
     rows = list(HourlySiteReading.objects.filter(
         associated_Site=site, leg_id=aisle_group.attached_leg_id,
         reading_from__gte=start - timedelta(days=2), reading_from__lt=start + timedelta(days=1),
     ).order_by("reading_from").values_list("reading_from", "unit_consumption"))
-    today = [kwh or 0.0 for at, kwh in rows if at >= start]
+    return [(spike.at, spike.kwh) for spike in find_spikes(rows, start, daily_baseline)]
+
+
+class Spike:
+    """One spike hour: ``kind`` "jump" or "catch_up"; ``previous`` = last reading before it."""
+
+    __slots__ = ("at", "kwh", "kind", "previous")
+
+    def __init__(self, at, kwh, kind, previous):
+        self.at, self.kwh, self.kind, self.previous = at, kwh, kind, previous
+
+
+def find_spikes(rows, day_start, daily_baseline):
+    """Spike hours of the day starting at ``day_start``.
+
+    ``rows``: ``(reading_from, kWh)`` of one aisle in time order, from before
+    the day (to see a gap at its start) to its end.
+    """
+    today = [kwh or 0.0 for at, kwh in rows if at >= day_start]
     spikes, previous = [], None
     for at, kwh in rows:
-        if at >= start and kwh:
-            jump = daily_baseline and kwh > daily_baseline
-            catch_up = False
-            if previous is None or at - previous > timedelta(hours=1):
+        if day_start <= at < day_start + timedelta(days=1) and kwh:
+            if daily_baseline and kwh > daily_baseline:
+                spikes.append(Spike(at, kwh, "jump", previous))
+            elif previous is None or at - previous > timedelta(hours=1):
                 others = sorted(value for value in today if value != kwh)
                 median = others[len(others) // 2] if others else 0.0
-                catch_up = median > 0 and kwh > CATCH_UP_FACTOR * median
-            if jump or catch_up:
-                spikes.append((at, kwh))
+                minimum = 2 * daily_baseline / 24 if daily_baseline else 1.0
+                if median > 0 and kwh > CATCH_UP_FACTOR * median and kwh > minimum:
+                    spikes.append(Spike(at, kwh, "catch_up", previous))
         previous = at
     return spikes
 
