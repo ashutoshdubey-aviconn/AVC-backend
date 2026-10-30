@@ -88,6 +88,13 @@ def _run_isolated_mqtt_client(client_id, subscriptions, description, on_message)
         60,
     )
     logger.info("%s MQTT client started", description)
+    try:
+        from wareApp.mqtt.services import gateway_health
+
+        # Gateway alarms count silence from here at the earliest.
+        gateway_health.mark(gateway_health.LISTENER_STARTED_MARKER)
+    except Exception:
+        logger.exception("Could not record the listener start for gateway health")
     return client.loop_forever(retry_first_connection=True)
 
 

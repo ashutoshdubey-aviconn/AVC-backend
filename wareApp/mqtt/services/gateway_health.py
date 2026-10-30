@@ -34,7 +34,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max
 
-from wareApp.models import AlarmNotifications, HomeGatewayStatus, MeterDisconnectionEvent, Site
+from wareApp.models import AlarmNotifications, HomeGatewayStatus, MeterDisconnectionEvent, MonitoringMarker, Site
 from wareApp.mqtt.services import alarm_policy
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email
@@ -43,7 +43,8 @@ logger = logging.getLogger(__name__)
 
 METER_OBJECT = 4
 GATEWAY_OBJECT = 5
-PING_READ_KEY = "gateway-health:ping-log-read-at"
+PING_READ_MARKER = "broker_log_read_at"
+LISTENER_STARTED_MARKER = "mqtt_listener_started_at"
 LOG_OFFSET_KEY = "gateway-health:log-offset:{path}"
 FIRST_READ_BYTES = 20 * 1024 * 1024
 
@@ -53,6 +54,14 @@ FIRST_READ_BYTES = 20 * 1024 * 1024
 _ALIVE = re.compile(
     r"^(?P<epoch>\d+): (?:Received \S+ from|New client connected from \S+ as) (?P<client>\S+)"
 )
+
+
+def mark(name, at=None):
+    MonitoringMarker.objects.update_or_create(name=name, defaults={"at": at or datetime.now()})
+
+
+def marker(name):
+    return MonitoringMarker.objects.filter(name=name).values_list("at", flat=True).first()
 
 
 def _down_after(site_id, alarm_type):
@@ -121,12 +130,12 @@ def store_pings(alive, now=None):
             status.last_ping_at = seen_at
             changed.append(status)
     HomeGatewayStatus.objects.bulk_update(changed, ["last_ping_at"])
-    cache.set(PING_READ_KEY, now or datetime.now(), None)
+    mark(PING_READ_MARKER, now)
     return len(changed)
 
 
 def ping_information_fresh(now):
-    read_at = cache.get(PING_READ_KEY)
+    read_at = marker(PING_READ_MARKER)
     fresh = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_PING_FRESH_MINUTES", 15))
     return read_at is not None and now - read_at <= fresh
 
@@ -137,9 +146,11 @@ class Report:
     raised: list = field(default_factory=list)
     repeated: list = field(default_factory=list)
     cleared: list = field(default_factory=list)
+    skipped: str = ""
 
     def __str__(self):
-        return f"raised={len(self.raised)} still_active={len(self.repeated)} cleared={len(self.cleared)}"
+        text = f"raised={len(self.raised)} still_active={len(self.repeated)} cleared={len(self.cleared)}"
+        return f"{text} (gateways skipped: {self.skipped})" if self.skipped else text
 
 
 def _raise(report, site_id, alarm_type, object_type, object_id, detail, details, now, priority):
@@ -183,6 +194,17 @@ def _clear(report, site_id, alarm_type, object_type, object_id, now):
 
 
 def evaluate_gateways(report, now):
+    # No gateway at all has sent data lately: our side (listeners, broker,
+    # network) is down, not the gateways. Judge nothing until data flows again.
+    newest = HomeGatewayStatus.objects.aggregate(newest=Max("last_data_at"))["newest"]
+    silent_limit = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_ALL_SILENT_MINUTES", 15))
+    if newest is None or now - newest > silent_limit:
+        report.skipped = "no gateway data at all since " + (f"{newest:%d %b %H:%M}" if newest else "ever")
+        logger.warning("Gateway health check skipped: %s", report.skipped)
+        return
+    # Silence counts from our own (re)start at the earliest: a gateway is not
+    # disconnected because our server or listener was down.
+    listening_since = marker(LISTENER_STARTED_MARKER)
     with_pings = ping_information_fresh(now)
     statuses = HomeGatewayStatus.objects.select_related("home_gateway").filter(
         home_gateway__connected_to__is_live=True, last_data_at__isnull=False,
@@ -190,16 +212,27 @@ def evaluate_gateways(report, now):
     for status in statuses:
         hgw = status.home_gateway
         site_id, number = hgw.connected_to_id, gateway_number(hgw.hgw_id)
-        data_age = now - status.last_data_at
+        # real_age: since the gateway's last data. data_age: the same, but not
+        # before our own restart (grace). Raising uses data_age; clearing needs
+        # real data again, so a restart never closes a real outage.
+        real_age = now - status.last_data_at
+        silent_since = status.last_data_at
+        if listening_since and listening_since > silent_since:
+            silent_since = listening_since
+        data_age = now - silent_since
         ping_age = (now - status.last_ping_at) if (with_pings and status.last_ping_at) else None
         disconnected_after = _down_after(site_id, AlarmNotifications.GATEWAY_DISCONNECTED)
         service_after = _down_after(site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE)
         common = [["Gateway", hgw.hgw_id, False], ["Last data", f"{status.last_data_at:%d %b %H:%M}", True]]
+        if data_age < disconnected_after and real_age >= disconnected_after:
+            # In the grace after our restart while the gateway is still silent:
+            # keep any open alarm as it is, raise nothing new.
+            continue
         if data_age >= disconnected_after and (ping_age is None or ping_age >= disconnected_after):
             last_ping = f"{status.last_ping_at:%d %b %H:%M}" if status.last_ping_at else "unknown"
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
-                f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(data_age)}",
+                f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
                 common + [["Last ping", last_ping if with_pings else "not available", False]],
                 now, AlarmNotifications.PRIORITY_HIGH,
             )
@@ -207,7 +240,7 @@ def evaluate_gateways(report, now):
         elif data_age >= service_after and ping_age is not None:
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number,
-                f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(data_age)}",
+                f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}",
                 common + [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]],
                 now, AlarmNotifications.PRIORITY_HIGH,
             )

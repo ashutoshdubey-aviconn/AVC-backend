@@ -1429,6 +1429,21 @@ class HomeGatewayStatus(models.Model):
         return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"
 
 
+class MonitoringMarker(models.Model):
+    """Named timestamps shared by processes (the cache may be per process).
+
+    mqtt_listener_started_at: an MQTT listener (re)started - gateway alarms
+    count silence from here at the earliest (our own downtime is not theirs).
+    broker_log_read_at: gateway_health --broker-log last read ping lines.
+    """
+
+    name = models.CharField(max_length=50, unique=True)
+    at = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.name}: {self.at}"
+
+
 class MqttDeadLetter(models.Model):
     """An MQTT packet that could not be processed (kept for inspection/replay)."""
 

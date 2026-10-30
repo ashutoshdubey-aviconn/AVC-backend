@@ -38,10 +38,15 @@ Bypassed is also checked during the day (decided 2026-10-28): as soon as an
 aisle's running total for today reaches its bypass threshold the alarm is
 raised (check_intraday_bypass, called by the live consumption path). It is
 still one alarm per aisle per day, so the day-end check then finds it.
+
+Unreliable data (decided 2026-10-30): Bypassed and High Consumption do not
+count spike hours - an hour above the aisle's whole daily baseline, or the
+first hour after a data gap (it carries the gap's consumption, spread by hand)
+- and are not raised on a day the aisle has a Meter Reading Issue.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.core.cache import cache
@@ -110,6 +115,55 @@ def bypass_threshold_for(site, baseline):
     return _threshold(
         site, BYPASSED, lambda: _bypass_threshold(site, baseline), lambda: _bypass_auto(baseline)
     )
+
+
+METER_READING_ISSUE = 10
+
+
+CATCH_UP_FACTOR = 3
+
+
+def spike_hours(site, aisle_group, day, daily_baseline):
+    """``[(hour, kWh)]`` of ``day`` that Bypassed / High do not count.
+
+    * An hour above the aisle's whole daily baseline (impossible in one hour:
+      a meter jump).
+    * A catch-up hour: the first hour after a data gap (no reading the hour
+      before) that is more than CATCH_UP_FACTOR x the median of the day's
+      other hours - it carries the gap's consumption. A normal-sized hour
+      after a gap (e.g. our own server was down) still counts.
+    """
+    start = datetime.combine(day, time.min)
+    rows = list(HourlySiteReading.objects.filter(
+        associated_Site=site, leg_id=aisle_group.attached_leg_id,
+        reading_from__gte=start - timedelta(days=2), reading_from__lt=start + timedelta(days=1),
+    ).order_by("reading_from").values_list("reading_from", "unit_consumption"))
+    today = [kwh or 0.0 for at, kwh in rows if at >= start]
+    spikes, previous = [], None
+    for at, kwh in rows:
+        if at >= start and kwh:
+            jump = daily_baseline and kwh > daily_baseline
+            catch_up = False
+            if previous is None or at - previous > timedelta(hours=1):
+                others = sorted(value for value in today if value != kwh)
+                median = others[len(others) // 2] if others else 0.0
+                catch_up = median > 0 and kwh > CATCH_UP_FACTOR * median
+            if jump or catch_up:
+                spikes.append((at, kwh))
+        previous = at
+    return spikes
+
+
+def meter_issue_on(site, aisle_group, day):
+    start = datetime.combine(day, time.min)
+    return AlarmNotifications.objects.filter(
+        site_id=site, aisle_group=aisle_group, Alarm_type=METER_READING_ISSUE,
+        created_time__gte=start, created_time__lt=start + timedelta(days=1),
+    ).exists()
+
+
+def _spike_note(spikes):
+    return ", ".join(f"{at:%H:%M} {kwh:.2f} kWh" for at, kwh in spikes)
 
 
 def _activity_threshold():
@@ -243,13 +297,20 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     ]
     stored = []
 
+    # Bypassed / High count only reliable hours (see module docstring).
+    unreliable_day = meter_issue_on(site, aisle_group, day)
+    spikes = spike_hours(site, aisle_group, day, baseline)
+    counted = consumption - sum(kwh for _, kwh in spikes)
+    if spikes:
+        common = common + [["Not counted (spike hours)", _spike_note(spikes), False]]
+
     bypass, bypass_how = bypass_threshold_for(site, baseline)
-    if bypass is not None and consumption >= bypass:
+    if bypass is not None and not unreliable_day and counted >= bypass:
         if _record(
             site, aisle_group, day, BYPASSED, "Bypassed Alarm",
-            f"Bypassed: consumption={consumption:.2f}, threshold={bypass:.2f} ({bypass_how}), baseline={baseline:.2f}.",
+            f"Bypassed: consumption={counted:.2f}, threshold={bypass:.2f} ({bypass_how}), baseline={baseline:.2f}.",
             common + [["Bypass threshold (kWh)", f"{bypass:.2f} ({bypass_how})", False]],
-            value=consumption,
+            value=counted,
         ):
             stored.append("Bypassed")
         return stored
@@ -282,14 +343,14 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
         return (units, "site setting") if units is not None else high_auto()
 
     high, _ = _threshold(site, HIGH_CONSUMPTION, high_legacy, high_auto)
-    if high is not None and consumption >= high:
+    if high is not None and not unreliable_day and counted >= high:
         cause = " Cause: operation hours increased." if hours_check is not None else ""
         if _record(
             site, aisle_group, day, HIGH_CONSUMPTION, "High Consumption Alarm",
-            f"High consumption: consumption={consumption:.2f}, threshold={high:.2f}, baseline={baseline:.2f}.{cause}",
+            f"High consumption: consumption={counted:.2f}, threshold={high:.2f}, baseline={baseline:.2f}.{cause}",
             common + [["High threshold (kWh)", f"{high:.2f}", False]]
             + ([["Cause", "Operation hours increased", True]] if cause else []),
-            value=consumption,
+            value=counted,
         ):
             stored.append("High Consumption")
         return stored
@@ -339,18 +400,33 @@ def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
     threshold, how = bypass_threshold_for(site, baseline)
     if threshold is None or consumption < threshold:
         return False
+    # Above the threshold: check the data before raising (a few queries, at
+    # most every 10 minutes per aisle while it stays above).
+    recheck_key = f"{done_key}:recheck"
+    if cache.get(recheck_key):
+        return False
+    if meter_issue_on(site, aisle_group, day):
+        cache.set(recheck_key, 1, 10 * 60)
+        return False
+    spikes = spike_hours(site, aisle_group, day, baseline)
+    counted = consumption - sum(kwh for _, kwh in spikes)
+    if counted < threshold:
+        cache.set(recheck_key, 1, 10 * 60)
+        return False
     now = now or datetime.now()
+    spike_note = f" Not counted (spikes): {_spike_note(spikes)}." if spikes else ""
     stored = _record(
         site, aisle_group, day, BYPASSED, "Bypassed Alarm",
-        f"Bypassed (during the day, {now:%H:%M}): consumption so far={consumption:.2f}, "
-        f"threshold={threshold:.2f} ({how}), baseline={baseline:.2f}.",
+        f"Bypassed (during the day, {now:%H:%M}): consumption so far={counted:.2f}, "
+        f"threshold={threshold:.2f} ({how}), baseline={baseline:.2f}.{spike_note}",
         [
-            ["Consumption so far (kWh)", f"{consumption:.2f} at {now:%H:%M}", True],
+            ["Consumption so far (kWh)", f"{counted:.2f} at {now:%H:%M}", True],
             ["Daily baseline (kWh)", f"{baseline:.2f}", False],
             ["Bypass threshold (kWh)", f"{threshold:.2f} ({how})", False],
+            *([["Not counted (spike hours)", _spike_note(spikes), False]] if spikes else []),
             ["Note", "Raised during the day: the day is not over yet", False],
         ],
-        value=consumption,
+        value=counted,
     )
     cache.set(done_key, 1, 26 * 60 * 60)
     return stored

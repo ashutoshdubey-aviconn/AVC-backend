@@ -13,7 +13,6 @@ threshold counts as disconnected (15); with them 15 and 16 are told apart.
 
 from unittest import mock
 
-from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -34,7 +33,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, broker_log=None, from_start=False, dry_run=False, **options):
         mails = []
-        ping_marker = cache.get(gateway_health.PING_READ_KEY)
+        ping_marker = gateway_health.marker(gateway_health.PING_READ_MARKER)
         try:
             with transaction.atomic(), mock.patch.object(
                 gateway_health, "notify", side_effect=lambda *a: mails.append(a)
@@ -55,11 +54,8 @@ class Command(BaseCommand):
                         self.stdout.write(f"  would e-mail: {mail[1]} - site {mail[2]}")
                     raise _Rollback
         except _Rollback:
-            # Leave the live ping marker as it was.
-            if ping_marker is None:
-                cache.delete(gateway_health.PING_READ_KEY)
-            else:
-                cache.set(gateway_health.PING_READ_KEY, ping_marker, None)
+            # Leave the live ping marker as it was (the rollback restores the row).
+            del ping_marker
             self.stdout.write("dry run: nothing stored, no e-mail sent")
 
 

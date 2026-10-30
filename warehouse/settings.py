@@ -357,6 +357,8 @@ if MQTT_CONSUMPTION_BATCH_SECONDS > 0:
 GATEWAY_HEALTH_CHECK_SECONDS = config("GATEWAY_HEALTH_CHECK_SECONDS", default=300, cast=int)
 GATEWAY_HEALTH_DOWN_MINUTES = config("GATEWAY_HEALTH_DOWN_MINUTES", default=60, cast=int)
 GATEWAY_HEALTH_PING_FRESH_MINUTES = config("GATEWAY_HEALTH_PING_FRESH_MINUTES", default=15, cast=int)
+# No gateway at all with data for this long: our side is down, skip the check.
+GATEWAY_HEALTH_ALL_SILENT_MINUTES = config("GATEWAY_HEALTH_ALL_SILENT_MINUTES", default=15, cast=int)
 if GATEWAY_HEALTH_CHECK_SECONDS > 0:
     CELERY_BEAT_SCHEDULE["check-gateway-health"] = {
         "task": "wareApp.tasks.check_gateway_health",
