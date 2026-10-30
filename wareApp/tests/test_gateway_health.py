@@ -82,6 +82,9 @@ class GatewayAlarmTests(TestCase):
         self.site = Site.objects.create(site_name="Gateway site", site_type=1, is_live=True)
         hgw = HomeGatewayId.objects.create(hgw_id=GW, connected_to=self.site)
         self.status = HomeGatewayStatus.objects.create(home_gateway=hgw, last_data_at=NOW - timedelta(minutes=10))
+        # Another gateway keeps sending: our own side is receiving data.
+        other = HomeGatewayId.objects.create(hgw_id="avc_healthy_000502_1", connected_to=self.site)
+        self.healthy = HomeGatewayStatus.objects.create(home_gateway=other, last_data_at=NOW - timedelta(minutes=1))
 
     def set(self, data_minutes_ago, ping_minutes_ago=None):
         self.status.last_data_at = NOW - timedelta(minutes=data_minutes_ago)
@@ -90,7 +93,7 @@ class GatewayAlarmTests(TestCase):
         )
         self.status.save()
         if ping_minutes_ago is not None:
-            cache.set(gateway_health.PING_READ_KEY, NOW, None)
+            gateway_health.mark(gateway_health.PING_READ_MARKER, NOW)
 
     def active(self):
         return list(
@@ -127,6 +130,7 @@ class GatewayAlarmTests(TestCase):
 
         self.status.last_data_at = NOW + timedelta(minutes=9)
         self.status.save()
+        HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=NOW + timedelta(minutes=79))
         report = gateway_health.evaluate(NOW + timedelta(minutes=10))
         self.assertEqual(len(report.cleared), 1)
         cleared = AlarmNotifications.objects.get()
@@ -137,6 +141,32 @@ class GatewayAlarmTests(TestCase):
         self.assertEqual(notify.call_count, 2)
         labels = [row[0] for row in notify.call_args.args[3]]
         self.assertIn("Previous outage", labels)
+
+    def test_no_gateway_data_at_all_skips_the_check(self, notify):
+        self.set(data_minutes_ago=300)
+        HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=NOW - timedelta(minutes=40))
+        report = gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [])
+        self.assertIn("no gateway data at all", str(report))
+        notify.assert_not_called()
+
+    def test_silence_counts_from_our_listener_restart_at_the_earliest(self, notify):
+        self.set(data_minutes_ago=35 * 60)  # our server was down 35 h
+        gateway_health.mark(gateway_health.LISTENER_STARTED_MARKER, NOW - timedelta(minutes=5))
+        gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [])  # 5 min since we listen again
+        HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=NOW + timedelta(minutes=60))
+        gateway_health.evaluate(NOW + timedelta(minutes=61))
+        self.assertEqual(self.active(), [(15, 2)])
+
+    def test_our_restart_does_not_clear_a_real_outage(self, notify):
+        self.set(data_minutes_ago=180)
+        gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [(15, 2)])
+        gateway_health.mark(gateway_health.LISTENER_STARTED_MARKER, NOW + timedelta(minutes=1))
+        report = gateway_health.evaluate(NOW + timedelta(minutes=5))
+        self.assertEqual(self.active(), [(15, 2)])  # still silent: stays open
+        self.assertEqual(report.cleared, [])
 
     def test_off_and_manual_threshold_in_hours(self, notify):
         self.set(data_minutes_ago=90)
@@ -190,6 +220,8 @@ class CommandTests(TestCase):
         site = Site.objects.create(site_name="Dry site", site_type=1, is_live=True)
         hgw = HomeGatewayId.objects.create(hgw_id=GW, connected_to=site)
         HomeGatewayStatus.objects.create(home_gateway=hgw, last_data_at=datetime.now() - timedelta(hours=3))
+        other = HomeGatewayId.objects.create(hgw_id="avc_healthy_000502_1", connected_to=site)
+        HomeGatewayStatus.objects.create(home_gateway=other, last_data_at=datetime.now())
         log = tempfile.NamedTemporaryFile("w", delete=False, suffix=".log")
         log.write(f"{int(time.time())}: Received PINGREQ from odroid.{GW}\n")
         log.close()
@@ -201,5 +233,5 @@ class CommandTests(TestCase):
         self.assertIn("would e-mail: Gateway Service / Modbus Issue", out.getvalue())
         self.assertFalse(AlarmNotifications.objects.exists())
         notify.assert_not_called()
-        self.assertIsNone(HomeGatewayStatus.objects.get().last_ping_at)
-        self.assertIsNone(cache.get(gateway_health.PING_READ_KEY))
+        self.assertIsNone(HomeGatewayStatus.objects.get(home_gateway=hgw).last_ping_at)
+        self.assertIsNone(gateway_health.marker(gateway_health.PING_READ_MARKER))

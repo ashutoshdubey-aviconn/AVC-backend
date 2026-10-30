@@ -216,3 +216,66 @@ class IntradayBypassTests(TestCase):
         AlarmSetting.objects.create(site=self.site, alarm_type=11, mode=AlarmSetting.OFF)
         self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 500.0))
         self.assertEqual(self.bypassed(), [])
+
+
+@patch("wareApp.mqtt.services.consumption_alarms.notify")
+class UnreliableDataTests(TestCase):
+    """Spike hours do not count; no Bypassed / High on a Meter Reading Issue day."""
+
+    def setUp(self):
+        cache.clear()
+        self.site = Site.objects.create(site_name="Spike site", site_type=1)
+        self.aisle = AisleGroup.objects.create(site=self.site, aisleGroupName="F1-C-Section-EL", is_active=True)
+        self.aisle.refresh_from_db()
+        SiteBaseline.objects.create(
+            associated_site_id=self.site, leg_id=self.aisle.attached_leg_id, baseline_value=48.0,
+            working_hours=24, baseline_from=date(2026, 1, 1),
+        )
+
+    def hours(self, values, day=DAY, first_hour=0):
+        for offset, kwh in enumerate(values):
+            HourlySiteReading.objects.create(
+                associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+                unit_consumption=kwh, reading_from=datetime.combine(day, time(first_hour + offset)),
+                reading_to=datetime.combine(day, time(first_hour + offset, 59, 59)), is_visible=True,
+            )
+
+    def daily(self, kwh, day=DAY):
+        return DailySiteReading.objects.create(
+            associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+            unit_consumption=kwh, reading_for=day, is_visible=True,
+        )
+
+    def test_hour_above_the_whole_daily_baseline_is_not_counted(self, notify):
+        self.hours([1.0] * 23, day=date(2026, 10, 14), first_hour=1)  # yesterday 01-23
+        self.hours([1.0] * 4 + [3290.0] + [1.0] * 5)  # today: meter jump at 04:00
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 3299.0))
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.daily(3299.0)), [])
+        self.assertFalse(AlarmNotifications.objects.exists())
+
+    def test_first_hour_after_a_gap_is_not_counted(self, notify):
+        self.hours([1.0] * 6, day=date(2026, 10, 14), first_hour=12)  # yesterday until 17:00, then nothing
+        self.hours([40.0, 1.0, 1.0], first_hour=10)  # today 10:00 carries the gap
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 42.0 + 10))
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.daily(52.0)), [])
+
+    def test_normal_sized_hour_after_our_own_downtime_still_counts(self, notify):
+        # No readings yesterday (our server was down); today's hours are all normal.
+        self.hours([2.5] * 20)
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 50.0))
+
+    def test_normal_hours_still_raise_bypassed(self, notify):
+        self.hours([1.0] * 23, day=date(2026, 10, 14), first_hour=1)
+        self.hours([2.5] * 20)  # 50 kWh >= 48 baseline, no spike
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 50.0))
+
+    def test_no_bypassed_or_high_on_a_meter_reading_issue_day(self, notify):
+        self.hours([1.0] * 23, day=date(2026, 10, 14), first_hour=1)
+        self.hours([2.5] * 20)
+        AlarmNotifications.objects.create(
+            site_id=self.site, aisle_group=self.aisle, Alarm_type=10, object_type=4,
+            created_time=datetime.combine(DAY, time(12, 0)), to_do="lower meter reading reported",
+        )
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 50.0))
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.daily(50.0)), [])
+        self.assertEqual(list(AlarmNotifications.objects.values_list("Alarm_type", flat=True)), [10])
