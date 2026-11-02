@@ -230,11 +230,19 @@ def evaluate_gateways(report, now):
             continue
         if data_age >= disconnected_after and (ping_age is None or ping_age >= disconnected_after):
             last_ping = f"{status.last_ping_at:%d %b %H:%M}" if status.last_ping_at else "unknown"
+            if with_pings:
+                detail = f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}"
+                extra = [["Last ping", last_ping, False]]
+            else:
+                # Without the broker log (e.g. the test server: gateways ping
+                # main only) a gateway that pings but sends no data looks the
+                # same: do not claim "no ping".
+                detail = f"Gateway {hgw.hgw_id}: no data for {_hours(real_age)} (ping status unknown)"
+                extra = [["Last ping", "not available on this server (broker log not read)", False],
+                         ["Note", "If the gateway still pings, this is a Gateway Service / Modbus Issue", False]]
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
-                f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
-                common + [["Last ping", last_ping if with_pings else "not available", False]],
-                now, AlarmNotifications.PRIORITY_HIGH,
+                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH,
             )
             _clear(report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
         elif data_age >= service_after and ping_age is not None:

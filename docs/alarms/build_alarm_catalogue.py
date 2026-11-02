@@ -196,7 +196,7 @@ STATUS = {
          "Simulated 28 Oct 17:00: raised, e-mailed, auto-cleared 17:05, restored line on next e-mail. Test gets no real meter events (gateways post them to main only)",
          "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=14'; task line 'gateway health: raised=.. cleared=..'"),
     15: ("Done - working live", "test_gateway_health (GatewayAlarmTests, CommandTests)",
-         "Live: 43 alarms since 20 Oct (latest 30 Oct 12:21), 42 cleared, 1 still open (site 35). First live cycle: site 94 gw 3 raised 28 Oct 19:05, cleared 19:25",
+         "Live: 43 alarms since 20 Oct (latest 30 Oct 12:21), 42 cleared, 1 still open (site 35). First live cycle: site 94 gw 3 raised 28 Oct 19:05, cleared 19:25. LIMIT ON TEST: test sees no gateway pings (gateways ping main only), so a gateway that pings but sends no data is raised as 15, worded 'ping status unknown' - e.g. site 119, 2 Nov 17:04: main's broker log shows pings every 45 s, no data since 15:59 = really 16",
          "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=15'"),
     16: ("Done - needs the broker-log cron", "test_gateway_health (pings but no data -> 16)",
          "Dry run with main's broker log (28 Oct): 1 gateway would be 16 (avc_myn_bilaspursvng_000071_1). Not live: test gets data through a bridge, no gateway pings",
@@ -386,6 +386,67 @@ def sheet(book, title, columns, rows, first=False):
     return ws
 
 
+# Every alarm-related route in wareApp/urls.py (checked 2026-11-02), by purpose.
+API_LIST = [("#", 4), ("Group", 22), ("Endpoint", 34), ("Method", 8), ("Screen / purpose", 44), ("Request", 38),
+            ("Returns", 60), ("Shows", 26), ("Status", 34), ("View (file)", 46)]
+FRONTEND = "A. Frontend - working"
+LEGACY = "B. Frontend - old, shows nothing"
+INGEST = "C. Not frontend - data in"
+RELATED = "D. Related status (not alarm lists)"
+API_LIST_ROWS = [
+    [1, FRONTEND, "/api/alarmList/", "POST", "Site alarm page - summary: totals and one line per alarm type",
+     '{"siteId": 114}', "total_alarm, high_priority, medium_priority, active_alarms, data[]: name, count, priority, alarm_type",
+     "Active alarms only", "Working", "views/alarms.py -> AlarmsList"],
+    [2, FRONTEND, "/api/alarmListDetail/", "POST", "Site alarm page - detail: rows of one type (click on a type in #1)",
+     '{"siteId": 114, "alarm_type": 10}', "data[]: type, priority, aisle_group, issue, created, last_seen, occurrences, is_active, R/Y/B phase, fuel, run hours",
+     "Active alarms only", "Working", "views/alarms.py -> AlarmsListDetail"],
+    [3, FRONTEND, "/api/consumptionAlarms/", "POST", "Consumption alarms list: High / Low Consumption (types 7, 8), optional date range",
+     '{"site_id": 114, "start_date": "2026/11/01", "end_date": "2026/11/02"}', "data[]: id, alarm_type, priority, aisle_group, created_time, issue",
+     "Active alarms only", "Working", "views/alarms.py -> ConsumptionAlarmsAPI"],
+    [4, FRONTEND, "/api/alarmTypeApi/", "POST", "Super-admin alarm list: active issues of every live site, by customer (Super_Admin only)",
+     "{}", "data[]: customer_id, customer_name, alarm_list[] (one row per issue: site, aisle, type, priority, first / last seen, count)",
+     "Active, last seen <= 30 days", "Working", "views/superadmin.py -> SuperUserAllAlarmsTypeBasedOnCustomersList; alarm_feed.py"],
+    [5, FRONTEND, "/api/alarmapi/", "POST", "Super-admin dashboard: active issue counts per customer, priority and site",
+     "{}", "data[][]: Alarm_priority, site_id__site_name, alarm_count", "Same source as #4", "Working",
+     "views/superadmin.py -> SuperUserAllAlarmsPriorityBasedOnCustomersList"],
+    [6, FRONTEND, "/api/snapshot/", "POST", "Super-admin snapshot card: one alarm number next to energy figures",
+     '{"user_id": 1, "start_date": "2026/11/01", "end_date": "2026/11/02"}', "alarms (count of #4), total_unit_consumed, total_energy_saved, total_saved_percentage",
+     "Count of #4", "Working", "views/superadmin.py -> SuperAdminSnapShot"],
+    [7, FRONTEND, "/api/fireAlarm/", "POST", "Fire pump page: pump state per aisle (FirePumpAlarm, not the alarm table)",
+     '{"site_id": 114}', "data[]: aislename, R/Y/B voltage, manual / auto / off mode times, motor_status", "Fire pump state", "Working",
+     "views/fire.py -> FireAlarm"],
+    [8, LEGACY, "/api/alarmListOnCustomerPage/", "POST", "Customer page table: alarm counts per site and type",
+     '{"id": <customer user id>}', "data[]: site_id, site_name, alarms {type: count}, total_alarm_count, site_type",
+     "Rows with created_by = customer AND user_level = 4", "Always empty: no current alarm has these (0 of 12,393 rows on test)",
+     "views/customer.py -> TotalAlarmsOnCustomerPageTabularForm"],
+    [9, LEGACY, "/api/alarmListOnSitePage/", "POST", "Site page table: alarm rows of one site",
+     '{"site_id": 114}', "data[]: alarm_type, object_type, object_name, alarm_priority, created_date",
+     "Rows with created_by = customer AND user_level = 4", "Always empty (same reason)", "views/site.py -> TotalAlarmsOnSitePageTabularForm"],
+    [10, LEGACY, "/api/getCustAlarmGraph/", "POST", "Customer page bar chart: count per alarm type",
+     '{"id": <customer user id>}', "Data[]: name, data [count], type column; alarm_name_list",
+     "Rows with created_by = customer", "Always empty (current alarms have no created_by)", "views/customer.py -> TotalAlarmsTypeCountOnCustomerPage"],
+    [11, LEGACY, "/api/customerSnapShotEnergySavingApi/", "POST", "Customer snapshot card (energy figures + alarm count)",
+     "(customer snapshot request)", "... alarms (count) ...", "Rows with user_level = 4", "alarms field always 0; energy figures fine",
+     "views/customer.py -> CustomerSnapshotApi"],
+    [12, INGEST, "/api/temp/dispatch/mail/", "POST", "Gateway script posts an overheat alert -> Gateway Overheat alarm (13)",
+     "gateway payload (no login, throttled)", '{"status": "stored" | "repeated" | "throttled" | "off" | "below threshold"}', "-", "Working",
+     "views/gateway_overheat.py -> GatewayOverheatAlertApi"],
+    [13, INGEST, "/api/meter-disconnections/ingest/", "POST", "Gateway posts meter connected / disconnected events -> Meter Disconnected alarm (14)",
+     "event object or list (no login)", "status, saved count", "-", "Working (gateways post to main only)",
+     "views/monitoring.py -> MeterDisconnectionIngestView"],
+    [14, INGEST, "/api/dgFuelAlerts/", "POST", "Fuel provider posts raw DG fuel alerts (stored in DGAlertsData)",
+     "provider payload (no login)", '{"status": 200, "msg": "alert received"}', "-", "Working", "views/dg_fuel.py -> FetchDGAlertData"],
+    [15, INGEST, "/api/dgFuelPushInterface/", "POST", "Roadcast / test interface pushes DG fuel alerts (X-Interface-Id header)",
+     "provider payload + X-Interface-Id", '{"status": 200, "message": "DG Fuel Alert Recieved"}', "-", "Working",
+     "views/dg_fuel.py -> DgAlertsPushInterface"],
+    ["-", RELATED, "/api/gateway-status/", "GET", "Gateway online / offline list (same state that raises 15 / 16)",
+     "?limit=100&offset=0", "gateway id, site, customer, status, last data / ping time", "All gateways", "Working",
+     "views/monitoring.py -> HomeGatewayStatusApi"],
+    ["-", RELATED, "/api/meter-disconnections/", "GET", "Raw meter connect / disconnect events (input of 14)",
+     "?site_id=&meter_id=&status=&from=&to=&limit=&offset=", "count, limit, offset, results[]", "All events", "Working",
+     "views/monitoring.py -> MeterDisconnectionListView"],
+]
+
 LOGS = [("Log", 46), ("Server path / command", 62), ("Shows", 70)]
 LOG_ROWS = [
     ["Celery queue-1 log (consumption, load, power alarms, e-mails)", "~/django_project/celerylogs1/celery_logs_of_server.log\n grep -a 'Consumption alarm stored\\|Power alarm\\|Meter reading issue' ...",
@@ -414,6 +475,7 @@ def main():
     rows = [row[:5] + list(STATUS[row[0]]) + row[5:16] + [MODELS_BY_TYPE[row[0]]] + row[16:] for row in ALARMS]
     sheet(book, "Alarm catalogue", header, rows)
     sheet(book, "Frontend APIs", APIS, API_ROWS)
+    sheet(book, "Alarm API list", API_LIST, API_LIST_ROWS)
     sheet(book, "Configuration", CONFIG, CONFIG_ROWS)
     sheet(book, "E-mail flow", FLOW, FLOW_ROWS)
     sheet(book, "Fields", FIELDS, FIELD_ROWS)
