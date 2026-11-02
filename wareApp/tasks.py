@@ -260,6 +260,16 @@ def check_gateway_health():
 
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
+def close_resolved_alarms():
+    """Close alarms that are no longer happening (services/alarm_closer.py)."""
+    from wareApp.mqtt.services import alarm_closer
+
+    counts = alarm_closer.close_resolved()
+    return "alarms closed: " + (", ".join(f"{k}={v}" for k, v in counts.items() if v) or "none")
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
 def check_consumption_spikes():
     """Raise / update Consumption Spike alarms (type 17) for today and yesterday."""
     from wareApp.mqtt.services import spike_alarms

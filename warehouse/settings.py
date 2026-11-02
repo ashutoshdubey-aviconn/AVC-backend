@@ -375,6 +375,18 @@ if CONSUMPTION_SPIKE_CHECK_SECONDS > 0:
         "options": {"queue": "queue2_processing", "expires": max(CONSUMPTION_SPIKE_CHECK_SECONDS - 10, 10)},
     }
 
+# Closing resolved alarms (wareApp/mqtt/services/alarm_closer.py).
+ALARM_CLOSE_CHECK_SECONDS = config("ALARM_CLOSE_CHECK_SECONDS", default=300, cast=int)
+ALARM_CLOSE_POWER_MINUTES = config("ALARM_CLOSE_POWER_MINUTES", default=60, cast=int)
+ALARM_CLOSE_OVERHEAT_HOURS = config("ALARM_CLOSE_OVERHEAT_HOURS", default=2, cast=int)
+ALARM_CLOSE_EVENT_HOURS = config("ALARM_CLOSE_EVENT_HOURS", default=24, cast=int)
+if ALARM_CLOSE_CHECK_SECONDS > 0:
+    CELERY_BEAT_SCHEDULE["close-resolved-alarms"] = {
+        "task": "wareApp.tasks.close_resolved_alarms",
+        "schedule": ALARM_CLOSE_CHECK_SECONDS,
+        "options": {"queue": "queue2_processing", "expires": max(ALARM_CLOSE_CHECK_SECONDS - 10, 10)},
+    }
+
 CELERY_TASK_QUEUES = (
     Queue("celery"),
     Queue("queue1"),
