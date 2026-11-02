@@ -1,1 +1,275 @@
-{"alarmList": {"status": 200, "body": {"status": 200, "total_alarm": 159, "high_priority": 0, "medium_priority": 159, "active_alarms": 159, "data": [{"name": "High Consumption", "count": 57, "priority": "Medium", "alarm_type": 7}, {"name": "Bypassed", "count": 102, "priority": "Medium", "alarm_type": 11}]}}, "alarmListDetail": {"status": 200, "body": {"status": 200, "data": [{"get_alarm_type_display": "Bypassed", "power_source": null, "get_alarm_priority_display": "Medium", "r_phase": null, "y_phase": null, "b_phase": null, "fuel_level": null, "run_hours": null, "created": "2026-10-28T00:00:00", "is_active": true, "aisle_group": "GF_Fan-Z1&2-AtoD/GH", "issue": "Bypassed (during the day, 21:52): consumption so far=33.85, threshold=10.91 (100 % of baseline), baseline=10.91.", "occurrences": 1, "last_seen": null}, {"get_alarm_type_display": "Bypassed", "power_source": null, "get_alarm_priority_display": "Medium", "r_phase": null, "y_phase": null, "b_phase": null, "fuel_level": null, "run_hours": null, "created": "2026-10-28T00:00:00", "is_active": true, "aisle_group": "GF_Zone1&2", "issue": "Bypassed (during the day, 21:52): consumption so far=43.22, threshold=29.42 (100 % of baseline), baseline=29.42.", "occurrences": 1, "last_seen": null}, "..."]}}, "alarmTypeApi": {"status": 200, "body": {"data": [{"customer_id": 2, "customer_name": "DelhiVery", "alarm_list": [{"alarm": "High Consumption", "Alarm_priority": 1, "site_id__site_name": "Hassanpur-GGNFC3-GF", "created_time": "2026-10-06 00:00:00", "priority": "Medium", "site_id": 125, "customer_id": 2, "customer_name": "DelhiVery", "source": "consumption", "aisle_group_id": 727, "aisle_group_name": "GF_FS_3&4/6&7_BS_3~5", "leg_id": "727", "power_source": null, "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1", "issue": "High consumption: consumption=14.24, threshold=12.01, baseline=16.01.", "alarm_type": 7, "last_seen": "2026-10-26 00:00:00", "occurrences": 12}, {"alarm": "Bypassed", "Alarm_priority": 1, "site_id__site_name": "Hassanpur-GGNFC3-GF", "created_time": "2026-10-06 00:00:00", "priority": "Medium", "site_id": 125, "customer_id": 2, "customer_name": "DelhiVery", "source": "consumption", "aisle_group_id": 724, "aisle_group_name": "GF_FS/BS_R1&BS_R2", "leg_id": "724", "power_source": null, "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1", "issue": "Bypassed: consumption=8.16, threshold=7.51 (100 % of baseline), baseline=7.51.", "alarm_type": 11, "last_seen": "2026-10-26 00:00:00", "occurrences": 12}, "..."]}, {"customer_id": 27, "customer_name": "Myntra", "alarm_list": [{"alarm": "High Consumption", "Alarm_priority": 1, "site_id__site_name": "Myntra Binola Inventory Saving", "created_time": "2026-09-25 00:00:00", "priority": "Medium", "site_id": 29, "customer_id": 27, "customer_name": "Myntra", "source": "consumption", "aisle_group_id": 224, "aisle_group_name": "F-Block-GF", "leg_id": "224", "power_source": null, "home_gateway_id": "avc_myntra_binola_000029_2", "issue": "High consumption: consumption=22.39, threshold=20.22, baseline=26.96.", "alarm_type": 7, "last_seen": "2026-10-26 00:00:00", "occurrences": 17}, {"alarm": "Bypassed", "Alarm_priority": 1, "site_id__site_name": "Myntra Binola Inventory Saving", "created_time": "2026-09-24 00:00:00", "priority": "Medium", "site_id": 29, "customer_id": 27, "customer_name": "Myntra", "source": "consumption", "aisle_group_id": 225, "aisle_group_name": "EL-F-Block-GF", "leg_id": "225", "power_source": null, "home_gateway_id": "avc_myntra_binola_000029_2", "issue": "Bypassed: consumption=9.90, threshold=7.73 (100 % of baseline), baseline=7.73.", "alarm_type": 11, "last_seen": "2026-10-26 00:00:00", "occurrences": 24}, "..."]}, "..."]}}, "alarmapi": {"status": 200, "body": {"data": [[{"Alarm_priority": 1, "site_id__site_name": "Hassanpur-GGNFC3-GF", "alarm_count": 10}], [], "..."]}}, "snapshot": {"status": 200, "body": {"current_date": "2026/10/01", "alarms": 147, "total_unit_consumed": 838313.89, "total_energy_saved": 39438.75, "total_saved_percentage": "4.72"}}, "consumptionAlarms": {"status": 200, "body": {"status": 200, "data": [{"id": 14424, "alarm_type": "High Consumption", "priority": "Medium", "aisle_group": "F1-Fan_RackIn-area", "created_time": "2026-10-25 00:00:00"}, {"id": 2902, "alarm_type": "High Consumption", "priority": "Medium", "aisle_group": "EL_F1", "created_time": "2026-10-23 00:00:00"}, "..."]}}, "gateway-status": {"status": 200, "body": {"status": 200, "count": 60, "limit": 100, "offset": 0, "results": [{"id": 1, "gateway_id": "avc_purplleOldInvt_farukhnagar_000135_1", "latitude": null, "longitude": null, "status": true, "site_id": 135, "site_name": "Purplle GGN Inventory", "customer_name": "Purplle"}, {"id": 2, "gateway_id": "avc_myntra_bhiwSvng_000109_2", "latitude": null, "longitude": null, "status": true, "site_id": 109, "site_name": "Myntra Bhiwandi Inventory Lights", "customer_name": "MyntraTesting"}, "..."]}}, "meter-disconnections": {"status": 200, "body": {"status": 200, "count": 1, "limit": 100, "offset": 0, "results": [{"id": 3635, "logged_site_id": 102, "meter_id": 790, "meter_number": 79, "meter_name": "meter790", "status": "connected", "port_id": "/dev/ttyUSB1", "detection_window_start": "2026-10-10T15:54:53.022863", "detection_window_end": "2026-10-10T17:02:05.445980", "last_seen_at": "2026-10-10T17:02:09.195121", "source_log_path": "/home/odroid/gateway-latest-code/pymodbusLogs/pymodbus.log", "raw_log_line": "2026-10-10 17:02:09.195121 : meter790 has been Connected", "synced_to_cloud": true, "synced_at": "2026-10-10T17:03:23.522617", "cloud_response": "", "created_at": "2026-10-10T16:55:21.427637", "updated_at": "2026-10-10T17:03:28.896184"}]}}, "_site_used": 134}
+{
+ "alarmList": {
+  "status": 200,
+  "body": {
+   "status": 200,
+   "total_alarm": 6,
+   "high_priority": 6,
+   "medium_priority": 0,
+   "active_alarms": 6,
+   "data": [
+    {
+     "name": "Meter Reading Issue",
+     "count": 6,
+     "priority": "High",
+     "alarm_type": 10
+    }
+   ]
+  }
+ },
+ "alarmListDetail": {
+  "status": 200,
+  "body": {
+   "status": 200,
+   "data": [
+    {
+     "get_alarm_type_display": "Meter Reading Issue",
+     "power_source": null,
+     "get_alarm_priority_display": "High",
+     "r_phase": null,
+     "y_phase": null,
+     "b_phase": null,
+     "fuel_level": null,
+     "run_hours": null,
+     "created": "2026-11-02T12:20:23.984023",
+     "is_active": true,
+     "aisle_group": "F1-Part1-EL",
+     "issue": "Gateway avc_Myntra_BGLRSvng_000114_1: lower meter reading reported.",
+     "occurrences": 3,
+     "last_seen": "2026-11-02T13:10:23.982042"
+    },
+    {
+     "get_alarm_type_display": "Meter Reading Issue",
+     "power_source": null,
+     "get_alarm_priority_display": "High",
+     "r_phase": null,
+     "y_phase": null,
+     "b_phase": null,
+     "fuel_level": null,
+     "run_hours": null,
+     "created": "2026-11-02T12:17:23.982873",
+     "is_active": true,
+     "aisle_group": "F2-2K Block",
+     "issue": "Gateway avc_Myntra_BGLRSvng_000114_1: lower meter reading reported.",
+     "occurrences": 3,
+     "last_seen": "2026-11-02T13:06:24.112807"
+    }
+   ]
+  }
+ },
+ "alarmTypeApi": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "customer_id": 2,
+     "customer_name": "DelhiVery",
+     "alarm_list": [
+      {
+       "alarm": "High Consumption",
+       "Alarm_priority": 1,
+       "site_id__site_name": "Hassanpur-GGNFC3-GF",
+       "created_time": "2026-10-06 00:00:00",
+       "priority": "Medium",
+       "site_id": 125,
+       "customer_id": 2,
+       "customer_name": "DelhiVery",
+       "source": "consumption",
+       "aisle_group_id": 727,
+       "aisle_group_name": "GF_FS_3&4/6&7_BS_3~5",
+       "leg_id": "727",
+       "power_source": null,
+       "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
+       "issue": "High consumption: consumption=14.24, threshold=12.01, baseline=16.01.",
+       "alarm_type": 7,
+       "last_seen": "2026-10-26 00:00:00",
+       "occurrences": 12
+      },
+      {
+       "alarm": "Bypassed",
+       "Alarm_priority": 1,
+       "site_id__site_name": "Hassanpur-GGNFC3-GF",
+       "created_time": "2026-10-06 00:00:00",
+       "priority": "Medium",
+       "site_id": 125,
+       "customer_id": 2,
+       "customer_name": "DelhiVery",
+       "source": "consumption",
+       "aisle_group_id": 724,
+       "aisle_group_name": "GF_FS/BS_R1&BS_R2",
+       "leg_id": "724",
+       "power_source": null,
+       "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
+       "issue": "Bypassed: consumption=8.16, threshold=7.51 (100 % of baseline), baseline=7.51.",
+       "alarm_type": 11,
+       "last_seen": "2026-10-26 00:00:00",
+       "occurrences": 12
+      },
+      "..."
+     ]
+    },
+    {
+     "customer_id": 27,
+     "customer_name": "Myntra",
+     "alarm_list": [
+      {
+       "alarm": "High Consumption",
+       "Alarm_priority": 1,
+       "site_id__site_name": "Myntra Binola Inventory Saving",
+       "created_time": "2026-09-25 00:00:00",
+       "priority": "Medium",
+       "site_id": 29,
+       "customer_id": 27,
+       "customer_name": "Myntra",
+       "source": "consumption",
+       "aisle_group_id": 224,
+       "aisle_group_name": "F-Block-GF",
+       "leg_id": "224",
+       "power_source": null,
+       "home_gateway_id": "avc_myntra_binola_000029_2",
+       "issue": "High consumption: consumption=22.39, threshold=20.22, baseline=26.96.",
+       "alarm_type": 7,
+       "last_seen": "2026-10-26 00:00:00",
+       "occurrences": 17
+      },
+      {
+       "alarm": "Bypassed",
+       "Alarm_priority": 1,
+       "site_id__site_name": "Myntra Binola Inventory Saving",
+       "created_time": "2026-09-24 00:00:00",
+       "priority": "Medium",
+       "site_id": 29,
+       "customer_id": 27,
+       "customer_name": "Myntra",
+       "source": "consumption",
+       "aisle_group_id": 225,
+       "aisle_group_name": "EL-F-Block-GF",
+       "leg_id": "225",
+       "power_source": null,
+       "home_gateway_id": "avc_myntra_binola_000029_2",
+       "issue": "Bypassed: consumption=9.90, threshold=7.73 (100 % of baseline), baseline=7.73.",
+       "alarm_type": 11,
+       "last_seen": "2026-10-26 00:00:00",
+       "occurrences": 24
+      },
+      "..."
+     ]
+    },
+    "..."
+   ]
+  }
+ },
+ "alarmapi": {
+  "status": 200,
+  "body": {
+   "data": [
+    [
+     {
+      "Alarm_priority": 1,
+      "site_id__site_name": "Hassanpur-GGNFC3-GF",
+      "alarm_count": 10
+     }
+    ],
+    [],
+    "..."
+   ]
+  }
+ },
+ "snapshot": {
+  "status": 200,
+  "body": {
+   "current_date": "2026/10/01",
+   "alarms": 147,
+   "total_unit_consumed": 838313.89,
+   "total_energy_saved": 39438.75,
+   "total_saved_percentage": "4.72"
+  }
+ },
+ "consumptionAlarms": {
+  "status": 200,
+  "body": {
+   "status": 200,
+   "data": [
+    {
+     "id": 14424,
+     "alarm_type": "High Consumption",
+     "priority": "Medium",
+     "aisle_group": "F1-Fan_RackIn-area",
+     "created_time": "2026-10-25 00:00:00"
+    },
+    {
+     "id": 2902,
+     "alarm_type": "High Consumption",
+     "priority": "Medium",
+     "aisle_group": "EL_F1",
+     "created_time": "2026-10-23 00:00:00"
+    },
+    "..."
+   ]
+  }
+ },
+ "gateway-status": {
+  "status": 200,
+  "body": {
+   "status": 200,
+   "count": 60,
+   "limit": 100,
+   "offset": 0,
+   "results": [
+    {
+     "id": 1,
+     "gateway_id": "avc_purplleOldInvt_farukhnagar_000135_1",
+     "latitude": null,
+     "longitude": null,
+     "status": true,
+     "site_id": 135,
+     "site_name": "Purplle GGN Inventory",
+     "customer_name": "Purplle"
+    },
+    {
+     "id": 2,
+     "gateway_id": "avc_myntra_bhiwSvng_000109_2",
+     "latitude": null,
+     "longitude": null,
+     "status": true,
+     "site_id": 109,
+     "site_name": "Myntra Bhiwandi Inventory Lights",
+     "customer_name": "MyntraTesting"
+    },
+    "..."
+   ]
+  }
+ },
+ "meter-disconnections": {
+  "status": 200,
+  "body": {
+   "status": 200,
+   "count": 1,
+   "limit": 100,
+   "offset": 0,
+   "results": [
+    {
+     "id": 3635,
+     "logged_site_id": 102,
+     "meter_id": 790,
+     "meter_number": 79,
+     "meter_name": "meter790",
+     "status": "connected",
+     "port_id": "/dev/ttyUSB1",
+     "detection_window_start": "2026-10-10T15:54:53.022863",
+     "detection_window_end": "2026-10-10T17:02:05.445980",
+     "last_seen_at": "2026-10-10T17:02:09.195121",
+     "source_log_path": "/home/odroid/gateway-latest-code/pymodbusLogs/pymodbus.log",
+     "raw_log_line": "2026-10-10 17:02:09.195121 : meter790 has been Connected",
+     "synced_to_cloud": true,
+     "synced_at": "2026-10-10T17:03:23.522617",
+     "cloud_response": "",
+     "created_at": "2026-10-10T16:55:21.427637",
+     "updated_at": "2026-10-10T17:03:28.896184"
+    }
+   ]
+  }
+ },
+ "_site_used": 134,
+ "_note": "alarmList / alarmListDetail: site 114, 2 Nov 2026 (active alarms only); other samples: site 134, 28 Oct 2026"
+}
