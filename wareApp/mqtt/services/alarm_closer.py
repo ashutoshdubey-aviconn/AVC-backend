@@ -9,7 +9,7 @@ Every other type is closed here, without an e-mail (decided 2026-11-02):
   off_time = last seen.
 * 13 Gateway Overheat: no overheat post for ALARM_CLOSE_OVERHEAT_HOURS (2).
 * 10 Meter Reading Issue: no repeat for ALARM_CLOSE_EVENT_HOURS (24).
-* Daily alarms (6, 7, 8, 9, 11, 12, 17), one row per day: closed at the end
+* Daily alarms (6, 7, 8, 9, 11, 12, 17, and old rows of 3, 4, 5), one row per day: closed at the end
   of the day after their day, so they stay visible for one full day.
   off_time = end of their day.
 
@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 A = AlarmNotifications
 POWER = (A.HIGH_VOLTAGE, A.LOW_VOLTAGE, A.PF_BAD_VALUE)
 DAILY = (A.FUEL_DRAIN, A.HIGH_CONSUMPTION, A.LOW_CONSUMPTION, A.DG_RUNNING_WITHOUT_LOAD,
-         A.BYPASSED, A.OPERATION_HOURS_INCREASED, A.CONSUMPTION_SPIKE)
+         A.BYPASSED, A.OPERATION_HOURS_INCREASED, A.CONSUMPTION_SPIKE,
+         # Not raised by the current code; only old rows: close them the same way.
+         A.DG_OVERTIME, A.DG_FUEL_UNDER_LEVEL, A.MAINS_HIGHER_CONSUMPTION)
 
 
 def _setting(name, default):
