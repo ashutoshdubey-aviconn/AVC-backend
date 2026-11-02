@@ -95,12 +95,17 @@ class GatewayAlarmTests(TestCase):
         if ping_minutes_ago is not None:
             gateway_health.mark(gateway_health.PING_READ_MARKER, NOW)
 
+    def log_read(self, at=NOW):
+        """The broker log was read at ``at`` (fresh ping information)."""
+        gateway_health.mark(gateway_health.PING_READ_MARKER, at)
+
     def active(self):
         return list(
             AlarmNotifications.objects.filter(is_active=True).values_list("Alarm_type", "object_id")
         )
 
-    def test_silent_gateway_without_ping_information_is_disconnected(self, notify):
+    def test_silent_gateway_without_pings_in_the_broker_log_is_disconnected(self, notify):
+        self.log_read()
         self.set(data_minutes_ago=59)
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [])
@@ -110,11 +115,16 @@ class GatewayAlarmTests(TestCase):
         self.assertEqual(len(report.raised), 1)
         self.assertEqual(notify.call_args.args[1], "Gateway Disconnected")
         self.assertEqual(notify.call_args.args[4], 15)
-        # No broker log read: it must not claim "no ping" (it may be a service issue).
-        self.assertIn("(ping status unknown)", AlarmNotifications.objects.get().to_do)
-        self.assertIn("Gateway Service / Modbus Issue", dict((r[0], r[1]) for r in notify.call_args.args[3])["Note"])
         self.status.refresh_from_db()
         self.assertFalse(self.status.status)
+
+    def test_without_ping_information_it_is_a_service_issue_never_disconnected(self, notify):
+        # Test server: gateways ping main only, so pings are unknown here.
+        self.set(data_minutes_ago=300)
+        gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [(16, 2)])
+        self.assertEqual(notify.call_args.args[1], "Gateway Service / Modbus Issue")
+        self.assertIn("(ping status unknown)", AlarmNotifications.objects.get().to_do)
 
     def test_pings_but_no_data_is_a_service_issue_and_switches_to_disconnected(self, notify):
         self.set(data_minutes_ago=90, ping_minutes_ago=2)
@@ -156,14 +166,17 @@ class GatewayAlarmTests(TestCase):
     def test_silence_counts_from_our_listener_restart_at_the_earliest(self, notify):
         self.set(data_minutes_ago=35 * 60)  # our server was down 35 h
         gateway_health.mark(gateway_health.LISTENER_STARTED_MARKER, NOW - timedelta(minutes=5))
+        self.log_read()
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [])  # 5 min since we listen again
         HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=NOW + timedelta(minutes=60))
+        self.log_read(NOW + timedelta(minutes=61))
         gateway_health.evaluate(NOW + timedelta(minutes=61))
         self.assertEqual(self.active(), [(15, 2)])
 
     def test_our_restart_does_not_clear_a_real_outage(self, notify):
         self.set(data_minutes_ago=180)
+        self.log_read()
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [(15, 2)])
         gateway_health.mark(gateway_health.LISTENER_STARTED_MARKER, NOW + timedelta(minutes=1))
@@ -173,6 +186,7 @@ class GatewayAlarmTests(TestCase):
 
     def test_off_and_manual_threshold_in_hours(self, notify):
         self.set(data_minutes_ago=90)
+        self.log_read()
         setting = AlarmSetting.objects.create(site=self.site, alarm_type=15, mode=AlarmSetting.MANUAL, threshold=2)
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [])  # 1.5 h < 2 h
