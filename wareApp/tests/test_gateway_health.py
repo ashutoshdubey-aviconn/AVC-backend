@@ -110,6 +110,9 @@ class GatewayAlarmTests(TestCase):
         self.assertEqual(len(report.raised), 1)
         self.assertEqual(notify.call_args.args[1], "Gateway Disconnected")
         self.assertEqual(notify.call_args.args[4], 15)
+        # No broker log read: it must not claim "no ping" (it may be a service issue).
+        self.assertIn("(ping status unknown)", AlarmNotifications.objects.get().to_do)
+        self.assertIn("Gateway Service / Modbus Issue", dict((r[0], r[1]) for r in notify.call_args.args[3])["Note"])
         self.status.refresh_from_db()
         self.assertFalse(self.status.status)
 
