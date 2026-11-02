@@ -152,7 +152,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         object_id=int(meter_id),
         aisle_group=aisle_group,
         Alarm_type=10,
-        Alarm_priority=1,
+        Alarm_priority=AlarmNotifications.PRIORITY_HIGH,
         created_time=occurred_at,
         last_seen=occurred_at,
         to_do=f"Gateway {gateway_id}: lower meter reading reported.",

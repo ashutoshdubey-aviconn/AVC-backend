@@ -240,6 +240,7 @@ class ConsumptionModeTests(TestCase):
     def test_low_auto_uses_the_default_percent(self, notify):
         AlarmSetting.objects.create(site=self.site, alarm_type=8, mode=AlarmSetting.AUTO)
         self.assertEqual(self.evaluate(19.0, date(2026, 10, 15)), ["Low Consumption"])  # < 20 = 10 %
+        self.assertEqual(AlarmNotifications.objects.get(Alarm_type=8).Alarm_priority, 1)  # stays Medium
         self.assertEqual(self.evaluate(21.0, date(2026, 10, 16)), [])
 
 

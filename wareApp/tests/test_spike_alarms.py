@@ -49,6 +49,7 @@ class SpikeAlarmTests(TestCase):
         self.assertIn("raised=1", spike_alarms.scan(NOW))
         alarm = self.alarm()
         self.assertEqual((alarm.aisle_group_id, alarm.created_time), (self.aisle.id, datetime.combine(DAY, time.min)))
+        self.assertEqual(alarm.Alarm_priority, 0)  # High
         self.assertIn("04:00 3290.26 kWh (meter reset or replaced)", alarm.to_do)
         self.assertEqual(notify.call_args.args[1], "Consumption Spike Alarm")
         self.assertEqual(notify.call_args.args[4], 17)

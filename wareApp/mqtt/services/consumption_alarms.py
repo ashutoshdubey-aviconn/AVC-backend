@@ -118,6 +118,16 @@ def bypass_threshold_for(site, baseline):
 
 
 METER_READING_ISSUE = 10
+# High priority (decided 2026-11-02): Bypassed, High Consumption, Operation
+# Hours Increased (and Meter Reading Issue / Consumption Spike, raised
+# elsewhere). Low Consumption stays Medium.
+HIGH_PRIORITY_TYPES = frozenset({BYPASSED, HIGH_CONSUMPTION, OPERATION_HOURS_INCREASED})
+
+
+def priority_of(alarm_type):
+    if alarm_type in HIGH_PRIORITY_TYPES:
+        return AlarmNotifications.PRIORITY_HIGH
+    return AlarmNotifications.PRIORITY_MEDIUM
 
 
 CATCH_UP_FACTOR = 3
@@ -259,7 +269,7 @@ def _record(site, aisle_group, day, alarm_type, title, to_do, details,
         object_id=int(meter_id) if meter_id.isdigit() else None,
         aisle_group=aisle_group,
         Alarm_type=alarm_type,
-        Alarm_priority=1,
+        Alarm_priority=priority_of(alarm_type),
         created_time=day_start,
         to_do=to_do[:200],
         # Carry the last e-mailed value forward when this one is not e-mailed.
