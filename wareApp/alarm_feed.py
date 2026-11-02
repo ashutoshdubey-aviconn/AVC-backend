@@ -47,6 +47,24 @@ def _power_issue(row):
     return ALARM_TYPES.get(alarm_type, "")
 
 
+def open_for(start, end):
+    """``(whole days, text)`` an issue has been open, e.g. ``(2, "2 days 5 h")``."""
+    seconds = max((end - start).total_seconds(), 0)
+    days, hours = int(seconds // 86400), int(seconds % 86400 // 3600)
+    if days:
+        return days, f"{days} day{'s' if days != 1 else ''} {hours} h"
+    return 0, f"{seconds / 3600:.1f} h"
+
+
+def open_info(start, alarm_is_active, off_time, now=None):
+    """API fields: whole days and text an alarm has been (or was) open."""
+    if start is None:
+        return {"open_days": None, "open_for": None}
+    end = (now or datetime.now()) if alarm_is_active or off_time is None else off_time
+    days, text = open_for(start, end)
+    return {"open_days": days, "open_for": text}
+
+
 def _cutoff():
     """Oldest last-seen time shown (ALARM_FEED_MAX_AGE_DAYS; 0 = no limit)."""
     days = getattr(settings, "ALARM_FEED_MAX_AGE_DAYS", 30)
@@ -62,6 +80,7 @@ def active_alarms(site_ids):
     """
     site_ids = list(site_ids)
     cutoff = _cutoff()
+    now = datetime.now()
     if not site_ids:
         return []
     sites = {
@@ -114,6 +133,8 @@ def active_alarms(site_ids):
             d for d in (group["last_created"], group["last_seen"]) if d is not None
         )
         common = dict(
+            # Days not solved, from the issue's first day (outages: when it began).
+            **open_info(group["first_seen"], True, None, now),
             alarm_type=alarm_type,
             alarm=ALARM_TYPES.get(alarm_type, str(alarm_type)),
             priority=group["priority"],

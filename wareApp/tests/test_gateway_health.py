@@ -126,6 +126,26 @@ class GatewayAlarmTests(TestCase):
         self.assertEqual(notify.call_args.args[1], "Gateway Service / Modbus Issue")
         self.assertIn("(ping status unknown)", AlarmNotifications.objects.get().to_do)
 
+    def test_open_since_the_outage_began_and_e_mailed_once_a_day_until_solved(self, notify):
+        self.set(data_minutes_ago=90)  # silent since 10:30
+        gateway_health.evaluate(NOW)
+        alarm = AlarmNotifications.objects.get()
+        self.assertEqual(alarm.created_time, NOW - timedelta(minutes=90))
+        self.assertEqual(notify.call_count, 1)
+        HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=NOW + timedelta(days=3))
+        gateway_health.evaluate(NOW + timedelta(hours=23))
+        self.assertEqual(notify.call_count, 1)  # same day: no second e-mail
+        gateway_health.evaluate(NOW + timedelta(hours=24))
+        self.assertEqual(notify.call_count, 2)
+        self.assertIn("still not solved (1 day 1 h)", notify.call_args.args[1])
+        details = dict((row[0], row[1]) for row in notify.call_args.args[3])
+        self.assertEqual(details["Not solved for"], "1 day 1 h")
+        gateway_health.evaluate(NOW + timedelta(hours=30))
+        self.assertEqual(notify.call_count, 2)
+        gateway_health.evaluate(NOW + timedelta(hours=48))
+        self.assertEqual(notify.call_count, 3)
+        self.assertEqual(AlarmNotifications.objects.count(), 1)  # still one open alarm
+
     def test_pings_but_no_data_is_a_service_issue_and_switches_to_disconnected(self, notify):
         self.set(data_minutes_ago=90, ping_minutes_ago=2)
         gateway_health.evaluate(NOW)

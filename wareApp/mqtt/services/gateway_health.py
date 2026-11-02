@@ -19,8 +19,10 @@ Manual threshold in hours; Off = not raised):
   ping information (e.g. the test server, gateways ping main only): without
   proof that pings stopped it is never called disconnected (decided 2026-11-02).
 
-An alarm is one active row per issue: it is e-mailed when raised and only
-``last_seen`` moves while it lasts. When the meter / gateway is back the row
+An alarm is one active row per issue, created_time = when the outage began
+(lists show since when it is not solved). It is e-mailed when raised and
+again once a day while it is not solved (GATEWAY_HEALTH_REMINDER_HOURS);
+``last_seen`` moves at every check. When the meter / gateway is back the row
 is closed (is_active False, off_time). No e-mail on clearing; the next e-mail
 of the same issue carries a "Previous outage ... restored ..." line.
 """
@@ -35,6 +37,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max
 
+from wareApp.alarm_feed import open_for
 from wareApp.models import AlarmNotifications, HomeGatewayStatus, MeterDisconnectionEvent, MonitoringMarker, Site
 from wareApp.mqtt.services import alarm_policy
 from wareApp.mqtt.services.notifications import notify
@@ -154,11 +157,30 @@ class Report:
         return f"{text} (gateways skipped: {self.skipped})" if self.skipped else text
 
 
-def _raise(report, site_id, alarm_type, object_type, object_id, detail, details, now, priority):
+def _raise(report, site_id, alarm_type, object_type, object_id, detail, details, now, priority, started):
+    """Raise or keep an outage alarm. ``started`` is when the outage began
+    (stored as created_time, so lists show since when it is not solved).
+    While it stays open it is e-mailed again once a day
+    (GATEWAY_HEALTH_REMINDER_HOURS, 24) until it is solved."""
     if alarm_policy.is_off(site_id, alarm_type):
         return
     issue = dict(site_id_id=site_id, Alarm_type=alarm_type, object_type=object_type, object_id=object_id)
-    if AlarmNotifications.objects.filter(is_active=True, **issue).update(last_seen=now, to_do=detail[:200]):
+    title = dict(AlarmNotifications.alarm_type)[alarm_type]
+    open_alarm = AlarmNotifications.objects.filter(is_active=True, **issue).order_by("-id").first()
+    if open_alarm is not None:
+        update = dict(last_seen=now, to_do=detail[:200])
+        notified = open_alarm.last_notified_at or open_alarm.created_time
+        remind = timedelta(hours=getattr(settings, "GATEWAY_HEALTH_REMINDER_HOURS", 24))
+        if remind.total_seconds() > 0 and now - notified >= remind:
+            days, text = open_for(open_alarm.created_time, now)
+            notify(send_alarm_email, f"{title} - still not solved ({text})", site_id, details + [
+                ["Open since", f"{open_alarm.created_time:%d %b %H:%M}", False],
+                ["Not solved for", text, True],
+            ], alarm_type)
+            update["last_notified_at"] = now
+            logger.warning("Gateway health alarm reminder: site=%s type=%s object=%s open %s",
+                           site_id, alarm_type, object_id, text)
+        AlarmNotifications.objects.filter(pk=open_alarm.pk).update(**update)
         report.repeated.append((site_id, alarm_type, object_id))
         return
     previous = (
@@ -167,18 +189,18 @@ def _raise(report, site_id, alarm_type, object_type, object_id, detail, details,
         .first()
     )
     AlarmNotifications.objects.create(
-        user_level=2, Alarm_priority=priority, created_time=now, last_seen=now,
-        off_time=now, to_do=detail[:200], **issue,
+        user_level=2, Alarm_priority=priority, created_time=started, last_seen=now,
+        off_time=now, last_notified_at=now, to_do=detail[:200], **issue,
     )
+    details = details + [["Open since", f"{started:%d %b %H:%M} ({open_for(started, now)[1]})", False]]
     if previous is not None:
-        started = previous.created_time
+        previous_start = previous.created_time
         details = details + [[
             "Previous outage",
-            f"{started:%d %b %H:%M} - restored {previous.off_time:%d %b %H:%M} "
-            f"({_hours(previous.off_time - started)})",
+            f"{previous_start:%d %b %H:%M} - restored {previous.off_time:%d %b %H:%M} "
+            f"({_hours(previous.off_time - previous_start)})",
             False,
         ]]
-    title = dict(AlarmNotifications.alarm_type)[alarm_type]
     notify(send_alarm_email, title, site_id, details, alarm_type)
     report.raised.append((site_id, alarm_type, object_id))
     logger.warning("Gateway health alarm raised: site=%s type=%s object=%s %s", site_id, alarm_type, object_id, detail)
@@ -240,7 +262,7 @@ def evaluate_gateways(report, now):
                 report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
                 f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
                 common + [["Last ping", last_ping, False]],
-                now, AlarmNotifications.PRIORITY_HIGH,
+                now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at,
             )
             _clear(report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
         elif data_age >= service_after and not no_pings:
@@ -252,7 +274,7 @@ def evaluate_gateways(report, now):
                 extra = [["Last ping", "not available on this server (broker log not read)", False]]
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number,
-                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH,
+                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at,
             )
             _clear(report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number, now)
         else:
@@ -290,7 +312,7 @@ def evaluate_meters(report, now):
                         ["Port", event.port_id or "-", False],
                         ["Disconnected since", f"{event.detection_window_start:%d %b %H:%M}", True],
                     ],
-                    now, AlarmNotifications.PRIORITY_MEDIUM,
+                    now, AlarmNotifications.PRIORITY_MEDIUM, event.detection_window_start,
                 )
         else:
             _clear(report, site_id, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter, now)
