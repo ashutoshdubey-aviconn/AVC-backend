@@ -303,16 +303,16 @@ def report(out_dir, day):
                 per_core[r["core"]].append(float(r["busy_percent"]))
         print("Cores avg/max busy: " + "  ".join(
             f"core{c} {sum(v) / len(v):.1f}/{max(v):.0f}%" for c, v in sorted(per_core.items(), key=lambda x: int(x[0]))))
-        users = defaultdict(lambda: [0.0, 0, ""])
+        users = defaultdict(lambda: [0.0, set(), ""])
         for r in procs:
             if r["server"] == server:
                 key = f"{r['name']} [{r['service'].removesuffix('.service')}]" if r["service"] else r["name"]
                 users[key][0] += float(r["cpu_percent"])
-                users[key][1] += 1
+                users[key][1].add(r["time"])  # postgres etc. run several processes per minute
                 users[key][2] = r["command"][:90]
         print(f"Who used the CPU (average % of one core over {len(good)} samples):")
         for key, (total, seen, command) in sorted(users.items(), key=lambda x: -x[1][0])[:12]:
-            print(f"  {total / len(good):6.1f}%  in {seen:4d} samples  {key}  {command}")
+            print(f"  {total / len(good):6.1f}%  in {len(seen):4d} samples  {key}  {command}")
 
 
 def main():
