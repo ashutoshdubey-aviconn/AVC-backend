@@ -23,7 +23,7 @@ REPEAT_POWER = "First occurrence e-mailed. Repeat: counted on the day's row at m
 REPEAT_DAILY = "One alarm per aisle per day, e-mailed when raised. If the same alarm fired the day before, e-mailed only when today's consumption is > 5 % worse than the last e-mailed value."
 REPEAT_SAME_DAY = "One alarm per aisle per day, e-mailed once when raised. A new day is a new alarm and is e-mailed again (no comparison with the day before)."
 CLEAR_SAME_DAY = "Yes: at the end of its own day"
-REPEAT_OUTAGE = "One active alarm per outage, e-mailed once when raised; while it lasts only last_seen moves. Cleared automatically (no e-mail) when it recovers; the next e-mail of the same issue shows 'Previous outage ... restored ... (duration)'."
+REPEAT_OUTAGE = "One active alarm per outage, shown on the frontend until solved; created_time = when the outage began, and the APIs give open_days / open_for (days not solved). E-mailed when raised, then once a day ('still not solved (N days)', GATEWAY_HEALTH_REMINDER_HOURS=24) until solved. Cleared automatically (no e-mail) when it recovers; the next e-mail of the same issue shows 'Previous outage ... restored ... (duration)'."
 CONFIG_STD = "AlarmSetting (Django admin, per site + type): Auto / Manual (threshold) / Off, e-mail software team on/off, e-mail ground team on/off, repeat tolerance %."
 RECIPIENTS = "wareApp/mqtt/services/alarm_recipients.py: SOFTWARE_TEAM (all sites) + GROUND_TEAM_ALL_SITES + LOCATION_TEAMS (by site location) + GROUND_TEAM (per site). Test server: ALARM_EMAIL_OVERRIDE_TO replaces them."
 
@@ -274,7 +274,7 @@ API_ROWS = [
     ["/api/alarmList/", "POST", "Token", "Site alarm page: totals and one line per alarm type (active alarms only)",
      '{"siteId": 114}', "Active alarms only. status, total_alarm (sum of occurrences), high_priority, medium_priority, active_alarms, data[]: name, count, priority, alarm_type", sample("alarmList")],
     ["/api/alarmListDetail/", "POST", "Token", "Site alarm page: active rows of one type, newest first",
-     '{"siteId": 114, "alarm_type": 10}', "Active rows only. data[]: get_alarm_type_display, get_alarm_priority_display, power_source, r_phase, y_phase, b_phase, fuel_level, run_hours, created, is_active, aisle_group, issue, occurrences, last_seen", sample("alarmListDetail")],
+     '{"siteId": 114, "alarm_type": 10}', "Active rows only. data[]: get_alarm_type_display, get_alarm_priority_display, power_source, r_phase, y_phase, b_phase, fuel_level, run_hours, created, is_active, aisle_group, issue, occurrences, last_seen, open_days, open_for (days not solved)", sample("alarmListDetail")],
     ["/api/alarmTypeApi/", "POST", "Token, Super_Admin only", "Super-admin alarm list: active issues of every live site (last 30 days), grouped by customer",
      "{}", "data[]: customer_id, customer_name, alarm_list[] (see 'Fields' sheet: alarm, priority, site, source, aisle / leg / power source / gateway, issue, created_time = first seen, last_seen, occurrences, alarm_type)", sample("alarmTypeApi")],
     ["/api/alarmapi/", "POST", "Token", "Super-admin: active issue counts per customer, priority and site",
@@ -349,6 +349,7 @@ FIELD_ROWS = [
     ["created_time", "First time the issue was seen."],
     ["last_seen", "Last time it was seen (repeats)."],
     ["occurrences", "How many times it happened (one row per issue per day)."],
+    ["open_days / open_for (API)", "Days the alarm has not been solved (whole days) and as text, e.g. 4 / '4 days 17 h'. From created_time; outages 14 / 15 / 16: from when the outage began. Closed alarms: until off_time."],
     ["is_active", "False once the alarm is closed (resolved, or its day is over for 7 / 8 / 11). Only active alarms are shown on the frontend."],
     ["r_phase, y_phase, b_phase, fuel_level, run_hours", "Measured values of power / DG alarms."],
 ]

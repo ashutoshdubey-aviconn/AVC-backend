@@ -115,6 +115,8 @@ class SiteAlarmApiTests(TestCase):
         self.assertEqual(row["get_alarm_type_display"], "PF Bad Value Alarm")
         self.assertEqual(row["get_alarm_priority_display"], "Medium")
         self.assertEqual(row["occurrences"], 5)
+        self.assertIn("open_days", row)
+        self.assertIn("open_for", row)
 
     def test_detail_of_a_consumption_alarm(self):
         body = self.client.post(

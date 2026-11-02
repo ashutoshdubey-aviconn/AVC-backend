@@ -90,6 +90,19 @@ class AlarmListSerializer(serializers.ModelSerializer):
     created = serializers.DateTimeField(source="created_time", read_only=True)
     aisle_group = serializers.CharField(source="aisle_group.aisleGroupName", default=None, read_only=True)
     issue = serializers.CharField(source="to_do", default=None, read_only=True)
+    # Days not solved (since created_time; outages: since the outage began).
+    open_days = serializers.SerializerMethodField()
+    open_for = serializers.SerializerMethodField()
+
+    def _open(self, alarm):
+        from wareApp.alarm_feed import open_info
+        return open_info(alarm.created_time, alarm.is_active, alarm.off_time)
+
+    def get_open_days(self, alarm):
+        return self._open(alarm)["open_days"]
+
+    def get_open_for(self, alarm):
+        return self._open(alarm)["open_for"]
 
     class Meta:
         model = AlarmNotifications
@@ -97,6 +110,7 @@ class AlarmListSerializer(serializers.ModelSerializer):
             "get_alarm_type_display", "power_source", "get_alarm_priority_display",
             "r_phase", "y_phase", "b_phase", "fuel_level", "run_hours", "created",
             "is_active", "aisle_group", "issue", "occurrences", "last_seen",
+            "open_days", "open_for",
         ]
 
 class MeterDisconnectionEventSerializer(serializers.ModelSerializer):

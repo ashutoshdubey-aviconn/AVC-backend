@@ -54,6 +54,9 @@ class AlarmFeedTests(TestCase):
         self.assertEqual(meter["home_gateway_id"], "avc_FMMCF_BGLR_000162_1")
         self.assertEqual(meter["customer_name"], "FM-Testing")
         self.assertEqual(meter["priority"], "Medium")
+        # Days not solved, from the issue's first row.
+        self.assertEqual(meter["open_days"], (datetime.now() - datetime(2026, 10, 20, 0, 7)).days)
+        self.assertTrue(meter["open_for"].startswith(f"{meter['open_days']} day"))
         pf = next(r for r in rows if r["source"] == "power")
         self.assertEqual(pf["alarm"], "PF Bad Value Alarm")
         self.assertEqual(pf["occurrences"], 3)
