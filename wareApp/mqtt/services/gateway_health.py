@@ -13,10 +13,11 @@ Sources (existing tables):
 Rules (threshold GATEWAY_HEALTH_DOWN_MINUTES = 60, or an AlarmSetting's
 Manual threshold in hours; Off = not raised):
 * 14: the meter's latest event is "disconnected" since >= threshold.
-* 15: no ping and no data for >= threshold. Without fresh ping information
-  (log not read in the last GATEWAY_HEALTH_PING_FRESH_MINUTES) a gateway
-  silent >= threshold counts as disconnected.
-* 16: pings arrive but no data for >= threshold.
+* 15: no ping and no data for >= threshold - only when the broker log was read
+  in the last GATEWAY_HEALTH_PING_FRESH_MINUTES and shows no recent ping.
+* 16: pings arrive but no data for >= threshold. Also used when there is no
+  ping information (e.g. the test server, gateways ping main only): without
+  proof that pings stopped it is never called disconnected (decided 2026-11-02).
 
 An alarm is one active row per issue: it is e-mailed when raised and only
 ``last_seen`` moves while it lasts. When the meter / gateway is back the row
@@ -228,29 +229,30 @@ def evaluate_gateways(report, now):
             # In the grace after our restart while the gateway is still silent:
             # keep any open alarm as it is, raise nothing new.
             continue
-        if data_age >= disconnected_after and (ping_age is None or ping_age >= disconnected_after):
+        # 15 needs proof the gateway also stopped pinging (broker log read).
+        # Pings but no data, or no ping information at all (the test server:
+        # gateways ping main only), is a Service / Modbus issue (16), never 15
+        # (decided 2026-11-02).
+        no_pings = with_pings and (ping_age is None or ping_age >= disconnected_after)
+        if data_age >= disconnected_after and no_pings:
             last_ping = f"{status.last_ping_at:%d %b %H:%M}" if status.last_ping_at else "unknown"
-            if with_pings:
-                detail = f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}"
-                extra = [["Last ping", last_ping, False]]
-            else:
-                # Without the broker log (e.g. the test server: gateways ping
-                # main only) a gateway that pings but sends no data looks the
-                # same: do not claim "no ping".
-                detail = f"Gateway {hgw.hgw_id}: no data for {_hours(real_age)} (ping status unknown)"
-                extra = [["Last ping", "not available on this server (broker log not read)", False],
-                         ["Note", "If the gateway still pings, this is a Gateway Service / Modbus Issue", False]]
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
-                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH,
+                f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
+                common + [["Last ping", last_ping, False]],
+                now, AlarmNotifications.PRIORITY_HIGH,
             )
             _clear(report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
-        elif data_age >= service_after and ping_age is not None:
+        elif data_age >= service_after and not no_pings:
+            if ping_age is not None:
+                detail = f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}"
+                extra = [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]]
+            else:
+                detail = f"Gateway {hgw.hgw_id}: no consumption / recovery / load data for {_hours(real_age)} (ping status unknown)"
+                extra = [["Last ping", "not available on this server (broker log not read)", False]]
             _raise(
                 report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number,
-                f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}",
-                common + [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]],
-                now, AlarmNotifications.PRIORITY_HIGH,
+                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH,
             )
             _clear(report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number, now)
         else:
