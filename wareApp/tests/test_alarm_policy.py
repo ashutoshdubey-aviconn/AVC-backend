@@ -214,13 +214,15 @@ class ConsumptionModeTests(TestCase):
         )
         return evaluate_daily_alarms(self.site, self.aisle, reading)
 
-    def test_bypassed_on_consecutive_days_is_e_mailed_only_when_worse(self, notify):
+    def test_bypassed_is_e_mailed_every_day_it_happens(self, notify):
+        # High / Low / Bypassed belong to their day: no comparison with the day before.
         self.assertEqual(self.evaluate(220.0, date(2026, 10, 15)), ["Bypassed"])
-        self.assertEqual(self.evaluate(225.0, date(2026, 10, 16)), ["Bypassed"])  # +2.3 %
-        self.assertEqual(notify.call_count, 1)
-        self.assertEqual(self.evaluate(240.0, date(2026, 10, 17)), ["Bypassed"])  # +9 % on 220
-        self.assertEqual(notify.call_count, 2)
+        self.assertEqual(self.evaluate(225.0, date(2026, 10, 16)), ["Bypassed"])
+        self.assertEqual(self.evaluate(200.0, date(2026, 10, 17)), ["Bypassed"])
+        self.assertEqual(notify.call_count, 3)
         self.assertEqual(notify.call_args.args[4], 11)  # alarm type routes the recipients
+        self.assertEqual(self.evaluate(240.0, date(2026, 10, 17)), [])  # same day: once
+        self.assertEqual(notify.call_count, 3)
 
     def test_a_day_without_the_alarm_clears_it(self, notify):
         self.evaluate(220.0, date(2026, 10, 15))

@@ -6,7 +6,7 @@ from unittest import mock
 from django.core.cache import cache
 from django.test import TestCase
 
-from wareApp.models import AlarmNotifications, Site
+from wareApp.models import AisleGroup, AlarmNotifications, HourlySiteReading, Site
 from wareApp.mqtt.services import alarm_closer, alarms
 
 NOW = datetime(2026, 11, 2, 12, 0)
@@ -37,8 +37,8 @@ class AlarmCloserTests(TestCase):
         self.assertEqual(self.state(old), (False, datetime(2023, 10, 26, 16, 51)))
 
     def test_daily_alarm_stays_one_full_day_then_closes_at_the_end_of_its_day(self):
-        yesterday = self.alarm(11, TODAY - timedelta(days=1))
-        older = self.alarm(7, TODAY - timedelta(days=2))
+        yesterday = self.alarm(12, TODAY - timedelta(days=1))
+        older = self.alarm(17, TODAY - timedelta(days=2))
         today = self.alarm(17, TODAY)
         legacy = self.alarm(4, datetime(2023, 10, 26, 15, 22))
         alarm_closer.close_resolved(NOW)
@@ -47,13 +47,44 @@ class AlarmCloserTests(TestCase):
         self.assertTrue(self.state(today)[0])
         self.assertEqual(self.state(older), (False, datetime.combine((TODAY - timedelta(days=2)).date(), time(23, 59, 59))))
 
-    def test_overheat_and_meter_reading_issue(self):
+    def test_high_low_bypassed_only_for_their_own_day(self):
+        yesterday = [self.alarm(t, TODAY - timedelta(days=1)) for t in (7, 8, 11)]
+        intraday_yesterday = self.alarm(11, TODAY - timedelta(hours=7))  # raised 17:00 yesterday
+        today = [self.alarm(t, TODAY) for t in (7, 8, 11)]
+        alarm_closer.close_resolved(NOW)
+        end_of_yesterday = datetime.combine((TODAY - timedelta(days=1)).date(), time(23, 59, 59))
+        for alarm in yesterday + [intraday_yesterday]:
+            self.assertEqual(self.state(alarm), (False, end_of_yesterday))
+        self.assertEqual([self.state(a)[0] for a in today], [True, True, True])
+
+    def meter_issue(self, last_seen):
+        aisle = AisleGroup.objects.create(site=self.site, aisleGroupName=f"A{AisleGroup.objects.count()}")
+        aisle.refresh_from_db()
+        return aisle, self.alarm(10, NOW - timedelta(days=3), last_seen, aisle_group=aisle)
+
+    def hour(self, aisle, start):
+        HourlySiteReading.objects.create(
+            associated_Site=self.site, aisle_group=aisle, leg_id=aisle.attached_leg_id, unit_consumption=1.0,
+            reading_from=start, reading_to=start + timedelta(minutes=59, seconds=59), is_visible=True,
+        )
+
+    def test_overheat_and_meter_reading_issue_stays_until_fixed(self):
         hot_gone = self.alarm(13, TODAY, NOW - timedelta(hours=3))
         hot_now = self.alarm(13, TODAY, NOW - timedelta(minutes=10))
-        meter_gone = self.alarm(10, NOW - timedelta(days=2), NOW - timedelta(hours=25))
-        meter_now = self.alarm(10, NOW - timedelta(hours=5), NOW - timedelta(hours=5))
+        fixed_aisle, fixed = self.meter_issue(NOW - timedelta(hours=2, minutes=30))
+        self.hour(fixed_aisle, NOW - timedelta(hours=2))  # a clean hour after the last error
+        quiet_aisle, no_data = self.meter_issue(NOW - timedelta(days=2))  # silent, no newer data
+        self.hour(quiet_aisle, NOW - timedelta(days=2, hours=1))
+        recent_aisle, recent = self.meter_issue(NOW - timedelta(minutes=20))
+        self.hour(recent_aisle, NOW - timedelta(minutes=10))
+        old_row = self.alarm(10, NOW - timedelta(days=2), NOW - timedelta(hours=25))  # no aisle
+        no_last_seen_aisle, no_last_seen = self.meter_issue(None)  # old row: created 3 days ago
+        self.hour(no_last_seen_aisle, NOW - timedelta(days=1))
         alarm_closer.close_resolved(NOW)
-        self.assertEqual([self.state(a)[0] for a in (hot_gone, hot_now, meter_gone, meter_now)], [False, True, False, True])
+        self.assertEqual(self.state(no_last_seen), (False, NOW - timedelta(days=3)))
+        self.assertEqual([self.state(a)[0] for a in (hot_gone, hot_now)], [False, True])
+        self.assertEqual(self.state(fixed), (False, NOW - timedelta(hours=2, minutes=30)))
+        self.assertEqual([self.state(a)[0] for a in (no_data, recent, old_row)], [True, True, False])
 
     def test_outage_alarms_are_left_to_gateway_health(self):
         outage = self.alarm(15, NOW - timedelta(days=3), NOW - timedelta(days=3))

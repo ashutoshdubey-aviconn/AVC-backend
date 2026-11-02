@@ -18,9 +18,11 @@ from openpyxl.utils import get_column_letter
 HERE = pathlib.Path(__file__).resolve().parent
 SAMPLES = json.loads((HERE / "api_samples_test_server.json").read_text())
 
-SITE_APIS = "alarmList/ (site summary), alarmListDetail/ (rows of one type), alarmTypeApi/ + alarmapi/ (super-admin active issues), snapshot/ (count)"
+SITE_APIS = "alarmList/ (site summary, active alarms only), alarmListDetail/ (active rows of one type), alarmTypeApi/ + alarmapi/ (super-admin active issues), snapshot/ (count)"
 REPEAT_POWER = "First occurrence e-mailed. Repeat: counted on the day's row at most every 30 min; e-mailed again only if > 5 % worse than the last e-mailed value (repeat tolerance). Next day with a similar value: no e-mail; after 24 h without the alarm it is new again."
 REPEAT_DAILY = "One alarm per aisle per day, e-mailed when raised. If the same alarm fired the day before, e-mailed only when today's consumption is > 5 % worse than the last e-mailed value."
+REPEAT_SAME_DAY = "One alarm per aisle per day, e-mailed once when raised. A new day is a new alarm and is e-mailed again (no comparison with the day before)."
+CLEAR_SAME_DAY = "Yes: at the end of its own day"
 REPEAT_OUTAGE = "One active alarm per outage, e-mailed once when raised; while it lasts only last_seen moves. Cleared automatically (no e-mail) when it recovers; the next e-mail of the same issue shows 'Previous outage ... restored ... (duration)'."
 CONFIG_STD = "AlarmSetting (Django admin, per site + type): Auto / Manual (threshold) / Off, e-mail software team on/off, e-mail ground team on/off, repeat tolerance %."
 RECIPIENTS = "wareApp/mqtt/services/alarm_recipients.py: SOFTWARE_TEAM (all sites) + GROUND_TEAM_ALL_SITES + LOCATION_TEAMS (by site location) + GROUND_TEAM (per site). Test server: ALARM_EMAIL_OVERRIDE_TO replaces them."
@@ -71,17 +73,17 @@ ALARMS = [
      "DG_FUEL_POLL_INTERVAL_SECONDS=300", SITE_APIS, "Severity = litres used."],
     [7, "High Consumption", "Consumption", "Active", "High", "aisle + day",
      "Daily reading (sum of the aisle's hourly readings)",
-     "Day's consumption >= threshold. Not raised when Bypassed fired for that aisle and day (Bypassed covers >= 100 %). Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
+     "Consumption >= threshold, raised DURING the day as soon as today's running total crosses it. A later Bypassed the same day closes it; not raised when Bypassed fired for that aisle and day (Bypassed covers >= 100 %). Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
      "Site.high_consumption_units, else baseline x Site.high_consumption_baseline_percent (default 75 %).",
      "Yes", CONFIG_STD + " Manual = kWh per day; Auto = baseline x percent.",
-     "Day end: first reading after midnight; re-checked after recovery rewrites a past day (up to 7 days)",
-     REPEAT_DAILY, "Yes: end of the day after its day", RECIPIENTS,
-     "wareApp/mqtt/services/consumption_alarms.py -> evaluate_daily_alarms, _record",
+     "Every consumption batch (~1 min) for today; day end; re-checked after recovery rewrites a past day (up to 7 days)",
+     REPEAT_SAME_DAY, CLEAR_SAME_DAY, RECIPIENTS,
+     "wareApp/mqtt/services/consumption_alarms.py -> check_intraday_bypass, evaluate_daily_alarms, _record",
      "ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT=75, ALARM_REEVALUATE_DAYS=7", SITE_APIS + ", consumptionAlarms/", ""],
     [8, "Low Consumption", "Consumption", "Active (opt-in)", "Medium", "aisle + day",
      "Daily reading", "Day's consumption < baseline x (1 - percent / 100).",
      "Only for sites with Site.min_threshold_value set (opt-in), or AlarmSetting Auto: baseline less 90 %.",
-     "Yes", CONFIG_STD + " Manual = minimum kWh per day.", "Day end (as High Consumption)", REPEAT_DAILY.replace("worse", "lower"), "Yes: end of the day after its day", RECIPIENTS,
+     "Yes", CONFIG_STD + " Manual = minimum kWh per day.", "Day end", REPEAT_SAME_DAY, CLEAR_SAME_DAY, RECIPIENTS,
      "consumption_alarms.py -> evaluate_daily_alarms", "ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT=90", SITE_APIS + ", consumptionAlarms/",
      "Off by default: most aisle-days use far below baseline, so a default would flood alarms."],
     [9, "DG Running Without Load", "DG fuel", "Active", "High", "site + day (count of fetches)",
@@ -89,18 +91,18 @@ ALARMS = [
      "Fixed rule", "On / Off", CONFIG_STD + " (threshold not used)", "Every 5 min (fuel service cycle)",
      REPEAT_POWER.replace("at most every 30 min", "each fetch"), "Yes: end of the day after its day", RECIPIENTS,
      "dg_fuel/sessions.py -> attempt_fetch_for_unit; services/alarms.py -> raise_power_alarm", "-", SITE_APIS, ""],
-    [10, "Meter Reading Issue", "Consumption", "Active", "High", "meter + day (count)",
+    [10, "Meter Reading Issue", "Consumption", "Active", "High", "meter, until fixed (count)",
      "MQTT consumption packet with 'ERROR!!! New meter reading ... smaller than previous meter reading'",
-     "Gateway reports a lower cumulative meter reading. Stored at most every 30 min per meter; repeats the same day add to the count.",
+     "Gateway reports a lower cumulative meter reading. Stored at most every 30 min per meter; repeats add to the open alarm's count (also on later days).",
      "No threshold (event)", "On / Off", CONFIG_STD + " (threshold not used)", "Real time, on the packet",
-     "E-mailed for the first occurrence of the day only.", "Yes: 24 h without a repeat", RECIPIENTS,
-     "wareApp/mqtt/consumption.py -> _notify_meter_reading_issue", "-", SITE_APIS, "Zero-consumption case 1."],
+     "E-mailed once when raised; stays open until fixed.", "Yes: when fixed - no repeat for 1 h AND a normal hourly reading for the aisle after the last error", RECIPIENTS,
+     "wareApp/mqtt/consumption.py -> _notify_meter_reading_issue; services/alarm_closer.py", "ALARM_CLOSE_METER_ISSUE_MINUTES=60", SITE_APIS, "Zero-consumption case 1."],
     [11, "Bypassed", "Consumption", "Active", "High", "aisle + day",
      "Live consumption (running total of today) and the daily reading",
-     "Consumption >= the aisle's own daily baseline x 100 % (no saving). Raised DURING the day as soon as today's running total crosses it, and checked again at day end. Supersedes High Consumption. Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
+     "Consumption >= the aisle's own daily baseline x 100 % (no saving). Raised DURING the day as soon as today's running total crosses it, and checked again at day end. Supersedes (closes) High Consumption. Spike hours (meter jump / catch-up, see type 17) are not counted, and it is not raised on a day the aisle has a Meter Reading Issue.",
      "Baseline x ALARM_BYPASS_DEFAULT_PERCENT (100 %); Site.bypass_consumption_units overrides.",
      "Yes", CONFIG_STD + " Manual = kWh per day.", "Every consumption batch (~1 min) for today; day end for complete days",
-     REPEAT_DAILY, "Yes: end of the day after its day", RECIPIENTS,
+     REPEAT_SAME_DAY, CLEAR_SAME_DAY, RECIPIENTS,
      "consumption_alarms.py -> check_intraday_bypass, evaluate_daily_alarms; called from mqtt/consumption_batch.py and mqtt/consumption.py",
      "ALARM_BYPASS_DEFAULT_PERCENT=100", SITE_APIS, "Intra-day raise added 2026-10-28 (manual bypass visible the same day)."],
     [12, "Operation Hours Increased", "Consumption", "Active", "High", "aisle + day",
@@ -268,9 +270,9 @@ APIS = [
     ("Endpoint", 26), ("Method", 8), ("Auth", 20), ("Used for", 34), ("Request", 36), ("Response fields", 50), ("Example response (test server, trimmed)", 80),
 ]
 API_ROWS = [
-    ["/api/alarmList/", "POST", "Token", "Site alarm page: totals and one line per alarm type",
+    ["/api/alarmList/", "POST", "Token", "Site alarm page: totals and one line per alarm type (active alarms only)",
      '{"siteId": 134}', "status, total_alarm (sum of occurrences), high_priority, medium_priority, active_alarms, data[]: name, count, priority, alarm_type", sample("alarmList")],
-    ["/api/alarmListDetail/", "POST", "Token", "Site alarm page: rows of one type, newest first",
+    ["/api/alarmListDetail/", "POST", "Token", "Site alarm page: active rows of one type, newest first",
      '{"siteId": 134, "alarm_type": 11}', "data[]: get_alarm_type_display, get_alarm_priority_display, power_source, r_phase, y_phase, b_phase, fuel_level, run_hours, created, is_active, aisle_group, issue, occurrences, last_seen", sample("alarmListDetail")],
     ["/api/alarmTypeApi/", "POST", "Token, Super_Admin only", "Super-admin alarm list: active issues of every live site (last 30 days), grouped by customer",
      "{}", "data[]: customer_id, customer_name, alarm_list[] (see 'Fields' sheet: alarm, priority, site, source, aisle / leg / power source / gateway, issue, created_time = first seen, last_seen, occurrences, alarm_type)", sample("alarmTypeApi")],
@@ -345,7 +347,7 @@ FIELD_ROWS = [
     ["created_time", "First time the issue was seen."],
     ["last_seen", "Last time it was seen (repeats)."],
     ["occurrences", "How many times it happened (one row per issue per day)."],
-    ["is_active", "False when an outage alarm (14 / 15 / 16) has cleared."],
+    ["is_active", "False once the alarm is closed (resolved, or its day is over for 7 / 8 / 11). Only active alarms are shown on the frontend."],
     ["r_phase, y_phase, b_phase, fuel_level, run_hours", "Measured values of power / DG alarms."],
 ]
 

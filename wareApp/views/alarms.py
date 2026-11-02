@@ -11,15 +11,15 @@ from wareApp.serializers import AlarmListSerializer
 
 
 class AlarmsList(APIView):
-    """Alarm summary of one site: every alarm type (one alarm table).
+    """Alarm summary of one site: active alarms only (decided 2026-11-02).
 
-    Response unchanged; counts are occurrences (a repeated issue is one row per
-    day with a count), so they keep meaning "how many times it happened".
+    Response keys unchanged; counts are occurrences of the alarms that are
+    still happening (closed alarms are not shown, see alarm_closer).
     """
 
     def post(self, request):
         site = int(request.data.get("siteId"))
-        alarms = AlarmNotifications.objects.filter(site_id=site)
+        alarms = AlarmNotifications.objects.filter(site_id=site, is_active=True)
 
         def total(queryset):
             return queryset.aggregate(n=Sum("occurrences"))["n"] or 0
@@ -54,13 +54,13 @@ class AlarmsList(APIView):
 
 
 class AlarmsListDetail(APIView):
-    """All alarms of one site and type, newest first (same JSON keys as before)."""
+    """Active alarms of one site and type, newest first (same JSON keys as before)."""
 
     def post(self, request):
         data = request.data
         try:
             alarms = AlarmNotifications.objects.filter(
-                site_id=data.get("siteId"), Alarm_type=int(data.get("alarm_type"))
+                site_id=data.get("siteId"), Alarm_type=int(data.get("alarm_type")), is_active=True
             ).select_related("aisle_group").order_by("-created_time")
             serializer = AlarmListSerializer(alarms, many=True)
             return Response({"status": 200, "data": serializer.data})

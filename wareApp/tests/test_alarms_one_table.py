@@ -85,6 +85,10 @@ class SiteAlarmApiTests(TestCase):
             to_do="Bypassed: consumption=200.00", occurrences=1,
         )
         AlarmNotifications.objects.create(site_id=self.site, Alarm_type=0, Alarm_priority=0, power_source="DG_1")
+        AlarmNotifications.objects.create(  # closed: not shown
+            site_id=self.site, Alarm_type=11, Alarm_priority=0, aisle_group=self.aisle, occurrences=3, is_active=False,
+        )
+        AlarmNotifications.objects.create(site_id=self.site, Alarm_type=7, Alarm_priority=0, is_active=False)
         self.client = APIClient()
         self.client.force_authenticate(User.objects.create(username="u1", UserType=1))
 
@@ -98,6 +102,7 @@ class SiteAlarmApiTests(TestCase):
         self.assertEqual(set(by_type), {0, 2, 11})
         self.assertEqual(by_type[2], {"name": "PF Bad Value Alarm", "count": 5, "priority": "Medium", "alarm_type": 2})
         self.assertEqual(by_type[11]["name"], "Bypassed")
+        self.assertEqual(by_type[11]["count"], 1)  # the closed Bypassed row is not counted
 
     def test_detail_keeps_the_former_keys(self):
         body = self.client.post(
@@ -115,6 +120,7 @@ class SiteAlarmApiTests(TestCase):
         body = self.client.post(
             "/api/alarmListDetail/", {"siteId": self.site.id, "alarm_type": 11}, format="json"
         ).data
+        self.assertEqual(len(body["data"]), 1)  # active only
         self.assertEqual(body["data"][0]["aisle_group"], "A1")
         self.assertTrue(body["data"][0]["issue"].startswith("Bypassed"))
 
