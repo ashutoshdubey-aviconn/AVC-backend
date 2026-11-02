@@ -71,6 +71,16 @@ def cause(site, aisle, day, spike, baseline, restarts):
     )
 
 
+def short_cause(spike, reason):
+    """Cause as kept in the alarm text (the e-mail has the full one)."""
+    if spike.kind == "catch_up" and spike.previous is not None:
+        missing = int((spike.at - spike.previous).total_seconds() // 3600) - 1
+        return f"catch-up, {missing} h gap from {spike.previous + timedelta(hours=1):%d %b %H:%M}"
+    if spike.kind == "catch_up":
+        return "catch-up, no data for 2+ days"
+    return reason.split(":")[0]
+
+
 def scan(now=None):
     """Raise / update Consumption Spike alarms for today and yesterday; returns a summary."""
     now = now or datetime.now()
@@ -108,7 +118,7 @@ def scan(now=None):
                 continue
             reasons = [cause(site, aisle, day, spike, baseline or 0, restarts) for spike in spikes]
             text = "Spike: " + "; ".join(
-                f"{spike.at:%H:%M} {spike.kwh:.2f} kWh ({reason.split(':')[0]})"
+                f"{spike.at:%H:%M} {spike.kwh:.2f} kWh ({short_cause(spike, reason)})"
                 for spike, reason in zip(spikes, reasons)
             )
             day_start = datetime.combine(day, time.min)

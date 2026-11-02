@@ -72,7 +72,7 @@ class SpikeAlarmTests(TestCase):
         )
         spike_alarms.scan(NOW)
         alarm = self.alarm()
-        self.assertIn("10:00 34.23 kWh (catch-up)", alarm.to_do)
+        self.assertIn("10:00 34.23 kWh (catch-up, 16 h gap from 29 Oct 18:00)", alarm.to_do)
         details = dict((row[0], row[1]) for row in notify.call_args.args[3])
         self.assertIn("16 missing hour(s) 29 Oct 18:00-09:00", details["F1-C-Section-EL 30 Oct 10:00"])
         self.assertIn("Gateway Disconnected: Gateway avc_spike_000001_1", details["F1-C-Section-EL 30 Oct 10:00"])
