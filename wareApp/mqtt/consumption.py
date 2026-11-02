@@ -123,15 +123,14 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
         )
         return
 
-    day_start = datetime.combine(occurred_at.date(), datetime.min.time())
-    # The same issue already raised today: count it on that alarm instead of
-    # storing (and e-mailing) another row every cooldown window.
+    # The same issue is still open (it stays until fixed, see alarm_closer):
+    # count it on that alarm instead of storing (and e-mailing) another row
+    # every cooldown window.
     repeated = AlarmNotifications.objects.filter(
         site_id=site,
         object_id=int(meter_id),
         Alarm_type=10,
         is_active=True,
-        created_time__gte=day_start,
     ).update(last_seen=occurred_at, occurrences=F("occurrences") + 1)
     if repeated:
         logger.warning(

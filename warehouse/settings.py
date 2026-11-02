@@ -380,6 +380,7 @@ ALARM_CLOSE_CHECK_SECONDS = config("ALARM_CLOSE_CHECK_SECONDS", default=300, cas
 ALARM_CLOSE_POWER_MINUTES = config("ALARM_CLOSE_POWER_MINUTES", default=60, cast=int)
 ALARM_CLOSE_OVERHEAT_HOURS = config("ALARM_CLOSE_OVERHEAT_HOURS", default=2, cast=int)
 ALARM_CLOSE_EVENT_HOURS = config("ALARM_CLOSE_EVENT_HOURS", default=24, cast=int)
+ALARM_CLOSE_METER_ISSUE_MINUTES = config("ALARM_CLOSE_METER_ISSUE_MINUTES", default=60, cast=int)
 if ALARM_CLOSE_CHECK_SECONDS > 0:
     CELERY_BEAT_SCHEDULE["close-resolved-alarms"] = {
         "task": "wareApp.tasks.close_resolved_alarms",

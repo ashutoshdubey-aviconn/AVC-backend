@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -194,7 +194,7 @@ class IntradayBypassTests(TestCase):
 
     def test_raised_once_when_the_running_total_crosses_the_baseline(self, notify):
         at = datetime(2026, 10, 15, 16, 30)
-        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 150.0, now=at))
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 140.0, now=at))
         self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 205.0, now=at))
         self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 240.0, now=at))
         self.assertEqual(self.bypassed(), [datetime(2026, 10, 15)])
@@ -202,6 +202,28 @@ class IntradayBypassTests(TestCase):
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
         self.assertIn("during the day, 16:30", AlarmNotifications.objects.get().to_do)
+
+    def test_high_during_the_day_then_bypassed_closes_it(self, notify):
+        at = datetime(2026, 10, 15, 14, 0)
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 155.0, now=at))  # 75 % of 200
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 170.0, now=at))
+        high = AlarmNotifications.objects.get(Alarm_type=7)
+        self.assertEqual((high.is_active, high.Alarm_priority, notify.call_args.args[1]),
+                         (True, 0, "High Consumption Alarm"))
+        cache.delete(f"intraday:{self.site.id}:{self.aisle.id}:{DAY:%Y%m%d}:recheck")
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 205.0, now=at + timedelta(hours=2)))
+        high.refresh_from_db()
+        self.assertFalse(high.is_active)
+        self.assertEqual(self.bypassed(), [datetime(2026, 10, 15)])
+        self.assertEqual(notify.call_count, 2)
+
+    def test_next_day_is_a_new_alarm_and_e_mailed_again(self, notify):
+        check_intraday_bypass(self.site, self.aisle, DAY, 205.0)
+        AlarmNotifications.objects.filter(Alarm_type=11).update(is_active=False)  # closed at day end
+        check_intraday_bypass(self.site, self.aisle, DAY, 230.0)  # same day: still one
+        check_intraday_bypass(self.site, self.aisle, DAY + timedelta(days=1), 201.0)
+        self.assertEqual(self.bypassed(), [datetime(2026, 10, 15), datetime(2026, 10, 16)])
+        self.assertEqual(notify.call_count, 2)
 
     def test_day_end_check_does_not_duplicate_or_add_high(self, notify):
         check_intraday_bypass(self.site, self.aisle, DAY, 205.0)
@@ -215,6 +237,7 @@ class IntradayBypassTests(TestCase):
     def test_off_is_honoured(self, notify):
         from wareApp.models import AlarmSetting
         AlarmSetting.objects.create(site=self.site, alarm_type=11, mode=AlarmSetting.OFF)
+        AlarmSetting.objects.create(site=self.site, alarm_type=7, mode=AlarmSetting.OFF)
         self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 500.0))
         self.assertEqual(self.bypassed(), [])
 
