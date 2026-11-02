@@ -122,7 +122,7 @@ def scan(now=None):
             AlarmNotifications.objects.create(
                 user_level=2, site_id=site, object_type=4, aisle_group=aisle,
                 object_id=int(meter_id) if meter_id.isdigit() else None,
-                Alarm_type=CONSUMPTION_SPIKE, Alarm_priority=AlarmNotifications.PRIORITY_MEDIUM,
+                Alarm_type=CONSUMPTION_SPIKE, Alarm_priority=AlarmNotifications.PRIORITY_HIGH,
                 created_time=day_start, last_seen=now, to_do=text[:200],
                 notified_value=max(spike.kwh for spike in spikes),
             )

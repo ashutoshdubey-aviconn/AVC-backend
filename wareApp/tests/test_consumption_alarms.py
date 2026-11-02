@@ -198,6 +198,7 @@ class IntradayBypassTests(TestCase):
         self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 205.0, now=at))
         self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 240.0, now=at))
         self.assertEqual(self.bypassed(), [datetime(2026, 10, 15)])
+        self.assertEqual(AlarmNotifications.objects.get(Alarm_type=11).Alarm_priority, 0)  # High
         self.assertEqual(notify.call_count, 1)
         self.assertEqual(notify.call_args.args[1], "Bypassed Alarm")
         self.assertIn("during the day, 16:30", AlarmNotifications.objects.get().to_do)
