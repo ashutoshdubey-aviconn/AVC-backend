@@ -154,7 +154,8 @@ ALARMS = [
 ]
 
 
-# Progress per alarm type (checked 2026-10-28 on the test server; main runs older code).
+# Progress per alarm type (checked 2026-11-02 on the test server; main runs older code).
+# Counts are rows since 20 Oct; 'closed' = auto-closed by alarm_closer.py (active = still happening).
 # type -> (progress, unit tests, verified on test server, main server, logs: where + what to search)
 L1 = "celerylogs1/celery_logs_of_server.log"
 L2 = "celerylogs2/celery_logs_of_server.log"
@@ -166,7 +167,7 @@ STATUS = {
     1: ("Done - waiting for a live case", "test_load_handler (5 low readings), test_alarm_policy",
         "No live Low Voltage on test yet", MAIN_OLD, f"{L1}: 'Power alarm stored' type=1"),
     2: ("Done - working live", "test_load_handler, test_mqtt_services, test_alarm_policy",
-        "Live: 78 alarms since 20 Oct (latest 28 Oct 11:43). Repeat rule seen live: site 118 better PF counted, not e-mailed", MAIN_OLD,
+        "Live: 81 alarms since 20 Oct (latest 2 Nov 12:14); 80 auto-closed, 1 active. Repeat rule seen live: site 118 better PF counted, not e-mailed", MAIN_OLD,
         f"{L1}: 'Power alarm stored|repeated' type=2, 'repeat not e-mailed (value ... within tolerance)'"),
     3: ("Not implemented", "-", "-", "-", "-"),
     4: ("Not implemented (old rows only)", "-", "-", "-", "-"),
@@ -174,34 +175,34 @@ STATUS = {
     6: ("Done - waiting for a live case", "test_dg_session_integration, test_dg_fuel_cases",
         "No Fuel Drain on test yet (no DG run above 1.2 x tank)", MAIN_OLD,
         "journalctl -u fetch-fuel-data and logges/dg_fuel.log: 'DG fuel cycle summary', 'Power alarm stored' type=6"),
-    7: ("Done - working live", "test_consumption_alarms, test_alarm_policy, test_replay_consumption_alarms",
-        "Live: 78 alarms since 20 Oct", MAIN_OLD, f"{L1}: 'Consumption alarm stored ... alarm=High Consumption Alarm emailed=True|False'"),
+    7: ("Done - working live", "test_consumption_alarms, test_alarm_policy (e-mailed every day), test_alarm_closer (closed at end of its day), test_replay_consumption_alarms",
+        "Live: 80 alarms since 20 Oct (latest 28 Oct); all auto-closed at the end of their day. Test was down 30 Oct night - 2 Nov morning", MAIN_OLD, f"{L1}: 'Consumption alarm stored ... alarm=High Consumption Alarm emailed=True|False'"),
     8: ("Done - opt-in, not enabled for any site", "test_consumption_alarms, test_alarm_policy (Auto low)",
         "None (no site has it switched on)", MAIN_OLD, f"{L1}: 'Consumption alarm stored ... Low Consumption'"),
     9: ("Done - working live", "test_dg_session_integration, test_dg_fuel_cases",
         "Live: 56 alarms (latest 15 Sep 2026)", MAIN_OLD, "journalctl -u fetch-fuel-data, logges/dg_fuel.log: 'Power alarm stored' type=9"),
-    10: ("Done - working live", "test_consumption_handler (stored once, throttled, repeats counted)",
-         "Live: 53 alarms since 20 Oct (latest 28 Oct 14:30)", MAIN_OLD,
+    10: ("Done - working live", "test_consumption_handler (stored once, throttled, repeats counted), test_alarm_closer (closed only when fixed)",
+         "Live: 82 alarms since 20 Oct (latest 2 Nov 12:20), 4 open. 2 Nov: 20 old rows (19 Oct, sites 109 / 114 / 162) closed as fixed - clean hourly readings since", MAIN_OLD,
          f"{L1}: 'Meter reading issue stored' / 'Meter reading issue repeated'"),
-    11: ("Done - working live (incl. during the day)", "test_consumption_alarms (IntradayBypassTests), test_alarm_policy",
-         "Live: 68 alarms since 20 Oct; intra-day raised 28 Oct 21:49 for sites 133 (3 aisles) and 135, e-mailed", MAIN_OLD,
+    11: ("Done - working live (incl. during the day)", "test_consumption_alarms (IntradayBypassTests: new day = new alarm + e-mail), test_alarm_policy, test_alarm_closer",
+         "Live: 81 alarms since 20 Oct (latest 30 Oct), 13 raised during the day; all auto-closed at the end of their day. First intra-day raise 28 Oct 21:49 (sites 133, 135)", MAIN_OLD,
          f"{L1}: 'Consumption alarm stored ... Bypassed', to_do 'Bypassed (during the day, HH:MM)'"),
     12: ("Done - waiting for a live case", "test_consumption_alarms (operation hours)",
          "None on test yet (needs an NL aisle active outside its window)", MAIN_OLD, f"{L1}: 'Operation Hours Increased'"),
     13: ("Done - working live", "test_gateway_overheat, test_alarm_policy (manual °C, Off)",
-         "Live: 7 alarms since 20 Oct (latest 28 Oct 11:42)", MAIN_OLD,
+         "Live: 10 alarms since 20 Oct (latest 2 Nov 12:09), 1 active", MAIN_OLD,
          "journalctl -u gunicorn: 'Gateway overheat stored|repeated ... emailed='"),
     14: ("Done - waiting for a live case", "test_gateway_health (MeterDisconnectedTests)",
          "Simulated 28 Oct 17:00: raised, e-mailed, auto-cleared 17:05, restored line on next e-mail. Test gets no real meter events (gateways post them to main only)",
          "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=14'; task line 'gateway health: raised=.. cleared=..'"),
     15: ("Done - working live", "test_gateway_health (GatewayAlarmTests, CommandTests)",
-         "Live: site 94 gw 3 raised 28 Oct 19:05, auto-cleared 19:25; site 127 gw 1 raised 22:55 (active). Simulated full cycle 17:00-17:10",
+         "Live: 43 alarms since 20 Oct (latest 30 Oct 12:21), 42 cleared, 1 still open (site 35). First live cycle: site 94 gw 3 raised 28 Oct 19:05, cleared 19:25",
          "Not deployed", f"{L2}: 'Gateway health alarm raised|cleared ... type=15'"),
     16: ("Done - needs the broker-log cron", "test_gateway_health (pings but no data -> 16)",
          "Dry run with main's broker log (28 Oct): 1 gateway would be 16 (avc_myn_bilaspursvng_000071_1). Not live: test gets data through a bridge, no gateway pings",
          "Not deployed (needs root cron: manage.py gateway_health --broker-log)", f"{L2}: 'Gateway health alarm raised ... type=16'"),
     17: ("Done - working live", "test_spike_alarms (meter reset, jump, catch-up causes, one e-mail per site, Off)",
-         "Live 30 Oct: site 138 meter reset (3,290 + 3,162 kWh, ERROR!!! same day); site 114 catch-up at 10:00 on 20 aisles after a gateway gap. 2 tiny false ones before the minimum-size rule, closed",
+         "Live: 23 alarms (30 Oct), all auto-closed. Site 138 meter reset (3,290 + 3,162 kWh, ERROR!!! same day); site 114 catch-up at 10:00 on 20 aisles after a gateway gap. 2 tiny false ones before the minimum-size rule, closed",
          "Not deployed", f"{L2}: 'spike scan: raised=.. updated=..'"),
     "-": ("Existing (unchanged)", "test_fire_alarm_handler", "Live (fire pump e-mails)", "Live (old code)", f"{L1}: FIREALARM handler lines"),
 }
@@ -271,9 +272,9 @@ APIS = [
 ]
 API_ROWS = [
     ["/api/alarmList/", "POST", "Token", "Site alarm page: totals and one line per alarm type (active alarms only)",
-     '{"siteId": 134}', "status, total_alarm (sum of occurrences), high_priority, medium_priority, active_alarms, data[]: name, count, priority, alarm_type", sample("alarmList")],
+     '{"siteId": 114}', "Active alarms only. status, total_alarm (sum of occurrences), high_priority, medium_priority, active_alarms, data[]: name, count, priority, alarm_type", sample("alarmList")],
     ["/api/alarmListDetail/", "POST", "Token", "Site alarm page: active rows of one type, newest first",
-     '{"siteId": 134, "alarm_type": 11}', "data[]: get_alarm_type_display, get_alarm_priority_display, power_source, r_phase, y_phase, b_phase, fuel_level, run_hours, created, is_active, aisle_group, issue, occurrences, last_seen", sample("alarmListDetail")],
+     '{"siteId": 114, "alarm_type": 10}', "Active rows only. data[]: get_alarm_type_display, get_alarm_priority_display, power_source, r_phase, y_phase, b_phase, fuel_level, run_hours, created, is_active, aisle_group, issue, occurrences, last_seen", sample("alarmListDetail")],
     ["/api/alarmTypeApi/", "POST", "Token, Super_Admin only", "Super-admin alarm list: active issues of every live site (last 30 days), grouped by customer",
      "{}", "data[]: customer_id, customer_name, alarm_list[] (see 'Fields' sheet: alarm, priority, site, source, aisle / leg / power source / gateway, issue, created_time = first seen, last_seen, occurrences, alarm_type)", sample("alarmTypeApi")],
     ["/api/alarmapi/", "POST", "Token", "Super-admin: active issue counts per customer, priority and site",
@@ -325,11 +326,12 @@ CONFIG_ROWS = [
 FLOW = [("Step", 6), ("What happens", 110)]
 FLOW_ROWS = [
     [1, "A handler / checker decides an alarm is due (rules in the catalogue) and stores or updates its AlarmNotifications row."],
-    [2, "Repeat rule (wareApp/mqtt/services/alarm_policy.py -> should_email): first occurrence or > 5 % worse -> e-mail; otherwise only counted."],
+    [2, "Repeat rule (wareApp/mqtt/services/alarm_policy.py -> should_email): first occurrence or > 5 % worse -> e-mail; otherwise only counted. Exception: High / Low Consumption and Bypassed are e-mailed every day they happen (one alarm per aisle per day, no comparison with the day before)."],
     [3, "Recipients (alarm_policy.recipients): software team + all-sites ground team + the site's location team + per-site ground team, minus groups switched off in AlarmSetting."],
     [4, "notify() queues the e-mail on the 'notifications' RabbitMQ queue after the database commit; if the queue is down it is sent directly."],
     [5, "mqtt-notifications worker -> sendmail -> SMTP (EMAIL_* in .env). On test servers ALARM_EMAIL_OVERRIDE_TO replaces the recipients (banner shows the intended ones)."],
     [6, "Logs: 'Alarm email redirected' (test), 'Email sent: subject=... to=...' or 'Email failed: ...' in the Celery log."],
+    [7, "Closing (no e-mail): alarm_closer.py every 5 min sets is_active False and off_time when the alarm stopped - power after 60 min unseen, overheat after 2 h, High / Low / Bypassed at the end of their day, Meter Reading Issue when fixed, other daily alarms after one full day. 14 / 15 / 16 are closed by gateway health when data returns. Frontend lists show active alarms only."],
 ]
 
 FIELDS = [("Field", 22), ("Meaning", 90)]
@@ -390,12 +392,15 @@ LOG_ROWS = [
      "Alarms 0-2, 7, 8, 10, 11, 12 stored / repeated / not e-mailed; e-mail lines 'Alarm email redirected', 'Email sent', 'Email failed'"],
     ["Celery queue-2 log (LoadData, gateway health checker)", "~/django_project/celerylogs2/celery_logs_of_server.log\n grep -a 'Gateway health alarm\\|gateway health:' ...",
      "Alarms 14, 15, 16 raised / cleared; every 5-min check result 'gateway health: raised=.. still_active=.. cleared=..'"],
+    ["Celery queue-2 log: alarm closer", "~/django_project/celerylogs2/celery_logs_of_server.log\n grep -a 'close_resolved_alarms' ...",
+     "Every 5 min: 'alarms closed: none' or the count per rule (e.g. 'high / low / bypassed, its day is over=12', 'meter reading issue fixed=20')"],
     ["Fuel service", "journalctl -u fetch-fuel-data --since today\n~/django_project/logges/dg_fuel.log", "DG fuel cycle, alarms 6 and 9"],
     ["Web / API (gunicorn)", "journalctl -u gunicorn --since today", "Gateway overheat (13) and meter-disconnection posts (input of 14)"],
     ["Mosquitto broker (root only)", "/var/log/mosquitto/mosquitto.log", "Gateway pings (PINGREQ) used to tell 15 from 16"],
     ["Recipient check", "cd ~/django_project && virtualwarehouse/bin/python manage.py alarm_recipients [--site ID]", "Who gets each site's alarm e-mails (location team)"],
     ["Gateway health dry run", "virtualwarehouse/bin/python manage.py gateway_health --broker-log FILE --dry-run", "What 14 / 15 / 16 would raise now, without storing or e-mailing"],
-    ["Database", "AlarmNotifications (admin: /avcadmin/wareApp/alarmnotifications/)", "Every alarm row: type, site, issue, first / last seen, count, active"],
+    ["Database", "AlarmNotifications (admin: /avcadmin/wareApp/alarmnotifications/)", "Every alarm row: type, site, issue, first / last seen, count, active, off_time (when closed)"],
+    ["Closer dry run", "virtualwarehouse/bin/python manage.py shell -c 'from wareApp.mqtt.services import alarm_closer; print(alarm_closer.close_resolved(dry_run=True))'", "What would be closed now, per rule, without changing anything"],
 ]
 
 SUMMARY = [("Type", 6), ("Alarm", 30), ("Progress status", 34), ("Verified on test server", 70), ("Main server", 34)]
