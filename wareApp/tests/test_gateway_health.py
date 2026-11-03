@@ -216,6 +216,13 @@ class GatewayAlarmTests(TestCase):
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [])
 
+    def test_skipped_sites_are_not_checked(self, notify):
+        self.set(data_minutes_ago=300)
+        with self.settings(GATEWAY_HEALTH_SKIP_SITES=[self.site.id]):
+            gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [])
+        notify.assert_not_called()
+
     def test_sites_that_are_not_live_are_skipped(self, notify):
         Site.objects.filter(pk=self.site.pk).update(is_live=False)
         self.set(data_minutes_ago=300)
