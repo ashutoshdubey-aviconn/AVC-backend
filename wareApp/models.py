@@ -21,23 +21,51 @@ def clean_reading_float(value, default=0):
     return max(value, 0)
 
 
+# A reading above MAX_READING_KWH is a meter glitch and is stored as 0 - only on
+# energy-saving (2) and submetering (5) sites, which meter aisles. WH-metering
+# (1) measures the whole warehouse: its values can genuinely be far above it and
+# are never capped (decided 2026-11-03). Every write path uses this rule.
+MAX_READING_KWH = 10000
+CAPPED_SITE_TYPES = frozenset({2, 5})
+
+
+def reading_capped(site):
+    """True when ``site``'s readings are capped at MAX_READING_KWH."""
+    return getattr(site, "site_type", None) in CAPPED_SITE_TYPES
+
+
+def cap_reading(site, value):
+    """``value``, or 0 when it is a glitch on a capped site."""
+    return 0.0 if value > MAX_READING_KWH and reading_capped(site) else value
+
+
+def cap_reading_row(row, site):
+    """Apply only the glitch cap to an hourly / daily row (unit 0, saving =
+    baseline), for rows written without save() (bulk_update)."""
+    if row.unit_consumption is not None and row.unit_consumption > MAX_READING_KWH and reading_capped(site):
+        row.unit_consumption = 0
+        row.energy_saved = getattr(row, row.baseline_field)
+    return row
+
+
 class CleanReadingMixin:
     """save() cleaning shared by HourlySiteReading and DailySiteReading.
 
-    Consumption over 10000 kWh is treated as a meter glitch: stored as 0 with
-    saving = baseline. (bulk_create / update() skip save(); see
-    wareApp/mqtt/consumption_batch.py ``_as_saved`` for the batch path.)
+    Consumption over MAX_READING_KWH on a saving / submetering site is treated
+    as a meter glitch: stored as 0 with saving = baseline (see reading_capped).
+    bulk_create / bulk_update skip save(); the batch path calls
+    clean_reading_values itself (wareApp/mqtt/consumption_batch.py).
     """
 
     baseline_field = None
 
-    def clean_reading_values(self):
+    def clean_reading_values(self, site=None):
+        """``site``: the row's site when already loaded (saves a query)."""
         self.unit_consumption = clean_reading_float(self.unit_consumption)
         setattr(self, self.baseline_field, clean_reading_float(getattr(self, self.baseline_field)))
         self.energy_saved = clean_reading_float(self.energy_saved)
-        if self.unit_consumption > 10000:
-            self.unit_consumption = 0
-            self.energy_saved = getattr(self, self.baseline_field)
+        if self.unit_consumption > MAX_READING_KWH:
+            cap_reading_row(self, site or self.associated_Site)
 
     def save(self, *args, **kwargs):
         self.clean_reading_values()

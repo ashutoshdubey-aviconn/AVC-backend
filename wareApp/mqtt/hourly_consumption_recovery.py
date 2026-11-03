@@ -4,7 +4,7 @@ from datetime import datetime
 
 from django.db import transaction
 
-from wareApp.models import AisleGroup, HourlySiteReading
+from wareApp.models import AisleGroup, HourlySiteReading, cap_reading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import day_ranges, hour_ranges, log_bulk_write
 from wareApp.mqtt.services.baseline import BaselineMemo
@@ -60,6 +60,8 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
             hour_end = observed_at.replace(minute=59, second=59, microsecond=0)
             # ERROR404: the gateway has no data for that hour; stored as 0.
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
+            # Meter glitch guard (saving / submetering sites only).
+            consumption = cap_reading(site, consumption)
             status_slots.append(RecoverySlot(hour_start, recovery_value == "ERROR404"))
             hourly_baseline, _ = baselines.for_day(hour_start.date())
             slots[(hour_start, hour_end)] = {
