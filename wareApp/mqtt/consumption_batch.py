@@ -32,6 +32,7 @@ from kombu import Exchange, Queue
 from django.db.models import Q
 
 from wareApp.models import (
+    cap_reading_row,
     AisleGroup,
     DailySiteReading,
     HourlySiteReading,
@@ -569,6 +570,12 @@ def process_consumption_batch(packets, publish_recovery):
                 ok_states.append(state)
                 outcomes += state.outcomes
 
+            # bulk writes skip save(): apply the meter-glitch cap (saving /
+            # submetering sites) to every row now, after the batch's last change
+            # (a row created in this batch may have been updated since).
+            for s in ok_states:
+                for row in (*s.dirty_hourly.values(), *s.dirty_daily.values(), *s.new_hourly, *s.new_daily):
+                    cap_reading_row(row, s.site)
             dirty_hourly = [r for s in ok_states for r in s.dirty_hourly.values()]
             dirty_daily = [r for s in ok_states for r in s.dirty_daily.values()]
             new_hourly = [r for s in ok_states for r in s.new_hourly]

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from django.db import transaction
 
-from wareApp.models import AisleGroup, DailySiteReading
+from wareApp.models import AisleGroup, DailySiteReading, cap_reading
 from wareApp.mqtt.log_context import home_gateway_id_for
 from wareApp.mqtt.log_format import day_ranges, log_bulk_write
 from wareApp.mqtt.services.baseline import baseline_row
@@ -63,9 +63,8 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
         for recovery_date, recovery_value in zip(recovery_dates, recovery_values):
             observed_at = datetime.strptime(recovery_date, "%Y-%m-%d")
             consumption = 0.0 if recovery_value == "ERROR404" else float(recovery_value)
-            if getattr(site, "site_type", None) == 2 and consumption > 10000:
-                # Legacy guard for energy-saving sites: treat meter glitches as 0.
-                consumption = 0.0
+            # Meter glitch guard (saving / submetering sites only).
+            consumption = cap_reading(site, consumption)
             baseline_value = 0.0
             saving = 0.0
             if aisle_group.is_active:

@@ -5,12 +5,15 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import F, FloatField, Subquery, Sum, Value
+from django.db.models import Case, F, FloatField, Subquery, Sum, Value, When
+from django.db.models.lookups import GreaterThan
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
+    MAX_READING_KWH,
+    reading_capped,
     AisleGroup,
     AlarmNotifications,
     DailySiteReading,
@@ -75,17 +78,13 @@ def _parse_consumption_message(message):
     }
 
 
-WAREHOUSE_SAVING_SITE_TYPE = 2
-WAREHOUSE_SAVING_MAX_UNITS = 10000
+WAREHOUSE_SAVING_MAX_UNITS = MAX_READING_KWH
 
 
 def _cap_warehouse_saving_values(site, values):
-    """Apply the legacy guard against meter glitches on energy-saving sites.
-
-    The legacy root tasks.py replaced any consumption above 10000 units with 0
-    for ``site_type == 2`` sites; the modular handler keeps that behaviour.
-    """
-    if getattr(site, "site_type", None) != WAREHOUSE_SAVING_SITE_TYPE:
+    """Guard against meter glitches: values above MAX_READING_KWH become 0 on
+    saving and submetering sites, never on WH-metering (see reading_capped)."""
+    if not reading_capped(site):
         return values
     for key in (
         "new_unit_consumption",
@@ -301,9 +300,17 @@ def _daily_total_from_hourly(site, leg_id, day):
 
 def _daily_updates(site, leg_id, day, daily_baseline):
     total = _daily_total_from_hourly(site, leg_id, day)
+    saved = Value(float(daily_baseline)) - total
+    if reading_capped(site):
+        # Meter-glitch cap (saving / submetering sites), as save() does.
+        total_now = total
+        total = Case(When(GreaterThan(total_now, MAX_READING_KWH), then=Value(0.0)), default=total_now,
+                     output_field=FloatField())
+        saved = Case(When(GreaterThan(total_now, MAX_READING_KWH), then=Value(float(daily_baseline))),
+                     default=saved, output_field=FloatField())
     return {
         "unit_consumption": total,
-        "energy_saved": Value(float(daily_baseline)) - total,
+        "energy_saved": saved,
         "daily_baseline_value": daily_baseline,
     }
 

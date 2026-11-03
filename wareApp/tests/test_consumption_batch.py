@@ -42,8 +42,8 @@ def packet(day, hour, current_total, previous_total, new_units=1.5, leg="{leg}")
 class World:
     """One site with aisles; rows and packets refer to aisles by name."""
 
-    def __init__(self, name, aisles):
-        self.site = Site.objects.create(site_name=name, site_type=1)
+    def __init__(self, name, aisles, site_type=1):
+        self.site = Site.objects.create(site_name=name, site_type=site_type)
         self.legs = {}
         self.aisles = {}
         for aisle_name, options in aisles.items():
@@ -146,10 +146,10 @@ class BatchMatchesSinglePacketTests(TestCase):
     def setUp(self):
         cache.clear()
 
-    def run_both(self, prepare, packets):
+    def run_both(self, prepare, packets, site_type=1):
         """``packets``: list of (aisle name, payload text with {leg})."""
-        single = World("single", self.aisles)
-        batch = World("batch", self.aisles)
+        single = World("single", self.aisles, site_type)
+        batch = World("batch", self.aisles, site_type)
         for world in (single, batch):
             prepare(world)
 
@@ -214,6 +214,30 @@ class BatchMatchesSinglePacketTests(TestCase):
                 ("A2", packet(2, 11, 2.0, -1.0, new_units=2.0)),
             ],
         )
+
+    def test_glitch_cap_only_on_saving_and_submetering_sites(self):
+        """Over 10,000 kWh: 0 on saving (2) / submetering (5), kept on WH-metering (1);
+        hourly and daily, single-packet and batch paths alike."""
+        packets = [
+            ("A1", packet(2, 10, 6000.0, 0, new_units=6000.0)),
+            ("A1", packet(2, 11, 6500.0, 6000.0, new_units=6500.0)),  # day 12,500
+            ("A1", packet(2, 12, 20000.0, 6500.0, new_units=20000.0)),  # one hour 20,000
+        ]
+        for site_type, capped in ((1, False), (2, True), (5, True)):
+            with self.subTest(site_type=site_type):
+                HourlySiteReading.objects.all().delete()
+                DailySiteReading.objects.all().delete()
+                single, batch, _ = self.run_both(lambda w: None, packets, site_type=site_type)
+                for world in (single, batch):
+                    hours = dict(HourlySiteReading.objects.filter(associated_Site=world.site)
+                                 .values_list("reading_from__hour", "unit_consumption"))
+                    day = DailySiteReading.objects.get(associated_Site=world.site)
+                    if capped:
+                        self.assertEqual(hours[12], 0.0)
+                        self.assertEqual((day.unit_consumption, day.energy_saved), (0.0, day.daily_baseline_value))
+                    else:
+                        self.assertEqual(hours[12], 20000.0)
+                        self.assertEqual(day.unit_consumption, 6000.0 + 6500.0 + 20000.0)
 
     def test_existing_rows_current_hour_and_new_hour(self):
         def prepare(w):
@@ -517,7 +541,8 @@ class FlushAndListenerTests(TestCase):
 class ResyncDailyTotalsCommandTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.world = World("resync", {"A1": {"is_active": True}, "A2": {"is_active": True}})
+        # Energy-saving site: an hour over 10,000 kWh is a meter glitch there.
+        self.world = World("resync", {"A1": {"is_active": True}, "A2": {"is_active": True}}, site_type=2)
         for hour in range(24):
             self.world.hourly("A1", 2, hour, 0.25)  # 6.0 for the day
         self.world.daily("A1", 2, 99.0)  # drifted
@@ -558,6 +583,13 @@ class ResyncDailyTotalsCommandTests(TestCase):
         output = self.run_command()
         self.assertIn("would update (dry run, use --apply) 1", output)
         self.assertEqual(self.totals(), before)
+
+    def test_wh_metering_big_hour_is_genuine(self):
+        # WH-metering measures the whole warehouse: > 10,000 kWh is real, not a glitch.
+        Site.objects.filter(pk=self.world.site.pk).update(site_type=1)
+        output = self.run_command("--apply")
+        self.assertNotIn("implausible hourly value 17260472869", output)
+        self.assertAlmostEqual(self.totals()[(self.world.legs["A1"], 4)][0], 17260472869.25 + 23 * 0.25, places=1)
 
     def test_apply_sets_daily_to_hourly_sum(self):
         output = self.run_command("--apply")

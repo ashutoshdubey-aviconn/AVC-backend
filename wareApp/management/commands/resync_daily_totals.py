@@ -8,7 +8,8 @@ every daily row that differs. Only days whose hourly rows are complete are
 changed (all 24 hours; today: every hour up to the previous one): with
 missing hours the sum would undercount, so those days are left alone and
 counted as "incomplete" (``--include-incomplete`` changes them too).
-Days with an implausible hourly value (meter glitch: over MAX_HOURLY_KWH,
+Days with an implausible hourly value (meter glitch: over MAX_HOURLY_KWH on
+saving / submetering sites - never on WH-metering, see models.reading_capped -
 or over GLITCH_FACTOR x the hour's baseline) are never changed; they are
 listed so the hourly row can be checked by hand.
 Dry run by default: prints what would change per site.
@@ -25,12 +26,14 @@ from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
 
-from wareApp.models import AisleGroup, DailySiteReading, HourlySiteReading, Site
+from wareApp.models import (
+    MAX_READING_KWH, AisleGroup, DailySiteReading, HourlySiteReading, Site, reading_capped,
+)
 
 BATCH = 2000
 # Differences below this (kWh) are float noise, not drift.
 TOLERANCE = 0.001
-MAX_HOURLY_KWH = 10000
+MAX_HOURLY_KWH = MAX_READING_KWH
 GLITCH_FACTOR = 100
 
 
@@ -87,8 +90,9 @@ class Command(BaseCommand):
             if not hourly:
                 continue
             glitches = {}
+            too_big = Q(unit_consumption__gt=MAX_HOURLY_KWH) if reading_capped(site_obj) else Q(pk__in=[])
             for row in HourlySiteReading.objects.filter(
-                Q(unit_consumption__gt=MAX_HOURLY_KWH)
+                too_big
                 | Q(
                     hourly_baseline_value__gt=0,
                     unit_consumption__gt=F("hourly_baseline_value") * GLITCH_FACTOR,
