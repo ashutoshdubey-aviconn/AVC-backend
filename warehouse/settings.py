@@ -357,6 +357,11 @@ if MQTT_CONSUMPTION_BATCH_SECONDS > 0:
 GATEWAY_HEALTH_CHECK_SECONDS = config("GATEWAY_HEALTH_CHECK_SECONDS", default=300, cast=int)
 GATEWAY_HEALTH_DOWN_MINUTES = config("GATEWAY_HEALTH_DOWN_MINUTES", default=60, cast=int)
 GATEWAY_HEALTH_PING_FRESH_MINUTES = config("GATEWAY_HEALTH_PING_FRESH_MINUTES", default=15, cast=int)
+# Site ids whose gateways the gateway check skips (comma list, e.g. "35" on the
+# test server: main's bridge does not forward that site's data to test).
+GATEWAY_HEALTH_SKIP_SITES = config(
+    "GATEWAY_HEALTH_SKIP_SITES", default="", cast=lambda v: [int(x) for x in v.split(",") if x.strip()]
+)
 # Open outage alarms (14 / 15 / 16) are e-mailed again every this many hours; 0 = never.
 GATEWAY_HEALTH_REMINDER_HOURS = config("GATEWAY_HEALTH_REMINDER_HOURS", default=24, cast=int)
 # No gateway at all with data for this long: our side is down, skip the check.

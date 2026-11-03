@@ -216,6 +216,12 @@ def _clear(report, site_id, alarm_type, object_type, object_id, now):
         logger.info("Gateway health alarm cleared: site=%s type=%s object=%s", site_id, alarm_type, object_id)
 
 
+def skipped_sites():
+    """GATEWAY_HEALTH_SKIP_SITES: site ids whose gateways are not checked, e.g. on
+    the test server a site whose data main does not forward (site 35)."""
+    return list(getattr(settings, "GATEWAY_HEALTH_SKIP_SITES", []))
+
+
 def evaluate_gateways(report, now):
     # No gateway at all has sent data lately: our side (listeners, broker,
     # network) is down, not the gateways. Judge nothing until data flows again.
@@ -231,7 +237,7 @@ def evaluate_gateways(report, now):
     with_pings = ping_information_fresh(now)
     statuses = HomeGatewayStatus.objects.select_related("home_gateway").filter(
         home_gateway__connected_to__is_live=True, last_data_at__isnull=False,
-    )
+    ).exclude(home_gateway__connected_to_id__in=skipped_sites())
     for status in statuses:
         hgw = status.home_gateway
         site_id, number = hgw.connected_to_id, gateway_number(hgw.hgw_id)
