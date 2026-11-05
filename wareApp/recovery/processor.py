@@ -21,6 +21,7 @@ from django.db.models import Sum
 from django.db import transaction
 
 from wareApp.models import (
+    hour_counts_in_day,
     AisleGroup,
     HourlySiteReading,
     SiteBaseline,
@@ -131,15 +132,6 @@ def update_daily_from_hourly(
     Aggregate HourlySiteReading into DailySiteReading
     """
 
-    total = (
-        HourlySiteReading.objects.filter(
-            associated_Site=site,
-            aisle_group=aisle,
-            leg_id=str(aisle_group_id),
-            reading_from__date=reading_date,
-        ).aggregate(total=Sum("unit_consumption"))["total"]
-        or 0
-    )
     baseline = SiteBaseline.objects.filter(
         associated_site_id=site.id,
         leg_id=str(aisle_group_id),
@@ -152,6 +144,16 @@ def update_daily_from_hourly(
             associated_site_id=site.id,
             leg_id=str(aisle_group_id),
         ).last()
+    hours = HourlySiteReading.objects.filter(
+        associated_Site=site,
+        aisle_group=aisle,
+        leg_id=str(aisle_group_id),
+        reading_from__date=reading_date,
+    )
+    if baseline and not hour_counts_in_day(site, float("inf"), baseline.baseline_value):
+        # Spike hours (above the whole daily baseline) do not count in the day.
+        hours = hours.exclude(unit_consumption__gt=baseline.baseline_value)
+    total = hours.aggregate(total=Sum("unit_consumption"))["total"] or 0
     daily_baseline = 0
     daily_saving = 0
 

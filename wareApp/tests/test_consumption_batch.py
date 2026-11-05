@@ -239,6 +239,27 @@ class BatchMatchesSinglePacketTests(TestCase):
                         self.assertEqual(hours[12], 20000.0)
                         self.assertEqual(day.unit_consumption, 6000.0 + 6500.0 + 20000.0)
 
+    def test_spike_hour_left_out_of_the_day_total(self):
+        """An hour above the whole daily baseline (48 kWh) does not count in the day on
+        saving / submetering sites; the other hours do. The hour row is kept."""
+        packets = [
+            ("A1", packet(2, 10, 2.0, 0, new_units=2.0)),
+            ("A1", packet(2, 11, 3290.0, 2.0, new_units=3290.0)),  # meter jump
+            ("A1", packet(2, 12, 1.0, 3290.0, new_units=1.0)),
+        ]
+        for site_type, skipped in ((1, False), (2, True), (5, True)):
+            with self.subTest(site_type=site_type):
+                HourlySiteReading.objects.all().delete()
+                DailySiteReading.objects.all().delete()
+                single, batch, _ = self.run_both(lambda w: None, packets, site_type=site_type)
+                for world in (single, batch):
+                    hours = dict(HourlySiteReading.objects.filter(associated_Site=world.site)
+                                 .values_list("reading_from__hour", "unit_consumption"))
+                    self.assertEqual(hours[11], 3290.0)  # kept as stored
+                    day = DailySiteReading.objects.get(associated_Site=world.site)
+                    expected = 3.0 if skipped else 3293.0
+                    self.assertEqual((day.unit_consumption, day.energy_saved), (expected, 48.0 - expected))
+
     def test_existing_rows_current_hour_and_new_hour(self):
         def prepare(w):
             w.hourly("A1", 2, 8, 3.0)
@@ -581,8 +602,24 @@ class ResyncDailyTotalsCommandTests(TestCase):
     def test_dry_run_changes_nothing(self):
         before = self.totals()
         output = self.run_command()
-        self.assertIn("would update (dry run, use --apply) 1", output)
+        # Day 2 (drifted) and day 4 (the glitch hour is a spike hour: left out).
+        self.assertIn("would update (dry run, use --apply) 2", output)
         self.assertEqual(self.totals(), before)
+
+    def test_spike_hour_is_left_out_of_the_resynced_total(self):
+        for hour in range(24):  # day 5 on the saving site: one meter jump at 04:00
+            self.world.hourly("A1", 5, hour, 3290.0 if hour == 4 else 0.25)
+        self.world.daily("A1", 5, 99.0)
+        DailySiteReading.objects.filter(associated_Site=self.world.site, reading_for__day=5).update(
+            daily_baseline_value=48.0
+        )
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        call_command("resync_daily_totals", "--from", "2026-10-05", "--to", "2026-10-05",
+                     "--site", str(self.world.site.id), "--apply", stdout=StringIO())
+        self.assertEqual(self.totals()[(self.world.legs["A1"], 5)], (23 * 0.25, 48.0 - 23 * 0.25))
 
     def test_wh_metering_big_hour_is_genuine(self):
         # WH-metering measures the whole warehouse: > 10,000 kWh is real, not a glitch.
@@ -599,9 +636,10 @@ class ResyncDailyTotalsCommandTests(TestCase):
         self.assertEqual(totals[(self.world.legs["A2"], 2)][0], 7.0)
         # Day 3 misses 23 hours: left alone unless asked.
         self.assertEqual(totals[(self.world.legs["A1"], 3)][0], 50.0)
-        self.assertIn("left alone 1 days with missing hourly rows and 1 days with an implausible", output)
-        self.assertIn("implausible hourly value 17260472869.250 kWh at 09:00", output)
-        self.assertEqual(totals[(self.world.legs["A1"], 4)][0], 6.0)
+        # Day 4: the 17,260,472,869 kWh hour is above the whole daily baseline, so it
+        # is a spike hour left out; the other 23 hours make the day (decided 2026-11-05).
+        self.assertIn("left alone 1 days with missing hourly rows and 0 days with an implausible", output)
+        self.assertEqual(totals[(self.world.legs["A1"], 4)], (23 * 0.25, 48.0 - 23 * 0.25))
         self.assertIn("updated 0", self.run_command("--apply"))
         self.run_command("--apply", "--include-incomplete")
         self.assertEqual(self.totals()[(self.world.legs["A1"], 3)][0], 4.0)

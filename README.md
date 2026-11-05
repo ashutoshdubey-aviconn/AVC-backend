@@ -70,6 +70,8 @@ All documentation is in [`docs/`](docs/):
 
 | Folder | Contents |
 | --- | --- |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Every implemented / modified / removed behaviour, newest first |
+| [`docs/consumption/`](docs/consumption/READING_RULES.md) | Consumption reading rules: 10,000 kWh glitch limit, spike hours in day totals |
 | [`docs/mqtt-flows/`](docs/mqtt-flows/README.md) | Every MQTT topic and alarm flow, with draw.io diagrams |
 | [`docs/deploy/`](docs/deploy/README.md) | Systemd units, test and main server rollouts |
 | [`docs/operations/`](docs/operations/) | Server operations, production change logs, incident notes |

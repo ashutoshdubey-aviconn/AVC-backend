@@ -147,7 +147,7 @@ ALARMS = [
      "One alarm per aisle per day; ONE e-mail per site per scan listing all new spike aisles with their cause; later spikes the same day update the alarm text.",
      "Yes: end of the day after its day", RECIPIENTS,
      "wareApp/mqtt/services/spike_alarms.py -> scan, cause; consumption_alarms.py -> find_spikes",
-     "CONSUMPTION_SPIKE_CHECK_SECONDS=300", SITE_APIS, "Spike hours are excluded from Bypassed / High. Added 2026-10-30."],
+     "CONSUMPTION_SPIKE_CHECK_SECONDS=300", SITE_APIS, "Spike hours are excluded from Bypassed / High. Added 2026-10-30. Since 2026-11-05 meter-jump hours (above the whole daily baseline) on saving / submetering sites are also left out of the aisle's day total (docs/consumption/READING_RULES.md)."],
     ["-", "Fire pump mode / motor on", "Fire", "Active (e-mail only)", "-", "device event",
      "MQTT .../out/FIREALARM/localstate", "Pump mode changes and motor-on events e-mail the customer; no alarm row in AlarmNotifications.",
      "-", "No", "-", "Real time; motor-on at most every 10 min", "Customer e-mail per event", "-", "Customer addresses in sendmail", "wareApp/mqtt/fire_alarm.py; sendmail.send_mail_fire_alarm_user", "-", "fireAlarm/", ""],

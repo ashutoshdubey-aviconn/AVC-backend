@@ -13,6 +13,7 @@ from django.utils import timezone
 from wareApp.mqtt.services import alarm_policy
 from wareApp.models import (
     MAX_READING_KWH,
+    hour_counts_in_day,
     reading_capped,
     AisleGroup,
     AlarmNotifications,
@@ -274,22 +275,32 @@ class _BaselineMemo:
         return self._values()[1]
 
 
-def _daily_total_from_hourly(site, leg_id, day):
-    """SQL expression: the day's total = sum of its hourly readings (0 if none).
+def _counted_hours(site, leg_id, day, daily_baseline):
+    """The day's hourly rows that count in its total: spike hours (above the
+    whole daily baseline on saving / submetering sites, see
+    models.hour_counts_in_day) are left out; the rows themselves are kept."""
+    day_start = datetime.combine(day, datetime.min.time())
+    hours = HourlySiteReading.objects.filter(
+        associated_Site=site,
+        leg_id=leg_id,
+        reading_from__gte=day_start,
+        reading_from__lt=day_start + timedelta(days=1),
+    )
+    if not hour_counts_in_day(site, float("inf"), daily_baseline):
+        hours = hours.exclude(unit_consumption__gt=daily_baseline)
+    return hours
+
+
+def _daily_total_from_hourly(site, leg_id, day, daily_baseline=None):
+    """SQL expression: the day's total = sum of its counted hourly readings (0 if none).
 
     The daily row always equals what the hourly rows say. (Previously each
     packet added its new units to the day and the day was re-summed only at
     the hour change, so the two drifted apart whenever a packet's units did
-    not match the hour total.)
+    not match the hour total.) Spike hours are not counted (_counted_hours).
     """
-    day_start = datetime.combine(day, datetime.min.time())
     hourly_total = (
-        HourlySiteReading.objects.filter(
-            associated_Site=site,
-            leg_id=leg_id,
-            reading_from__gte=day_start,
-            reading_from__lt=day_start + timedelta(days=1),
-        )
+        _counted_hours(site, leg_id, day, daily_baseline)
         .order_by()
         .values("leg_id")
         .annotate(total=Sum("unit_consumption"))
@@ -299,7 +310,7 @@ def _daily_total_from_hourly(site, leg_id, day):
 
 
 def _daily_updates(site, leg_id, day, daily_baseline):
-    total = _daily_total_from_hourly(site, leg_id, day)
+    total = _daily_total_from_hourly(site, leg_id, day, daily_baseline)
     saved = Value(float(daily_baseline)) - total
     if reading_capped(site):
         # Meter-glitch cap (saving / submetering sites), as save() does.
@@ -565,15 +576,10 @@ def handle_consumption_message(
         if not daily_entries.update(
             **_daily_updates(site, aisle_group_id, observed_at.date(), daily_baseline)
         ):
-            # First packet of the day: create the row with the hourly sum.
-            day_start = datetime.combine(observed_at.date(), datetime.min.time())
+            # First packet of the day: create the row with the counted hourly sum.
             total = (
-                HourlySiteReading.objects.filter(
-                    associated_Site=site,
-                    leg_id=aisle_group_id,
-                    reading_from__gte=day_start,
-                    reading_from__lt=day_start + timedelta(days=1),
-                ).aggregate(total=Sum("unit_consumption"))["total"]
+                _counted_hours(site, aisle_group_id, observed_at.date(), daily_baseline)
+                .aggregate(total=Sum("unit_consumption"))["total"]
                 or 0.0
             )
             DailySiteReading.objects.create(

@@ -39,6 +39,18 @@ def cap_reading(site, value):
     return 0.0 if value > MAX_READING_KWH and reading_capped(site) else value
 
 
+def hour_counts_in_day(site, kwh, daily_baseline):
+    """False for a spike hour left out of the aisle's day total (decided
+    2026-11-05): on saving / submetering sites, an hour above the aisle's whole
+    daily baseline - impossible in one hour, a meter jump (the same test as the
+    Consumption Spike alarm). The hour row itself is kept; the day total and
+    saving use the other hours. Without a baseline every hour counts; on
+    WH-metering every hour counts (big values are genuine there)."""
+    return not (
+        reading_capped(site) and daily_baseline and kwh is not None and kwh > daily_baseline
+    )
+
+
 def cap_reading_row(row, site):
     """Apply only the glitch cap to an hourly / daily row (unit 0, saving =
     baseline), for rows written without save() (bulk_update)."""

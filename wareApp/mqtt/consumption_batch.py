@@ -33,6 +33,7 @@ from django.db.models import Q
 
 from wareApp.models import (
     cap_reading_row,
+    hour_counts_in_day,
     AisleGroup,
     DailySiteReading,
     HourlySiteReading,
@@ -302,8 +303,9 @@ def _as_saved(row):
     return row
 
 
-def _day_total(state, day):
-    """Sum of the aisle's hourly rows of ``day`` (stored or new in this batch)."""
+def _day_total(state, day, daily_baseline=None):
+    """Sum of the aisle's counted hourly rows of ``day`` (stored or new in this
+    batch); spike hours are left out (models.hour_counts_in_day)."""
     day_start = datetime.combine(day, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     return sum(
@@ -311,6 +313,7 @@ def _day_total(state, day):
         for hour, rows in state.hourly.items()
         if day_start <= hour < day_end
         for row in rows
+        if hour_counts_in_day(state.site, row.unit_consumption, daily_baseline)
     ) or 0.0
 
 
@@ -466,7 +469,7 @@ def _apply(state, p, publish_recovery):
 
     # The day's total is the sum of its hourly rows (same as the per-packet path).
     daily_baseline = baselines.daily
-    total = _day_total(state, observed_at.date())
+    total = _day_total(state, observed_at.date(), daily_baseline)
     days = state.daily.get(observed_at.date(), [])
     if days:
         for row in days:
