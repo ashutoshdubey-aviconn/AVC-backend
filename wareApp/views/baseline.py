@@ -2,9 +2,12 @@
 
 from datetime import datetime, timedelta
 
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from wareApp import baseline_setup
 from wareApp.models import AisleGroup, DailySiteReading, Site, SiteBaseline
 from wareApp.utility import entryExit, logger
 
@@ -163,14 +166,16 @@ class SavingBaselineData(APIView):
             baseline = SiteBaseline.objects.create(
                 associated_site_id=site,
                 aisle_group=aisle,
-                leg_id=aisle.id,
+                leg_id=aisle.attached_leg_id,
                 baseline_value=baseline_value,
                 baseline_from=date,
             )
             logger.debug("%s %s", "baseline value created :", baseline)
+            # First baseline of this aisle: baseline_data is empty here (it was
+            # read as baseline_data[0] and crashed, fixed 2026-11-05).
             current_consumption = DailySiteReading.objects.filter(
                 associated_Site=site_id,
-                leg_id=baseline_data[0].leg_id,
+                leg_id=aisle.attached_leg_id,
                 reading_for=date,
             ).update(daily_baseline_value=baseline_value)
             # current_consumption.unit_consumption = baseline_value
@@ -238,3 +243,40 @@ class AisleLevelBaseline(APIView):
                     {"name": leg.leg_id, "data": baseline, "type": "column"}
                 )
         return Response({"result": 1, "Dates": dateList, "Data": dataList})
+
+
+class BaselineSetup(APIView):
+    """Automatic baseline setup of a site: preview, then apply (Super_Admin only).
+
+    POST /api/baselineSetup/
+    {"site_id": 198, "sample_from": "2026/10/29", "sample_to": "2026/10/31",
+     "effective_from": "2026/11/01",              # optional: day after sample_to
+     "legs": ["1268", ...],                         # optional: all aisles of the site
+     "overrides": {"1273": 45.0},                   # optional: baseline per leg
+     "site_manager": {"name": .., "contact": .., "email": ..},   # optional
+     "apply": false}                                # false = preview (default)
+
+    See wareApp/baseline_setup.py and docs/consumption/BASELINE_SETUP.md.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.UserType != 1:
+            raise PermissionDenied("Only Super_Admin users can set baselines.")
+        data = request.data
+        site = Site.objects.filter(id=data.get("site_id")).first()
+        if site is None:
+            return Response({"status": 400, "error": "unknown site_id"}, status=400)
+        try:
+            the_plan = baseline_setup.plan(
+                site, data.get("sample_from"), data.get("sample_to"), data.get("effective_from"),
+                data.get("legs"), data.get("overrides"),
+            )
+            body = {"status": 200, "applied": False, "plan": the_plan.as_dict()}
+            if str(data.get("apply", "")).lower() in ("1", "true", "yes"):
+                body["result"] = baseline_setup.apply(site, the_plan, data.get("site_manager"), request.user)
+                body["applied"] = True
+        except (baseline_setup.BaselineSetupError, TypeError, ValueError) as error:
+            return Response({"status": 400, "error": str(error)}, status=400)
+        return Response(body)
