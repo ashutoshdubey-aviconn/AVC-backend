@@ -270,6 +270,20 @@ def close_resolved_alarms():
 
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
+def refresh_baseline_backfill(site_id, effective_from, legs=None):
+    """Re-run a baseline setup's backfill (wareApp/baseline_setup.py) after the
+    workers' baseline cache has expired, for hours stored in between."""
+    from wareApp import baseline_setup
+    from wareApp.models import Site
+
+    site = Site.objects.filter(id=site_id).first()
+    if site is None:
+        return f"skipped: unknown site {site_id}"
+    return f"baseline backfill site={site_id}: {baseline_setup.backfill(site, effective_from, legs)}"
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
 def check_consumption_spikes():
     """Raise / update Consumption Spike alarms (type 17) for today and yesterday."""
     from wareApp.mqtt.services import spike_alarms

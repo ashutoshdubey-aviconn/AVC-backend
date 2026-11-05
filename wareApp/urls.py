@@ -29,6 +29,7 @@ urlpatterns = [
     path("saveBaseline/", views.SavingBaselineData.as_view()),
     path("fetchBaseline/", views.BaselineData.as_view()),
     path("baselineHistory/", views.BaselineHistory.as_view()),
+    path("baselineSetup/", views.BaselineSetup.as_view()),
     path("customerSnapShotEnergySavingApi/", views.CustomerSnapshotApi.as_view()),
     path(
         "siteSnapShotEnergySavingApi/",
