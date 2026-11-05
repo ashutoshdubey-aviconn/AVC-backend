@@ -8,9 +8,12 @@ every daily row that differs. Only days whose hourly rows are complete are
 changed (all 24 hours; today: every hour up to the previous one): with
 missing hours the sum would undercount, so those days are left alone and
 counted as "incomplete" (``--include-incomplete`` changes them too).
-Days with an implausible hourly value (meter glitch: over MAX_HOURLY_KWH on
-saving / submetering sites - never on WH-metering, see models.reading_capped -
-or over GLITCH_FACTOR x the hour's baseline) are never changed; they are
+Spike hours are left out of the sum, as in the live path: on saving /
+submetering sites an hour above the aisle's whole daily baseline (see
+models.hour_counts_in_day). Days with another implausible hourly value (meter
+glitch: over MAX_HOURLY_KWH on saving / submetering sites - never on
+WH-metering, see models.reading_capped - or over GLITCH_FACTOR x the hour's
+baseline) that still counts are never changed; they are
 listed so the hourly row can be checked by hand.
 Dry run by default: prints what would change per site.
 
@@ -23,11 +26,12 @@ from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import TruncDate
 
 from wareApp.models import (
-    MAX_READING_KWH, AisleGroup, DailySiteReading, HourlySiteReading, Site, reading_capped,
+    MAX_READING_KWH, AisleGroup, DailySiteReading, HourlySiteReading, Site, hour_counts_in_day,
+    reading_capped,
 )
 
 BATCH = 2000
@@ -89,6 +93,23 @@ class Command(BaseCommand):
             }
             if not hourly:
                 continue
+            # Spike hours: above the whole daily baseline of their own day
+            # (saving / submetering sites only, see hour_counts_in_day).
+            big_hours = defaultdict(list)
+            if reading_capped(site_obj):
+                day_baseline = DailySiteReading.objects.filter(
+                    associated_Site=site_obj, leg_id=OuterRef("leg_id"), reading_for=OuterRef("day"),
+                ).values("daily_baseline_value")[:1]
+                for leg_id, at, kwh in (
+                    HourlySiteReading.objects.filter(
+                        associated_Site=site_obj, reading_from__gte=start, reading_from__lt=end,
+                    )
+                    .annotate(day=TruncDate("reading_from"))
+                    .annotate(day_baseline=Subquery(day_baseline))
+                    .filter(day_baseline__gt=0, unit_consumption__gt=F("day_baseline"))
+                    .values_list("leg_id", "reading_from", "unit_consumption")
+                ):
+                    big_hours[(str(leg_id), at.date())].append(kwh)
             glitches = {}
             too_big = Q(unit_consumption__gt=MAX_HOURLY_KWH) if reading_capped(site_obj) else Q(pk__in=[])
             for row in HourlySiteReading.objects.filter(
@@ -113,6 +134,10 @@ class Command(BaseCommand):
                 if found is None:
                     continue
                 total, hours = found
+                total -= sum(
+                    kwh for kwh in big_hours.get((str(row.leg_id), row.reading_for), [])
+                    if not hour_counts_in_day(site_obj, kwh, row.daily_baseline_value)
+                )
                 saved = (row.daily_baseline_value or 0.0) - total
                 if (
                     abs((row.unit_consumption or 0.0) - total) <= TOLERANCE
@@ -121,7 +146,9 @@ class Command(BaseCommand):
                 ):
                     continue
                 glitch = glitches.get((str(row.leg_id), row.reading_for))
-                if glitch is not None:
+                if glitch is not None and hour_counts_in_day(
+                    site_obj, glitch.unit_consumption, row.daily_baseline_value
+                ):
                     total_glitch += 1
                     self.stdout.write(
                         f"site {site_obj.id} leg {row.leg_id} {row.reading_for}: left alone, "

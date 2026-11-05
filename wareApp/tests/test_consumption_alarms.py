@@ -288,3 +288,43 @@ class UnreliableDataTests(TestCase):
         self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, 50.0))
         self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, self.daily(50.0)), [])
         self.assertEqual(list(AlarmNotifications.objects.values_list("Alarm_type", flat=True)), [10])
+
+
+
+@patch("wareApp.mqtt.services.consumption_alarms.notify")
+class SavingSiteSpikeTests(TestCase):
+    """Saving site: the day total already leaves the meter jump out (decided
+    2026-11-05), so the alarms must not subtract it a second time."""
+
+    def setUp(self):
+        cache.clear()
+        self.site = Site.objects.create(site_name="Saving spike site", site_type=2)
+        self.aisle = AisleGroup.objects.create(site=self.site, aisleGroupName="F1-C-Section-EL", is_active=True)
+        self.aisle.refresh_from_db()
+        SiteBaseline.objects.create(
+            associated_site_id=self.site, leg_id=self.aisle.attached_leg_id, baseline_value=48.0,
+            working_hours=24, baseline_from=date(2026, 1, 1),
+        )
+
+    def hours(self, values, day=DAY, first_hour=0):
+        for offset, kwh in enumerate(values):
+            HourlySiteReading.objects.create(
+                associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+                unit_consumption=kwh, reading_from=datetime.combine(day, time(first_hour + offset)),
+                reading_to=datetime.combine(day, time(first_hour + offset, 59, 59)), is_visible=True,
+            )
+
+    def test_bypassed_counts_the_other_hours(self, notify):
+        self.hours([1.0] * 23, day=date(2026, 10, 14), first_hour=1)
+        self.hours([5.0] * 4 + [3290.0] + [5.0] * 6)  # 10 normal hours = 50 kWh >= baseline 48
+        # The live path stores the day as 50 (the jump left out).
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 50.0))
+        alarm = AlarmNotifications.objects.get(Alarm_type=11)
+        self.assertIn("consumption so far=50.00", alarm.to_do)
+        self.assertIn("Not counted (spikes): 04:00 3290.00 kWh", alarm.to_do)
+        day = DailySiteReading.objects.create(
+            associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+            unit_consumption=50.0, reading_for=DAY, is_visible=True,
+        )
+        evaluate_daily_alarms(self.site, self.aisle, day)  # day end: same alarm, no second one
+        self.assertEqual(AlarmNotifications.objects.filter(Alarm_type=11).count(), 1)

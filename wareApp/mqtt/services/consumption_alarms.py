@@ -56,7 +56,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from wareApp.mqtt.services import alarm_policy
-from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading
+from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading, hour_counts_in_day
 from wareApp.mqtt.services.baseline import baseline_info, effective_hours, is_emergency_supply
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email
@@ -188,6 +188,13 @@ def find_spikes(rows, day_start, daily_baseline):
                     spikes.append(Spike(at, kwh, "catch_up", previous))
         previous = at
     return spikes
+
+
+def _still_in_day_total(site, spikes, daily_baseline):
+    """kWh of spike hours that the day total still contains. Meter jumps on
+    saving / submetering sites are already left out of it (decided 2026-11-05,
+    models.hour_counts_in_day); catch-up hours and other sites' spikes are not."""
+    return sum(kwh for _, kwh in spikes if hour_counts_in_day(site, kwh, daily_baseline))
 
 
 def meter_issue_on(site, aisle_group, day):
@@ -342,7 +349,7 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     # Bypassed / High count only reliable hours (see module docstring).
     unreliable_day = meter_issue_on(site, aisle_group, day)
     spikes = spike_hours(site, aisle_group, day, baseline)
-    counted = consumption - sum(kwh for _, kwh in spikes)
+    counted = consumption - _still_in_day_total(site, spikes, baseline)
     if spikes:
         common = common + [["Not counted (spike hours)", _spike_note(spikes), False]]
 
@@ -451,7 +458,7 @@ def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
         cache.set(recheck_key, 1, 10 * 60)
         return False
     spikes = spike_hours(site, aisle_group, day, baseline)
-    counted = consumption - sum(kwh for _, kwh in spikes)
+    counted = consumption - _still_in_day_total(site, spikes, baseline)
     if counted < threshold:
         cache.set(recheck_key, 1, 10 * 60)
         return False

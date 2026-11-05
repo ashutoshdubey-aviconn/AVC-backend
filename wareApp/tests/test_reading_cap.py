@@ -13,6 +13,7 @@ from wareApp.models import (
     Site,
     SiteBaseline,
     cap_reading,
+    hour_counts_in_day,
     reading_capped,
 )
 from wareApp.mqtt import consumption, daily_consumption_recovery, hourly_consumption_recovery
@@ -20,7 +21,7 @@ from wareApp.mqtt import consumption, daily_consumption_recovery, hourly_consump
 CASES = ((1, False), (2, True), (5, True))  # (site_type, capped)
 
 
-class ReadingCapTests(TestCase):
+class SiteMixin:
     def setUp(self):
         cache.clear()
 
@@ -34,6 +35,8 @@ class ReadingCapTests(TestCase):
         )
         return site, aisle
 
+
+class ReadingCapTests(SiteMixin, TestCase):
     def test_rule(self):
         for site_type, capped in CASES + ((None, False), (3, False)):
             site = Site(site_type=site_type)
@@ -102,3 +105,32 @@ class ReadingCapTests(TestCase):
                     )
                 day = DailySiteReading.objects.get(associated_Site=site)
                 self.assertEqual(day.unit_consumption, 0.0 if capped else 45000.0)
+
+
+
+class SpikeHourInDayTests(SiteMixin, TestCase):
+    """An hour above the aisle's whole daily baseline is left out of the day total
+    on saving / submetering sites (decided 2026-11-05)."""
+
+    def test_rule(self):
+        for site_type, skipped in CASES:
+            site = Site(site_type=site_type)
+            self.assertEqual(hour_counts_in_day(site, 3290.0, 57.7), not skipped)
+            self.assertTrue(hour_counts_in_day(site, 5.0, 57.7))
+            self.assertTrue(hour_counts_in_day(site, 3290.0, None))  # no baseline: counts
+            self.assertTrue(hour_counts_in_day(site, 3290.0, 0))
+
+    def test_http_recovery_day_total(self):
+        from wareApp.recovery.processor import update_daily_from_hourly
+        for site_type, skipped in CASES:
+            with self.subTest(site_type=site_type):
+                site, aisle = self.make_site(site_type)
+                for hour, kwh in ((1, 1.0), (2, 3290.0), (3, 1.5)):
+                    at = datetime(2026, 11, 2, hour)
+                    HourlySiteReading.objects.create(
+                        associated_Site=site, aisle_group=aisle, leg_id=aisle.attached_leg_id,
+                        unit_consumption=kwh, reading_from=at, reading_to=at + timedelta(minutes=59, seconds=59),
+                    )
+                update_daily_from_hourly(site, aisle, aisle.attached_leg_id, date(2026, 11, 2))
+                day = DailySiteReading.objects.get(associated_Site=site)
+                self.assertEqual(day.unit_consumption, 2.5 if skipped else 3292.5)
