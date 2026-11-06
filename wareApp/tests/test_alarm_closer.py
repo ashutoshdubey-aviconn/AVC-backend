@@ -71,8 +71,11 @@ class AlarmCloserTests(TestCase):
     def test_overheat_and_meter_reading_issue_stays_until_fixed(self):
         hot_gone = self.alarm(13, TODAY, NOW - timedelta(hours=3))
         hot_now = self.alarm(13, TODAY, NOW - timedelta(minutes=10))
-        fixed_aisle, fixed = self.meter_issue(NOW - timedelta(hours=2, minutes=30))
-        self.hour(fixed_aisle, NOW - timedelta(hours=2))  # a clean hour after the last error
+        # Fixed = no repeat for 24 h (since 2026-11-06; was 1 h) and a clean hour after the last error.
+        fixed_aisle, fixed = self.meter_issue(NOW - timedelta(hours=25))
+        self.hour(fixed_aisle, NOW - timedelta(hours=24))
+        short_aisle, quiet_5h = self.meter_issue(NOW - timedelta(hours=5))  # clean data, but only 5 h quiet
+        self.hour(short_aisle, NOW - timedelta(hours=4))
         quiet_aisle, no_data = self.meter_issue(NOW - timedelta(days=2))  # silent, no newer data
         self.hour(quiet_aisle, NOW - timedelta(days=2, hours=1))
         recent_aisle, recent = self.meter_issue(NOW - timedelta(minutes=20))
@@ -83,8 +86,8 @@ class AlarmCloserTests(TestCase):
         alarm_closer.close_resolved(NOW)
         self.assertEqual(self.state(no_last_seen), (False, NOW - timedelta(days=3)))
         self.assertEqual([self.state(a)[0] for a in (hot_gone, hot_now)], [False, True])
-        self.assertEqual(self.state(fixed), (False, NOW - timedelta(hours=2, minutes=30)))
-        self.assertEqual([self.state(a)[0] for a in (no_data, recent, old_row)], [True, True, False])
+        self.assertEqual(self.state(fixed), (False, NOW - timedelta(hours=25)))
+        self.assertEqual([self.state(a)[0] for a in (quiet_5h, no_data, recent, old_row)], [True, True, True, False])
 
     def test_outage_alarms_are_left_to_gateway_health(self):
         outage = self.alarm(15, NOW - timedelta(days=3), NOW - timedelta(days=3))

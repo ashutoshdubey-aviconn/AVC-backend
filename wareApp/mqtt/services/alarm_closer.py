@@ -9,7 +9,8 @@ Every other type is closed here, without an e-mail (decided 2026-11-02):
   off_time = last seen.
 * 13 Gateway Overheat: no overheat post for ALARM_CLOSE_OVERHEAT_HOURS (2).
 * 10 Meter Reading Issue: stays until fixed (decided 2026-11-02): the gateway
-  has not repeated it for ALARM_CLOSE_METER_ISSUE_MINUTES (60) AND the aisle
+  has not repeated it for ALARM_CLOSE_METER_ISSUE_MINUTES (1440 = 24 h since
+  2026-11-06; was 60) AND the aisle
   has a normal hourly reading that starts after the last error. Old rows
   without an aisle: no repeat for ALARM_CLOSE_EVENT_HOURS (24).
 * 7 High / 8 Low Consumption, 11 Bypassed: only for their own day (decided
@@ -77,7 +78,7 @@ def rules(now):
             # Old rows have no last_seen: their created_time is the last error.
             active.filter(Alarm_type=A.METER_READING_ISSUE, aisle_group__isnull=False)
             .annotate(seen_at=Coalesce("last_seen", "created_time"))
-            .filter(seen_at__lt=now - timedelta(minutes=_setting("ALARM_CLOSE_METER_ISSUE_MINUTES", 60)))
+            .filter(seen_at__lt=now - timedelta(minutes=_setting("ALARM_CLOSE_METER_ISSUE_MINUTES", 1440)))
             .filter(
                 Exists(HourlySiteReading.objects.filter(
                     aisle_group=OuterRef("aisle_group"), reading_from__gt=OuterRef("seen_at"),
