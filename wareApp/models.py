@@ -1003,9 +1003,12 @@ class FansData(models.Model):
 
 class RawLoadData(models.Model):
     # No own index: (site, created) covers site lookups (migration 0111).
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
+    # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
+    # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
+    # up first; Django still cascades deletes itself.
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False, db_index=False)
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.CASCADE, null=True, blank=True
+        AisleGroup, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False
     )
     load_data = models.FloatField(blank=True, null=True)
     created = models.DateTimeField(blank=True, null=True)
@@ -1022,9 +1025,12 @@ class RawLoadData(models.Model):
 
 class HourlyLoadData(models.Model):
     # No own index: (site, created) / rollup index covers site lookups (migration 0111).
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
+    # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
+    # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
+    # up first; Django still cascades deletes itself.
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False, db_index=False)
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.CASCADE, null=True, blank=True
+        AisleGroup, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False
     )
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
@@ -1049,9 +1055,12 @@ class HourlyLoadData(models.Model):
 
 
 class DailyLoadData(models.Model):
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
+    # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
+    # up first; Django still cascades deletes itself.
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False)
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.CASCADE, null=True, blank=True
+        AisleGroup, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False
     )
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=50, blank=True, null=True)
@@ -1072,9 +1081,12 @@ class DailyLoadData(models.Model):
 
 
 class MainsDgLoadData(models.Model):
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
+    # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
+    # up first; Django still cascades deletes itself.
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False)
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.CASCADE, null=True, blank=True
+        AisleGroup, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False
     )
     load_data = models.FloatField(blank=True, null=True)
     epoch_time = models.CharField(max_length=200, blank=True, null=True)
@@ -1129,9 +1141,12 @@ class DGAlertsData(models.Model):
 
 class DgFuelConsumptionData(models.Model):
     # No own index: unique (site, vehicle_number, epoch_time) covers site lookups (migration 0111).
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
+    # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
+    # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
+    # up first; Django still cascades deletes itself.
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False, db_index=False)
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
+        AisleGroup, on_delete=models.SET_NULL, null=True, blank=True, db_constraint=False
     )
     vehicle_number = models.CharField(max_length=50, null=True, blank=True, default=1)
     fuel_consumption = models.FloatField(default=0, null=True, blank=True)
