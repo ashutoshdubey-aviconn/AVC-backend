@@ -36,6 +36,7 @@ column exists).
 |---|---|---|---|
 | A | Dropped 4 redundant single-column site indexes: RawLoadData `site_id` (239 MB), HourlyLoadData `site_id` (93 MB), HourlySiteReading `associated_Site_id` (73 MB), DgFuelConsumptionData `site_id` (76 MB) | Migration 0111 (`DROP INDEX CONCURRENTLY`, no table lock). Drops an index **only where a covering index exists**; databases differ (e.g. a local DB without the composite keeps its index) | ~480 MB less, lighter inserts; site lookups use `(site_id, created)`, `(associated_Site_id, leg_id, reading_from)`, `(site_id, vehicle_number, epoch_time)` |
 | B | HourlySiteReading index `(aisle_group_id, reading_from)` replaces `(aisle_group_id)` | Migration 0112 (`CREATE INDEX CONCURRENTLY`, then drop the old one) | The alarm closer's probe: one index lookup, 0.085 ms |
+| C | No database-level foreign keys on the 5 telemetry tables (RawLoadData, HourlyLoadData, DailyLoadData, MainsDgLoadData, DgFuelConsumptionData; site and aisle group) | Migration 0113: finds each constraint by table + column (main names one differently: `..._aisle_group_id_fkey`), drops it with a 15 s lock timeout. Columns, indexes and Django relations stay; Django still cascades / sets null on delete | Per 3 min on test: FK lookups ~860 → 8 (the rest from business tables, which keep their FKs); no row lock on Site / AisleGroup per insert, so no waits behind the consumption batch's aisle locks |
 | D | `random_page_cost = 1.1`, `effective_io_concurrency = 200`, `jit = off` | `ALTER SYSTEM` + `pg_reload_conf()` (no restart; written to `postgresql.auto.conf`) | Planner costs that match an SSD; no JIT compile on short queries |
 
 Index space on the four tables: 6,373 MB → 6,160 MB (480 MB dropped, ~270 MB new
@@ -49,9 +50,9 @@ time → `idx_rawload_site_created` (0.14 ms); hourly readings by site →
 
 ## Not done (for later)
 
-- **C:** RawLoadData written in batches and/or without database-level foreign
-  keys (removes the two per-row FK checks, ~54 % of DB time on test). Bigger
-  change; worth it mainly on main.
+- **C, batching part:** writing RawLoadData in batches (a buffer across
+  Celery tasks, like the consumption batcher). Left out: after dropping the
+  FK checks an insert is ~0.08 ms, and test writes ~1.6 rows/s.
 - **E:** partitioning / BRIN indexes for the load tables, which grow forever
   (retention is intentional).
 - **Main:** the same changes apply there with the rollout (migrations 0111 /
@@ -59,6 +60,8 @@ time → `idx_rawload_site_created` (0.14 ms); hourly readings by site →
 
 ## Rolling back
 
+- C: `python manage.py migrate wareApp 0112` (adds the foreign keys back as
+  `NOT VALID`: no scan of existing rows, new rows are checked).
 - A / B: `python manage.py migrate wareApp 0110` (recreates the dropped
   indexes concurrently and removes the new one).
 - D: `ALTER SYSTEM RESET random_page_cost; ALTER SYSTEM RESET
@@ -69,4 +72,6 @@ time → `idx_rawload_site_created` (0.14 ms); hourly readings by site →
 
 `wareApp/tests/test_db_indexes.py`: every site column still leads an index; the
 single index is gone wherever a covering one exists; hourly readings are indexed
-by aisle + time and not by aisle alone.
+by aisle + time and not by aisle alone; the telemetry tables have no
+database-level foreign keys while hourly site readings keep theirs; Django still
+cascades / sets null when an aisle is deleted.
