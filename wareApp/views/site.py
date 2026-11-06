@@ -434,43 +434,33 @@ class DemoApi(APIView):
 
 
 class TotalAlarmsOnSitePageTabularForm(APIView):
+    """Site page table: the site's open alarms, newest first (same keys as
+    before; it used to read rows that nothing writes, fixed 2026-11-06).
+
+    object_name: the aisle group, else the power source, else the object id
+    (meter / gateway number)."""
+
     @entryExit
     def post(self, request):
-        data = request.data
-        logger.debug("%s %s", "data in alarm table", data)
-        site_id = data.get("site_id", "")
-        logger.debug("%s %s", "site did ", site_id)
-        site = Site.objects.get(id=site_id)
-        logger.debug("%s %s", "site details ", site)
-        customer = site.customer
-        alarms = AlarmNotifications.objects.filter(
-            created_by=customer, site_id=site, user_level=4
-        )
-        logger.debug("%s %s", "alarms: ", alarms)
+        site = Site.objects.get(id=request.data.get("site_id", ""))
         data_list = []
-        for i in alarms:
-            logger.debug("%s %s", "inside the loop!!", i)
-            alarm_type = i.get_Alarm_type_display()
-            logger.debug("%s %s", "alarm type: ", alarm_type)
-            object_type = i.get_object_type_display()
-            logger.debug("%s %s", "object type: ", object_type)
-            object_name = i.object_id
-            logger.debug("%s %s", "object name: ", object_name)
-            created_time = i.created_time
-            logger.debug("%s %s", "created time: ", created_time)
-            created_time = datetime.strftime(created_time, "%d-%m-%Y")
-            alarm_priority = i.get_Alarm_priority_display()
-            logger.debug("%s %s", "alarm priority: ", alarm_priority)
+        for alarm in (
+            AlarmNotifications.objects.filter(site_id=site, is_active=True)
+            .select_related("aisle_group").order_by("-created_time")
+        ):
+            object_name = (
+                alarm.aisle_group.aisleGroupName if alarm.aisle_group_id
+                else alarm.power_source or alarm.object_id
+            )
             data_list.append(
                 {
-                    "alarm_type": alarm_type,
-                    "object_type": object_type,
+                    "alarm_type": alarm.get_Alarm_type_display(),
+                    "object_type": alarm.get_object_type_display(),
                     "object_name": object_name,
-                    "alarm_priority": alarm_priority,
-                    "created_date": created_time,
+                    "alarm_priority": alarm.get_Alarm_priority_display(),
+                    "created_date": alarm.created_time.strftime("%d-%m-%Y") if alarm.created_time else None,
                 }
             )
-        logger.debug("%s %s", "data list: ", data_list)
         return Response(
             {"result": 1, "data": data_list, "msg": "Alarms details on site page"}
         )
