@@ -22,6 +22,74 @@ What was still wrong after the manual steps on site 198 (checked on main, read
 only): the hourly baseline and saving of 1-3 Nov stayed 0 and 4 Nov was only
 partly filled, because Set Baseline never touches hourly rows.
 
+## Workflow
+
+### Who does what
+
+```
+ Admin (frontend)                         Server (POST /api/baselineSetup/)
+ ────────────────                         ─────────────────────────────────
+ 1. Pick site + sample days ───────────►  2. PREVIEW (apply: false) - changes nothing
+    (e.g. 29–31 Oct), optional               • per aisle: daily kWh of each sample day
+    start date (default: next day)           • average = baseline (0 / missing days left out)
+                                              • warnings: no data, 0 kWh, < 24 hours,
+                                                Meter Reading Issue that day
+                                              • errors: aisle with no usable day,
+                                                later baseline exists, bad dates
+ 3. Review the table  ◄──────────────────     returns the plan
+    • edit any aisle's value (override)
+    • fill site manager name/contact/email
+ 4. Click "Set baseline" ──────────────►  5. APPLY (apply: true) - one transaction
+                                              a. Baseline rows from the start date
+                                                 (open old baseline ends the day before;
+                                                  same date again = update)
+                                              b. Aisles set is_active
+                                              c. Site: is_live, live_date (if empty),
+                                                 baseline_date, site manager
+                                              d. Backfill start date → now:
+                                                 daily  = baseline, saving = baseline - used
+                                                 hourly = daily/24 (EL) or daily/NL hours,
+                                                          saving = hourly - used
+                                              e. Log line: who, date, values, rows changed
+ 6. Sees result  ◄───────────────────────     returns rows created/updated + backfill counts
+                                          7. ~6 min later: Celery re-runs the backfill
+                                             (hours stored while workers still cached
+                                              the old baseline get fixed)
+                                          8. From then on: live packets use the new
+                                             baseline automatically every hour/day
+```
+
+### Flowchart
+
+```mermaid
+flowchart TD
+    A[Admin: site + sample days] --> B[Preview: averages, warnings, errors]
+    B -->|errors| A
+    B --> C[Admin: review, override values, site manager]
+    C --> D[Apply: one transaction]
+    D --> E[SiteBaseline rows from start date]
+    D --> F[Aisles is_active]
+    D --> G[Site is_live, baseline_date, manager]
+    D --> H[Backfill daily + hourly baseline and saving]
+    H --> I[Response: what changed]
+    I --> J[After ~6 min: Celery re-runs backfill]
+    J --> K[Live data uses the new baseline]
+```
+
+### Example: Yusen Indore (site 198)
+
+| Step | What happens |
+|---|---|
+| Preview 29–31 Oct | MTS-FANS(G+3): 149.20 / 152.90 / 153.17, so a baseline of **151.76** (the same for the other 5 aisles) |
+| Review | No warnings on main's data. The site total is 788.4 kWh/day. |
+| Apply | Baselines from 1 Nov, all 6 aisles active, site live with baseline date 1 Nov. Daily and hourly rows for 1 Nov to now are filled in. |
+| After | Each day's saving = 788.4 − the day's consumption, e.g. 1 Nov: 788.4 − 150.6 = 637.8 kWh |
+
+### Rebaselining later
+
+Run the same steps with new sample days. The old baseline ends the day before
+the new start date; days before that keep their old baseline and saving.
+
 ## The rules (agreed 2026-11-05)
 
 | # | Point | Rule |
