@@ -391,7 +391,8 @@ ALARM_CLOSE_CHECK_SECONDS = config("ALARM_CLOSE_CHECK_SECONDS", default=300, cas
 ALARM_CLOSE_POWER_MINUTES = config("ALARM_CLOSE_POWER_MINUTES", default=60, cast=int)
 ALARM_CLOSE_OVERHEAT_HOURS = config("ALARM_CLOSE_OVERHEAT_HOURS", default=2, cast=int)
 ALARM_CLOSE_EVENT_HOURS = config("ALARM_CLOSE_EVENT_HOURS", default=24, cast=int)
-ALARM_CLOSE_METER_ISSUE_MINUTES = config("ALARM_CLOSE_METER_ISSUE_MINUTES", default=60, cast=int)
+# 24 h since 2026-11-06 (intermittent meters reopened within a day; was 60).
+ALARM_CLOSE_METER_ISSUE_MINUTES = config("ALARM_CLOSE_METER_ISSUE_MINUTES", default=1440, cast=int)
 # Failed alarm e-mails are retried with back-off for this many hours (0 = off),
 # checked every NOTIFICATION_RETRY_CHECK_SECONDS (docs/mqtt-flows/EMAIL_RETRIES.md).
 NOTIFICATION_RETRY_HOURS = config("NOTIFICATION_RETRY_HOURS", default=24, cast=int)
