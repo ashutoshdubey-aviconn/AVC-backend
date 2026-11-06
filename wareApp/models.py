@@ -437,11 +437,13 @@ class AisleInfo(models.Model):
 class HourlySiteReading(CleanReadingMixin, models.Model):
     baseline_field = "hourly_baseline_value"
 
+    # No own index: (associated_Site, leg_id, reading_from) covers site lookups (migration 0111).
     associated_Site = models.ForeignKey(
-        Site, on_delete=models.CASCADE, null=True, blank=True
+        Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False
     )
+    # Indexed together with reading_from (idx_hourly_aisle_reading_from, migration 0112).
     aisle_group = models.ForeignKey(
-        AisleGroup, on_delete=models.CASCADE, null=True, blank=True
+        AisleGroup, on_delete=models.CASCADE, null=True, blank=True, db_index=False
     )
     leg_id = models.CharField(max_length=50, null=True, blank=True)
     unit_consumption = models.FloatField(default=0)
@@ -454,6 +456,8 @@ class HourlySiteReading(CleanReadingMixin, models.Model):
 
     class Meta:
         indexes = [
+            # Aisle + time: e.g. "is there a reading after the last meter error" (alarm closer).
+            models.Index(fields=["aisle_group", "reading_from"], name="idx_hourly_aisle_reading_from"),
             models.Index(
                 fields=["associated_Site", "leg_id", "reading_from", "reading_to"],
                 name="idx_site_leg_time",
@@ -998,7 +1002,8 @@ class FansData(models.Model):
 
 
 class RawLoadData(models.Model):
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    # No own index: (site, created) covers site lookups (migration 0111).
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -1016,7 +1021,8 @@ class RawLoadData(models.Model):
 
 
 class HourlyLoadData(models.Model):
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    # No own index: (site, created) / rollup index covers site lookups (migration 0111).
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -1122,7 +1128,8 @@ class DGAlertsData(models.Model):
 
 
 class DgFuelConsumptionData(models.Model):
-    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
+    # No own index: unique (site, vehicle_number, epoch_time) covers site lookups (migration 0111).
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_index=False)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
     )
