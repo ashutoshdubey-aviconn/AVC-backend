@@ -118,7 +118,7 @@ ALARMS = [
      "Real time, on the gateway's POST", "E-mail at most once per hour per gateway and only if > 5 % hotter than the last e-mail.", "Yes: 2 h without an overheat post", RECIPIENTS,
      "wareApp/gateway_overheat.py -> parse_alert, record_overheat; views/gateway_overheat.py",
      "GATEWAY_OVERHEAT_STORE_SECONDS=60, GATEWAY_OVERHEAT_EMAIL_SECONDS=3600", SITE_APIS, ""],
-    [14, "Meter Disconnected", "Data missing", "Active (new)", "Medium", "meter outage",
+    [14, "Meter Disconnected", "Data missing", "Active (new)", "High", "meter outage",
      "Gateway's own meter event posted to /api/meter-disconnections/ingest/ (MeterDisconnectionEvent: disconnected / connected)",
      "The meter's latest event is 'disconnected' since >= 1 h -> alarm. Its 'connected' event clears it.",
      "1 hour", "Yes", CONFIG_STD + " Manual = hours.", "Every 5 min (Celery beat check_gateway_health)",
