@@ -1,0 +1,210 @@
+import logging
+from datetime import datetime, timedelta
+
+from django.db.models import F, Sum
+
+from wareApp.models import MonthlyLoadSharePercentage, SupplyLoadTimeShare
+from wareApp.mqtt.log_context import home_gateway_id_for
+from wareApp.mqtt.log_format import missing_hours
+from wareApp.mqtt.payloads import KeyValuePayload
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter
+from wareApp.mqtt.services.cooldown import recovery_request_allowed
+from wareApp.mqtt.services.recovery_status import (
+    LOAD_RUNTIME,
+    RecoveryScope,
+    RecoveryStatusService,
+)
+from wareApp.mqtt.sync_status import mark_source_healthy
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_supply_time_message(message):
+    value_for = KeyValuePayload.parse(message, "SupplyTime").get
+
+    try:
+        source = int(value_for("source", "supplysource"))
+        run_time = float(value_for("runtime"))
+        observed_at = datetime.fromisoformat(value_for("time", "messagetime"))
+    except ValueError as error:
+        if str(error).startswith("Missing SupplyTime field:"):
+            raise
+        raise ValueError("Invalid SupplyTime field value") from error
+
+    return source, run_time, observed_at
+
+
+def _update_monthly_share_if_due(site, location_id, last_runtime_entry, now):
+    if not last_runtime_entry or now.month == last_runtime_entry.reading_from.month:
+        return
+
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+    monthly_totals = (
+        SupplyLoadTimeShare.objects.filter(
+            site=location_id,
+            reading_from__gte=previous_month_start,
+            reading_from__lt=current_month_start,
+        )
+        .values("power_source")
+        .annotate(total_runtime=Sum("hourly_run_time"))
+    )
+    total_time = sum(entry["total_runtime"] for entry in monthly_totals)
+    if not total_time:
+        return
+
+    for entry in monthly_totals:
+        share = (entry["total_runtime"] / total_time) * 100
+        monthly_share = MonthlyLoadSharePercentage.objects.filter(
+            site=site,
+            power_source=entry["power_source"],
+            for_month=previous_month_start.strftime("%m %Y"),
+        )
+        if not monthly_share.update(monthly_time_based_percentage=share):
+            MonthlyLoadSharePercentage.objects.create(
+                site=site,
+                power_source=entry["power_source"],
+                monthly_time_based_percentage=share,
+                for_month=previous_month_start.strftime("%m %Y"),
+            )
+
+
+def _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end):
+    """Answer "is the previous hour stored?" from the latest row when possible.
+
+    The latest row was already fetched, so the extra ``exists()`` query is only
+    needed when that row is newer than the previous hour (late packet).
+    """
+    previous_start = hour_start - timedelta(hours=1)
+    previous_end = hour_end - timedelta(hours=1)
+    if last_runtime_entry is None:
+        return False
+    latest = last_runtime_entry.reading_from
+    if previous_start <= latest <= previous_end:
+        return True
+    if latest < previous_start:
+        return False
+    return run_time.filter(
+        reading_from__gte=previous_start, reading_from__lte=previous_end
+    ).exists()
+
+
+def handle_supply_time_message(
+    client, site, location_id, gateway_id, message, publish_recovery=None
+):
+    """Persist one SupplyTime packet and request gateway recovery for a detected gap."""
+    home_gateway_id = home_gateway_id_for(location_id, gateway_id)
+    try:
+        source, source_run_time, observed_at = _parse_supply_time_message(message)
+        hour_start = observed_at.replace(minute=0, second=0, microsecond=0)
+        hour_end = observed_at.replace(minute=59, second=59, microsecond=0)
+        run_time = SupplyLoadTimeShare.objects.filter(
+            site=location_id, power_source=source
+        )
+        current_hour = run_time.filter(
+            reading_from__gte=hour_start,
+            reading_from__lte=hour_end,
+        )
+        if current_hour.update(hourly_run_time=F("hourly_run_time") + source_run_time):
+            logger.info(
+                "Queue1 SupplyTime updated: site=%s home_gateway_id=%s source=%s runtime=%s hour=%s",
+                location_id,
+                home_gateway_id,
+                source,
+                source_run_time,
+                hour_start,
+            )
+            mark_source_healthy(site, home_gateway_id, source, hour_start)
+            return f"stored: source {source} hour {hour_start:%Y-%m-%d %H:00} runtime +{source_run_time}"
+
+        last_runtime_entry = run_time.order_by("-reading_from", "-id").first()
+        _update_monthly_share_if_due(
+            site, location_id, last_runtime_entry, datetime.now()
+        )
+        if _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end) or (
+            not last_runtime_entry
+        ):
+            SupplyLoadTimeShare.objects.create(
+                site=site,
+                power_source=source,
+                hourly_run_time=source_run_time,
+                reading_from=hour_start,
+                reading_to=hour_end,
+            )
+            logger.info(
+                "Queue1 SupplyTime created: site=%s home_gateway_id=%s source=%s runtime=%s hour=%s",
+                location_id,
+                home_gateway_id,
+                source,
+                source_run_time,
+                hour_start,
+            )
+            mark_source_healthy(site, home_gateway_id, source, hour_start)
+            return f"stored: source {source} new hour {hour_start:%Y-%m-%d %H:00} runtime {source_run_time}"
+
+        if not recovery_request_allowed(location_id, "source", source):
+            logger.info(
+                "Queue1 SupplyTime skipped, gap recovery already requested (cooldown): site=%s home_gateway_id=%s source=%s hour=%s",
+                location_id,
+                home_gateway_id,
+                source,
+                hour_start,
+            )
+            return f"skipped: source {source} has a gap, recovery already requested (cooldown)"
+        loss_time = (datetime.now() - last_runtime_entry.reading_from).total_seconds()
+        recovery_topic = (
+            f"/Acclivate/iOmniControl/{location_id}/{gateway_id}/in/sync/loadTime/state"
+        )
+        recovery_message = (
+            f"Power_source : {source}, Missed_consumption_time_in_secs : {loss_time}, "
+            f"Last_synced_hour : {last_runtime_entry.reading_from:%Y-%m-%d %H:%M:%S.%f}"
+        )
+        decision = RecoveryStatusService(site, home_gateway_id).request_recovery(
+            RecoveryScope.source(source),
+            LOAD_RUNTIME,
+            last_runtime_entry.reading_from,
+            hour_start,
+            recovery_topic,
+            recovery_message,
+        )
+        gap = missing_hours(decision.monitor.missing_from, decision.monitor.missing_to)
+        if not decision.publish:
+            logger.warning(
+                "Queue1 SupplyTime skipped, recovery failed for gap: site=%s home_gateway_id=%s source=%s missing=%s attempts=%s",
+                location_id,
+                home_gateway_id,
+                source,
+                gap,
+                decision.monitor.attempt,
+            )
+            return (
+                f"skipped: source {source} gap {gap}, recovery failed after "
+                f"{decision.monitor.attempt} attempts"
+            )
+        if publish_recovery:
+            publish_recovery(recovery_topic, recovery_message)
+        else:
+            client.publish(recovery_topic, recovery_message, qos=0, retain=False)
+        logger.warning(
+            "Queue1 SupplyTime recovery requested: site=%s home_gateway_id=%s source=%s missing=%s last_stored_hour=%s attempt=%s",
+            location_id,
+            home_gateway_id,
+            source,
+            gap,
+            last_runtime_entry.reading_from,
+            decision.monitor.attempt,
+        )
+        return (
+            f"skipped: source {source} gap {gap}, recovery requested "
+            f"(attempt {decision.monitor.attempt})"
+        )
+    except TRANSIENT_DB_ERRORS:
+        raise
+    except Exception as error:
+        logger.exception(
+            "Queue1 SupplyTime processing failed: site=%s home_gateway_id=%s",
+            location_id,
+            home_gateway_id,
+        )
+        record_dead_letter("SupplyTime", location_id, gateway_id, message, error)
+        return f"failed: {type(error).__name__}: {str(error)[:80]} (dead letter)"

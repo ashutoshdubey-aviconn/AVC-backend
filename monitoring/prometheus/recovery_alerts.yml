@@ -1,0 +1,20 @@
+groups:
+  - name: recovery.rules
+    rules:
+      - alert: RecoveryPendingHigh
+        expr: recovery_pending_payloads > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High pending recovery payloads ({{ $value }})"
+          description: "Pending recovery payloads = {{ $value }} on {{ $labels.instance }} for >2m. Investigate worker throughput or increase `RECOVERY_WORKER_CONCURRENCY`."
+
+      - alert: RecoveryQueueGrowing
+        expr: recovery_queue_length > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recovery queue length growing ({{ $value }})"
+          description: "Redis recovery queue length = {{ $value }} on {{ $labels.instance }} for >1m. Check consumers and Redis connectivity."

@@ -11,11 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='fireequipmentssystem',
-            name='updatedBy',
-            field=models.CharField(blank=True, max_length=25, null=True),
-        ),
         migrations.AlterField(
             model_name='monthlyloadsharepercentage',
             name='created_on',

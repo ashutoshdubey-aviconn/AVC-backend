@@ -1,0 +1,21 @@
+[Unit]
+Description=Root MQTT LoadData listener worker (queue2)
+After=network.target mosquitto.service rabbitmq-server.service
+Wants=mosquitto.service rabbitmq-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=sudo
+WorkingDirectory=/home/ubuntu/django_project
+Environment=DJANGO_SETTINGS_MODULE=warehouse.settings
+ExecStart=/home/ubuntu/django_project/virtualwarehouse/bin/celery -A tasks worker --hostname=root.queue2@%%h --queues=queue2 --concurrency=1 --loglevel=INFO
+ExecStartPost=/home/ubuntu/django_project/virtualwarehouse/bin/celery -A tasks call tasks.mqtt_client2 --queue=queue2
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+StandardOutput=append:/home/ubuntu/django_project/celerylogs2/celery_logs_of_server.log
+StandardError=append:/home/ubuntu/django_project/celerylogs2/celery_logs_of_server.log
+
+[Install]
+WantedBy=multi-user.target

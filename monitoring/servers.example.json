@@ -1,0 +1,16 @@
+{
+  "servers": [
+    {
+      "name": "production",
+      "host": "asem.aviconncorp.com",
+      "user": "ubuntu",
+      "identity_file": "~/.ssh/your-server-key.pem"
+    },
+    {
+      "name": "test",
+      "host": "43.204.53.81",
+      "user": "ubuntu",
+      "identity_file": "~/.ssh/your-server-key.pem"
+    }
+  ]
+}

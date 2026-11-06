@@ -1,0 +1,14 @@
+[Unit]
+Description=Per-core CPU analysis of the test and main servers, stored locally (monitoring/data/cpu)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ashutosh-dubey/django_project
+ExecStart=/usr/bin/python3 /home/ashutosh-dubey/django_project/monitoring/cpu_analysis.py --interval 60
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=default.target

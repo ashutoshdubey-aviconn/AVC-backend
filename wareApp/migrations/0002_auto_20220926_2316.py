@@ -11,21 +11,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='LightsData',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('areaName', models.CharField(blank=True, max_length=40, null=True)),
-                ('totalLights', models.IntegerField(blank=True, null=True)),
-                ('watt_18_Lights', models.IntegerField(blank=True, null=True)),
-                ('watt_20_Lights', models.IntegerField(blank=True, null=True)),
-                ('watt_24_Lights', models.IntegerField(blank=True, null=True)),
-                ('watt_36_Lights', models.IntegerField(blank=True, null=True)),
-                ('watt_40_Lights', models.IntegerField(blank=True, null=True)),
-                ('totalWattLights', models.IntegerField(blank=True, null=True)),
-                ('totalUnits', models.FloatField(blank=True, null=True)),
-            ],
-        ),
         migrations.AlterField(
             model_name='monthlyloadsharepercentage',
             name='created_on',

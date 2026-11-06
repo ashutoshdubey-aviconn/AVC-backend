@@ -1,21 +1,62 @@
+# Virtual Environment
+virtualwarehouse/
+venv/
+env/
+
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.log
-
-# Virtual environment
-venv/
+*.py[cod]
+*.so
 
 # Django
 db.sqlite3
-.env
-staticfiles/
+*.sqlite3
+
+# Logs
+logges/
+logs/
+*.log
+
+# Locally collected server-performance evidence
+monitoring/data/
+monitoring/servers.json
+
+# Static / Media
+static/
 media/
 
-# OS / IDE
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.*
+!.env.example
+
+# VS Code
 .vscode/
+
+# JetBrains
 .idea/
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+# Database dumps and data backups (can be GBs; never commit)
+backups/
+monitoring/backups/
+*.dump
+
+# Old code copies (contain credentials); kept on disk only
+wareApp/backups/
+reports/
+
+# Local working files (scratch scripts, exports) - never commit
+.work/
