@@ -362,7 +362,8 @@ def evaluate_meters(report, now):
                         ["Port", event.port_id or "-", False],
                         ["Disconnected since", f"{event.detection_window_start:%d %b %H:%M}", True],
                     ],
-                    now, AlarmNotifications.PRIORITY_MEDIUM, event.detection_window_start,
+                    # High since 2026-11-06, like the gateway alarms 15 / 16.
+                    now, AlarmNotifications.PRIORITY_HIGH, event.detection_window_start,
                 )
         else:
             _clear(report, site_id, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter, now)

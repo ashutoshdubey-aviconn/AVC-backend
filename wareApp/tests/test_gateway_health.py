@@ -292,6 +292,7 @@ class MeterDisconnectedTests(TestCase):
         gateway_health.evaluate(NOW + timedelta(minutes=31))
         alarm = AlarmNotifications.objects.get()
         self.assertEqual((alarm.Alarm_type, alarm.object_type, alarm.object_id, alarm.is_active), (14, 4, 79, True))
+        self.assertEqual(alarm.Alarm_priority, AlarmNotifications.PRIORITY_HIGH)  # High since 2026-11-06
         self.assertEqual(notify.call_args.args[1], "Meter Disconnected")
 
         self.event("connected", NOW - timedelta(minutes=30), NOW + timedelta(minutes=40))
