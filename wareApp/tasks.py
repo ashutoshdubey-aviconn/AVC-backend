@@ -156,9 +156,13 @@ def send_notification(function_name, args):
     result = getattr(sendmail, function_name)(*args)
     if result is True:
         return f"{function_name}: email sent"
-    if result is False:
-        return f"{function_name}: email FAILED (see 'Email failed' log line)"
+    if not result and result is not None:
+        from wareApp.mqtt.services.notifications import remember_failed
+
+        kept = remember_failed(function_name, args, result)
+        return f"{function_name}: email FAILED{' (kept for retry)' if kept else ''} (see 'Email failed' log line)"
     return f"{function_name}: {result}"
+
 
 
 def _site_for_queued_message(site_id, gateway_id, message_type):
@@ -283,6 +287,15 @@ def refresh_baseline_backfill(site_id, effective_from, legs=None):
     if site is None:
         return f"skipped: unknown site {site_id}"
     return f"baseline backfill site={site_id}: {baseline_setup.backfill(site, effective_from, legs)}"
+
+
+@app.task(queue="notifications")
+@_with_database_connection_cleanup
+def retry_pending_emails():
+    """Send failed alarm e-mails again (wareApp/mqtt/services/notifications.py)."""
+    from wareApp.mqtt.services.notifications import retry_pending
+
+    return retry_pending()
 
 
 @app.task(queue="queue2_processing")

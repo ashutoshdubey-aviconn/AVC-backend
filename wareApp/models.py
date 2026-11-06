@@ -1471,6 +1471,24 @@ class HomeGatewayStatus(models.Model):
         return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"
 
 
+class PendingEmail(models.Model):
+    """An alarm e-mail whose send failed for a passing reason (e.g. the mail
+    server refused the login); retried by ``tasks.retry_pending_emails`` with
+    back-off for up to NOTIFICATION_RETRY_HOURS, then given up (decided
+    2026-11-06, docs/mqtt-flows/EMAIL_RETRIES.md)."""
+
+    function_name = models.CharField(max_length=60)
+    args = models.JSONField(default=list)
+    summary = models.CharField(max_length=200, blank=True, default="")
+    attempts = models.PositiveIntegerField(default=1)
+    first_failed_at = models.DateTimeField()
+    next_try_at = models.DateTimeField(db_index=True)
+    last_error = models.CharField(max_length=300, blank=True, default="")
+
+    def __str__(self):
+        return f"{self.function_name}: {self.summary} (attempts {self.attempts})"
+
+
 class MonitoringMarker(models.Model):
     """Named timestamps shared by processes (the cache may be per process).
 

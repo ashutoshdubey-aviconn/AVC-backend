@@ -38,6 +38,27 @@ def _alarm_override_recipients():
     return list(getattr(settings, "ALARM_EMAIL_OVERRIDE_TO", []) or [])
 
 
+class EmailFailure:
+    """Result of a failed send: false like ``False``, plus whether trying again
+    later can help (``transient``: mail server down / refused the login) or not
+    (no recipients, mail not configured, address refused)."""
+
+    def __init__(self, error, transient):
+        self.error = str(error)[:300]
+        self.transient = transient
+
+    def __bool__(self):
+        return False
+
+    def __eq__(self, other):
+        return other is False or (isinstance(other, EmailFailure) and other.error == self.error)
+
+    __hash__ = None
+
+    def __repr__(self):
+        return f"EmailFailure({self.error!r}, transient={self.transient})"
+
+
 def _send_smtp_email(
     subject, html_message, to, cc=None, bcc=None, from_email=None, is_alarm=True
 ):
@@ -77,12 +98,12 @@ def _send_smtp_email(
         to, cc, bcc = override, [], []
     if not to:
         logger.warning("Email not sent, no recipients: subject=%r", subject)
-        return False
+        return EmailFailure("no recipients", transient=False)
 
     smtp = _smtp_config()
     if not smtp["host"]:
         logger.error("Email failed: subject=%r error=EMAIL_HOST not configured", subject)
-        return False
+        return EmailFailure("EMAIL_HOST not configured", transient=False)
     from_addr = from_email or smtp["from"]
 
     # Build MIME message
@@ -117,7 +138,10 @@ def _send_smtp_email(
         return True
     except Exception as e:  # pragma: no cover
         logger.error("Email failed: subject=%r to=%s error=%s: %s", subject, recipients, type(e).__name__, e)
-        return False
+        # A refused address will not work later either; anything else
+        # (connection closed, login refused, timeout) may.
+        refused = isinstance(e, (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused))
+        return EmailFailure(f"{type(e).__name__}: {e}", transient=not refused)
 
 
 # ---------------- Helpers ---------------- #
