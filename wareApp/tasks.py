@@ -255,7 +255,10 @@ def check_gateway_health():
     """Raise / clear Meter Disconnected, Gateway Disconnected, Service / Modbus alarms."""
     from wareApp.mqtt.services import gateway_health
 
-    return f"gateway health: {gateway_health.evaluate()}"
+    # Test server: pings come from main's broker log (GATEWAY_PINGS_SSH).
+    pings = gateway_health.fetch_remote_pings()
+    prefix = f"pings updated={pings}; " if pings is not None else ""
+    return f"gateway health: {prefix}{gateway_health.evaluate()}"
 
 
 @app.task(queue="queue2_processing")

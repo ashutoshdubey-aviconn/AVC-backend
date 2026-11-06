@@ -59,6 +59,48 @@ class BrokerLogTests(TestCase):
         self.assertEqual(gateway_health.read_broker_log(path), {})
 
 
+class RemotePingTests(TestCase):
+    """Pings from main's broker log over SSH (test server; decided 2026-11-06)."""
+
+    def setUp(self):
+        cache.clear()
+        site = Site.objects.create(site_name="Remote ping site", site_type=1, is_live=True)
+        hgw = HomeGatewayId.objects.create(hgw_id=GW, connected_to=site)
+        self.status = HomeGatewayStatus.objects.create(home_gateway=hgw, last_data_at=NOW)
+
+    def run_ssh(self, stdout="", returncode=0):
+        result = mock.Mock(stdout=stdout, stderr="denied", returncode=returncode)
+        return mock.patch.object(gateway_health.subprocess, "run", return_value=result)
+
+    def test_bridge_connect_lines_count_as_alive(self):
+        alive = gateway_health.alive_from_lines([
+            f"1793175000: New bridge connected from 1.2.3.4:5 as odroid.{GW} (p2, c1, k45).",
+            "1793175010: Received PINGREQ from odroid.avc_other_000502_1",
+        ])
+        self.assertEqual(alive[GW], datetime.fromtimestamp(1793175000))
+        self.assertIn("avc_other_000502_1", alive)
+
+    def test_not_configured_does_nothing(self):
+        with self.settings(GATEWAY_PINGS_SSH=""), self.run_ssh() as run:
+            self.assertIsNone(gateway_health.fetch_remote_pings())
+        run.assert_not_called()
+
+    def test_fetch_stores_pings_and_marks_them_fresh(self):
+        lines = f"1793175060: Received PINGREQ from odroid.{GW}\n"
+        with self.settings(GATEWAY_PINGS_SSH="ubuntu@main", GATEWAY_PINGS_SSH_KEY="~/.ssh/k"), \
+                self.run_ssh(lines) as run:
+            self.assertEqual(gateway_health.fetch_remote_pings(NOW), 1)
+        self.assertIn("ubuntu@main", run.call_args.args[0])
+        self.status.refresh_from_db()
+        self.assertEqual(self.status.last_ping_at, datetime.fromtimestamp(1793175060))
+        self.assertEqual(gateway_health.marker(gateway_health.PING_READ_MARKER), NOW)
+
+    def test_failed_fetch_keeps_ping_data_stale(self):
+        with self.settings(GATEWAY_PINGS_SSH="ubuntu@main"), self.run_ssh(returncode=255):
+            self.assertIsNone(gateway_health.fetch_remote_pings(NOW))
+        self.assertIsNone(gateway_health.marker(gateway_health.PING_READ_MARKER))
+
+
 class GatewayActivityTests(TestCase):
     def setUp(self):
         self.site = Site.objects.create(site_name="Activity site", site_type=1, is_live=True)

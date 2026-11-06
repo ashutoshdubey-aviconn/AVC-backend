@@ -30,6 +30,7 @@ of the same issue carries a "Previous outage ... restored ..." line.
 import logging
 import os
 import re
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -54,9 +55,11 @@ FIRST_READ_BYTES = 20 * 1024 * 1024
 
 # "1793175085: Received PINGREQ from odroid.avc_x_000145_1"
 # "1793175085: New client connected from 1.2.3.4:5 as odroid.avc_x_000145_1 (p2, c1, k60)."
+# "1793175085: New bridge connected from 1.2.3.4:5 as odroid.avc_x_000145_1 (p2, c1, k45)."
+#   (gateways connect to main's broker as bridges)
 # "1793175085: Received PUBLISH from odroid.avc_x_000145_1 (d0, q0, ...)"
 _ALIVE = re.compile(
-    r"^(?P<epoch>\d+): (?:Received \S+ from|New client connected from \S+ as) (?P<client>\S+)"
+    r"^(?P<epoch>\d+): (?:Received \S+ from|New (?:client|bridge) connected from \S+ as) (?P<client>\S+)"
 )
 
 
@@ -106,17 +109,58 @@ def read_broker_log(path, from_start=False, remember=True):
         log.seek(offset)
         if mid_line:
             log.readline()  # started inside a line
-        for raw in log:
-            match = _ALIVE.match(raw.decode("utf-8", "replace"))
-            if not match:
-                continue
-            client = match.group("client")
-            gateway = client.split(".", 1)[1] if client.startswith("odroid.") else client
-            alive[gateway] = max(alive.get(gateway, 0), int(match.group("epoch")))
+        alive = alive_from_lines(raw.decode("utf-8", "replace") for raw in log)
         offset = log.tell()
     if remember:
         cache.set(key, (stat.st_ino, offset), None)
+    return alive
+
+
+def alive_from_lines(lines):
+    """``{home gateway id: last alive}`` from Mosquitto log lines."""
+    alive = {}
+    for line in lines:
+        match = _ALIVE.match(line)
+        if not match:
+            continue
+        client = match.group("client")
+        gateway = client.split(".", 1)[1] if client.startswith("odroid.") else client
+        alive[gateway] = max(alive.get(gateway, 0), int(match.group("epoch")))
     return {gateway: datetime.fromtimestamp(epoch) for gateway, epoch in alive.items()}
+
+
+def fetch_remote_pings(now=None):
+    """Gateway pings from another server's broker log over SSH (decided 2026-11-06).
+
+    For the test server: gateways ping main only. GATEWAY_PINGS_SSH
+    ("user@host") with key GATEWAY_PINGS_SSH_KEY; on main that key is locked
+    to one forced command that prints the ping / connect lines of the last
+    few MB of the broker log (docs/mqtt-flows/GATEWAY_PINGS_FROM_MAIN.md).
+    Returns the number of gateways updated, or None when not configured or
+    the fetch failed (then ping data stays stale: 15 is not raised).
+    """
+    target = getattr(settings, "GATEWAY_PINGS_SSH", "")
+    if not target:
+        return None
+    command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+               "-o", "StrictHostKeyChecking=accept-new"]
+    key = getattr(settings, "GATEWAY_PINGS_SSH_KEY", "")
+    if key:
+        command += ["-i", os.path.expanduser(key), "-o", "IdentitiesOnly=yes"]
+    try:
+        done = subprocess.run(command + [target], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        logger.warning("Gateway pings from %s failed: %s", target, error)
+        return None
+    if done.returncode != 0:
+        logger.warning("Gateway pings from %s failed (exit %s): %s", target, done.returncode,
+                       done.stderr.strip()[-300:])
+        return None
+    alive = alive_from_lines(done.stdout.splitlines())
+    if not alive:
+        logger.warning("Gateway pings from %s: no ping lines received", target)
+        return None
+    return store_pings(alive, now)
 
 
 def store_pings(alive, now=None):

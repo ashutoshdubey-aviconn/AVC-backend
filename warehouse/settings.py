@@ -363,6 +363,10 @@ GATEWAY_HEALTH_SKIP_SITES = config(
     "GATEWAY_HEALTH_SKIP_SITES", default="", cast=lambda v: [int(x) for x in v.split(",") if x.strip()]
 )
 # Open outage alarms (14 / 15 / 16) are e-mailed again every this many hours; 0 = never.
+# Pings from another server's broker log over SSH (test server: main), see
+# wareApp/mqtt/services/gateway_health.py fetch_remote_pings. Empty = off.
+GATEWAY_PINGS_SSH = config("GATEWAY_PINGS_SSH", default="")
+GATEWAY_PINGS_SSH_KEY = config("GATEWAY_PINGS_SSH_KEY", default="")
 GATEWAY_HEALTH_REMINDER_HOURS = config("GATEWAY_HEALTH_REMINDER_HOURS", default=24, cast=int)
 # No gateway at all with data for this long: our side is down, skip the check.
 GATEWAY_HEALTH_ALL_SILENT_MINUTES = config("GATEWAY_HEALTH_ALL_SILENT_MINUTES", default=15, cast=int)
