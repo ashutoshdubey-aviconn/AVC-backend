@@ -160,6 +160,8 @@ site=... user=... effective_from=... sample=... values={...} backfill={...}`.
 
 ## Suggested frontend flow
 
+Full spec for the frontend developer (screen, fields, request / response, errors): [BASELINE_SETUP_FRONTEND.md](BASELINE_SETUP_FRONTEND.md).
+
 1. Select site, the sample days (from / to) and optionally the start date.
 2. Call with `apply: false` and show the per-aisle table: each sample day,
    average, warnings, an editable baseline (sent as `overrides`) and the
