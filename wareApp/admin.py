@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from wareApp.mqtt.services.cooldown import release_recovery_request
 from .models import (
+    PendingEmail,
     AisleGroup,
     AisleInfo,
     AisleSyncRecoveryStatus,
@@ -412,3 +413,11 @@ class AlarmNotificationsAdmin(admin.ModelAdmin):
     search_fields = ["site_id__site_name", "to_do", "power_source"]
     list_select_related = ["site_id", "aisle_group"]
     date_hierarchy = "created_time"
+
+
+@admin.register(PendingEmail)
+class PendingEmailAdmin(admin.ModelAdmin):
+    """Alarm e-mails waiting for a retry (docs/mqtt-flows/EMAIL_RETRIES.md)."""
+
+    list_display = ("id", "summary", "attempts", "first_failed_at", "next_try_at", "last_error")
+    ordering = ("first_failed_at",)

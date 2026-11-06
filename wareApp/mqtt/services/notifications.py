@@ -7,6 +7,7 @@ hanging SMTP server can no longer stall MQTT processing.
 """
 
 import logging
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -42,7 +43,9 @@ def notify(send_function, *args):
     if not getattr(settings, "MQTT_ASYNC_NOTIFICATIONS", False) or (
         name not in ALLOWED_NOTIFICATIONS
     ):
-        return send_function(*args)
+        result = send_function(*args)
+        remember_failed(name, args, result)
+        return result
 
     outcome = {}
 
@@ -60,7 +63,89 @@ def notify(send_function, *args):
                 name,
             )
             outcome["delivered"] = send_function(*args)
+            remember_failed(name, args, outcome["delivered"])
 
     transaction.on_commit(enqueue)
     # Outside an atomic block on_commit runs immediately, so the outcome is known.
     return outcome.get("delivered")
+
+
+# ---------------------------------------------------------------- retries
+# Minutes until the next try after the 1st, 2nd, ... failure; the last value
+# repeats until NOTIFICATION_RETRY_HOURS after the first failure.
+RETRY_MINUTES = (5, 15, 30, 60, 120, 240, 480)
+RETRY_BATCH = 20
+
+
+def _summary(function_name, args):
+    if function_name == "send_alarm_email" and args:
+        return f"{args[0]} - site {args[1] if len(args) > 1 else '?'}"[:200]
+    return function_name
+
+
+def remember_failed(function_name, args, result, now=None):
+    """Keep a failed alarm e-mail for a later retry; True when kept.
+
+    Only for a passing failure (``sendmail.EmailFailure.transient``) of an
+    allowed notification, and only while retries are on
+    (NOTIFICATION_RETRY_HOURS > 0)."""
+    from wareApp.models import PendingEmail
+
+    if (
+        result
+        or not getattr(result, "transient", False)
+        or function_name not in ALLOWED_NOTIFICATIONS
+        or getattr(settings, "NOTIFICATION_RETRY_HOURS", 24) <= 0
+    ):
+        return False
+    now = now or datetime.now()
+    pending = PendingEmail.objects.create(
+        function_name=function_name, args=list(args), summary=_summary(function_name, args),
+        first_failed_at=now, next_try_at=now + timedelta(minutes=RETRY_MINUTES[0]),
+        last_error=result.error,
+    )
+    logger.warning("Email kept for retry: id=%s %s (next try %s)", pending.id, pending.summary,
+                   f"{pending.next_try_at:%H:%M}")
+    return True
+
+
+def retry_pending(now=None):
+    """Send pending alarm e-mails that are due; returns a summary string.
+
+    Stops at the first failure of a run (the mail server is still refusing;
+    no need to try the others now). Gives an e-mail up after
+    NOTIFICATION_RETRY_HOURS from its first failure.
+    """
+    from wareApp import sendmail
+    from wareApp.models import PendingEmail
+
+    now = now or datetime.now()
+    limit = timedelta(hours=getattr(settings, "NOTIFICATION_RETRY_HOURS", 24))
+    sent = failed = given_up = 0
+    for pending in PendingEmail.objects.filter(next_try_at__lte=now).order_by("first_failed_at")[:RETRY_BATCH]:
+        if pending.function_name not in ALLOWED_NOTIFICATIONS:
+            pending.delete()
+            continue
+        result = getattr(sendmail, pending.function_name)(*pending.args)
+        if result:
+            logger.info("Email sent on retry %s: id=%s %s (first failed %s)", pending.attempts,
+                        pending.id, pending.summary, f"{pending.first_failed_at:%d %b %H:%M}")
+            pending.delete()
+            sent += 1
+            continue
+        pending.attempts += 1
+        pending.last_error = getattr(result, "error", str(result))[:300]
+        if not getattr(result, "transient", False) or now - pending.first_failed_at >= limit:
+            logger.error("Email given up after %s attempts: id=%s %s (first failed %s) error=%s",
+                         pending.attempts, pending.id, pending.summary,
+                         f"{pending.first_failed_at:%d %b %H:%M}", pending.last_error)
+            pending.delete()
+            given_up += 1
+            continue
+        delay = RETRY_MINUTES[min(pending.attempts - 1, len(RETRY_MINUTES) - 1)]
+        pending.next_try_at = now + timedelta(minutes=delay)
+        pending.save(update_fields=["attempts", "last_error", "next_try_at"])
+        failed += 1
+        break  # still refused: try the rest next run
+    waiting = PendingEmail.objects.count()
+    return f"email retries: sent={sent} failed={failed} given_up={given_up} waiting={waiting}"
