@@ -391,7 +391,7 @@ def sheet(book, title, columns, rows, first=False):
 API_LIST = [("#", 4), ("Group", 22), ("Endpoint", 34), ("Method", 8), ("Screen / purpose", 44), ("Request", 38),
             ("Returns", 60), ("Shows", 26), ("Status", 34), ("View (file)", 46)]
 FRONTEND = "A. Frontend - working"
-LEGACY = "B. Frontend - old, shows nothing"
+LEGACY = "B. Frontend - customer / site page (fixed 6 Nov)"
 INGEST = "C. Not frontend - data in"
 RELATED = "D. Related status (not alarm lists)"
 API_LIST_ROWS = [
@@ -418,16 +418,16 @@ API_LIST_ROWS = [
      "views/fire.py -> FireAlarm"],
     [8, LEGACY, "/api/alarmListOnCustomerPage/", "POST", "Customer page table: alarm counts per site and type",
      '{"id": <customer user id>}', "data[]: site_id, site_name, alarms {type: count}, total_alarm_count, site_type",
-     "Rows with created_by = customer AND user_level = 4", "Always empty: no current alarm has these (0 of 12,393 rows on test)",
+     "Open alarms of the customer's sites", "Working since 6 Nov (before: always empty - read user_level=4 rows nothing writes)",
      "views/customer.py -> TotalAlarmsOnCustomerPageTabularForm"],
     [9, LEGACY, "/api/alarmListOnSitePage/", "POST", "Site page table: alarm rows of one site",
      '{"site_id": 114}', "data[]: alarm_type, object_type, object_name, alarm_priority, created_date",
-     "Rows with created_by = customer AND user_level = 4", "Always empty (same reason)", "views/site.py -> TotalAlarmsOnSitePageTabularForm"],
+     "Open alarms of the site, newest first; object_name = aisle / power source / meter-gateway number", "Working since 6 Nov (before: always empty)", "views/site.py -> TotalAlarmsOnSitePageTabularForm"],
     [10, LEGACY, "/api/getCustAlarmGraph/", "POST", "Customer page bar chart: count per alarm type",
      '{"id": <customer user id>}', "Data[]: name, data [count], type column; alarm_name_list",
-     "Rows with created_by = customer", "Always empty (current alarms have no created_by)", "views/customer.py -> TotalAlarmsTypeCountOnCustomerPage"],
+     "Open alarms per type over the customer's sites", "Working since 6 Nov (before: always empty)", "views/customer.py -> TotalAlarmsTypeCountOnCustomerPage"],
     [11, LEGACY, "/api/customerSnapShotEnergySavingApi/", "POST", "Customer snapshot card (energy figures + alarm count)",
-     "(customer snapshot request)", "... alarms (count) ...", "Rows with user_level = 4", "alarms field always 0; energy figures fine",
+     "(customer snapshot request)", "... alarms (count) ...", "Open alarms of the customer's saving sites", "Working since 6 Nov (before: alarms always 0); energy figures unchanged",
      "views/customer.py -> CustomerSnapshotApi"],
     [12, INGEST, "/api/temp/dispatch/mail/", "POST", "Gateway script posts an overheat alert -> Gateway Overheat alarm (13)",
      "gateway payload (no login, throttled)", '{"status": "stored" | "repeated" | "throttled" | "off" | "below threshold"}', "-", "Working",

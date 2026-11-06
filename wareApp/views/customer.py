@@ -1,8 +1,9 @@
 """Customer-level pages: sites, totals, snapshots and alarm counts."""
 
+from collections import defaultdict
 from datetime import datetime, timedelta
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -259,9 +260,8 @@ class CustomerSnapshotApi(APIView):
                     carbon_visible = True
             except Exception as err:
                 baseline_date = live_date
-            alarm += AlarmNotifications.objects.filter(
-                site_id=i.id, user_level=4
-            ).count()
+            # Open alarms of the site (read user_level=4 rows that nothing writes; fixed 2026-11-06).
+            alarm += AlarmNotifications.objects.filter(site_id=i.id, is_active=True).count()
             if user_type == 1:
                 aisle_group = AisleGroup.objects.filter(site_id=i.id, is_visible=True)
                 all_leg_id = [aisle.attached_leg_id for aisle in aisle_group]
@@ -349,72 +349,53 @@ class ParticularCustomerInfo(APIView):
 
 
 class TotalAlarmsOnCustomerPageTabularForm(APIView):
+    """Customer page table: open alarms per site and type (same keys as before).
+
+    Counted from the open alarms (is_active) of the customer's sites; it used
+    to read user_level=4 rows that nothing writes any more, so it was always
+    empty (fixed 2026-11-06)."""
+
     @entryExit
     def post(self, request):
-        data = request.data
-        user_id = data.get("id", "")
-        user = User.objects.get(id=user_id)
-        all_alarms = AlarmNotifications.objects.filter(
-            created_by=user, user_level=4
-        ).distinct("Alarm_type")
-        all_sites = Site.objects.select_related("customer").filter(customer=user)
+        user = User.objects.get(id=request.data.get("id", ""))
+        counts = defaultdict(lambda: defaultdict(int))
+        for site_id, alarm_type in AlarmNotifications.objects.filter(
+            site_id__customer=user, is_active=True
+        ).values_list("site_id", "Alarm_type"):
+            counts[site_id][alarm_type] += 1
+        names = dict(AlarmNotifications.alarm_type)
         data_list = []
-        for i in all_sites:
-            site_id = i.id
-            site_name = i.site_name
-            site_type = i.get_site_type_display()
-            alarm_list = {}
-            total_alarms = 0
-            for j in all_alarms:
-                alarm = AlarmNotifications.objects.filter(
-                    created_by=user, site_id=i, user_level=4, Alarm_type=j.Alarm_type
-                )
-                if alarm.exists():
-                    alarm_name = j.get_Alarm_type_display()
-                    alarm_count = alarm.count()
-                    alarm_list[alarm_name] = alarm_count
-                    total_alarms += alarm_count
-            if len(alarm_list) == 0:
-                pass
-            else:
-                data_list.append(
-                    {
-                        "site_id": site_id,
-                        "site_name": site_name,
-                        "alarms": alarm_list,
-                        "total_alarm_count": total_alarms,
-                        "site_type": site_type,
-                    }
-                )
-        logger.debug("%s %s", "data list of alarms on customer page: ", data_list)
+        for site in Site.objects.filter(customer=user, id__in=counts).order_by("id"):
+            alarm_list = {names.get(t, str(t)): n for t, n in sorted(counts[site.id].items())}
+            data_list.append(
+                {
+                    "site_id": site.id,
+                    "site_name": site.site_name,
+                    "alarms": alarm_list,
+                    "total_alarm_count": sum(alarm_list.values()),
+                    "site_type": site.get_site_type_display(),
+                }
+            )
         return Response({"result": "1", "data": data_list})
 
 
 class TotalAlarmsTypeCountOnCustomerPage(APIView):
+    """Customer page bar chart: open alarms per type over the customer's sites
+    (same keys as before; it used to read rows that nothing writes, fixed
+    2026-11-06)."""
+
     @entryExit
     def post(self, request):
-        data = request.data
-        user_id = data.get("id", "")
-        user = User.objects.get(id=user_id)
-        all_alarms = AlarmNotifications.objects.filter(created_by=user).distinct(
-            "Alarm_type"
+        user = User.objects.get(id=request.data.get("id", ""))
+        names = dict(AlarmNotifications.alarm_type)
+        per_type = (
+            AlarmNotifications.objects.filter(site_id__customer=user, is_active=True)
+            .values("Alarm_type").annotate(n=Count("id")).order_by("Alarm_type")
         )
-        data_list = []
-        alarm_name_list = []
-        alarm_count_list = []
-        for i in all_alarms:
-            logger.debug("%s %s", "i value: ", i)
-            alarm_name = i.get_Alarm_type_display()
-            logger.debug("%s %s", "alarm name: ", alarm_name)
-            alarm_count = AlarmNotifications.objects.filter(
-                created_by=user, Alarm_type=i.Alarm_type
-            ).count()
-            logger.debug("%s %s", "alarm count: ", alarm_count)
-            data_list.append(
-                {"name": alarm_name, "data": [alarm_count], "type": "column"}
-            )
-            alarm_name_list.append(alarm_name)
-            # alarm_count_list.append(alarm_count)
-        return Response(
-            {"result": 1, "Data": data_list, "alarm_name_list": alarm_name_list}
-        )
+        data_list, alarm_name_list = [], []
+        for row in per_type:
+            name = names.get(row["Alarm_type"], str(row["Alarm_type"]))
+            data_list.append({"name": name, "data": [row["n"]], "type": "column"})
+            alarm_name_list.append(name)
+        return Response({"result": 1, "Data": data_list, "alarm_name_list": alarm_name_list})
+
