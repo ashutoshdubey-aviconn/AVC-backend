@@ -123,7 +123,7 @@ class DailyAlarmRuleTests(TestCase):
 
     def test_operation_hours_names_cause_of_high_consumption(self, notify):
         self.configure_window(9, 18, 9)
-        self.hourly(self.aisle, list(range(8, 20)))
+        self.hourly(self.aisle, list(range(8, 20)), kwh=15.0)  # 12 h x 15 = the day's 180 kWh
         stored = evaluate_daily_alarms(self.site, self.aisle, self.reading(180.0))
         self.assertEqual(stored, ["Operation Hours Increased", "High Consumption"])
         high = AlarmNotifications.objects.get(Alarm_type=7)
@@ -328,3 +328,50 @@ class SavingSiteSpikeTests(TestCase):
         )
         evaluate_daily_alarms(self.site, self.aisle, day)  # day end: same alarm, no second one
         self.assertEqual(AlarmNotifications.objects.filter(Alarm_type=11).count(), 1)
+
+
+@patch("wareApp.mqtt.services.consumption_alarms.notify")
+class VerifiedFromHourlyDataTests(TestCase):
+    """Bypassed / High are verified from the hourly rows incl. yesterday's,
+    not from the stored daily row (decided 2026-11-16; site 114, 16 Nov:
+    a daily row copied from main still held a 43.6 kWh catch-up)."""
+
+    def setUp(self):
+        cache.clear()
+        self.site = Site.objects.create(site_name="Myntra BGLR Inventory", site_type=2)
+        self.aisle = AisleGroup.objects.create(site=self.site, aisleGroupName="F1-Outward&Hub area", is_active=True)
+        self.aisle.refresh_from_db()
+        SiteBaseline.objects.create(
+            associated_site_id=self.site, leg_id=self.aisle.attached_leg_id, baseline_value=36.72,
+            working_hours=24, baseline_from=date(2025, 7, 5),
+        )
+        # Two days ago: normal until 19:00; yesterday: nothing (gateway issue);
+        # today: 09:00 carries the whole gap, then normal hours.
+        self.hours(DAY - timedelta(days=2), range(0, 20), 1.2)
+        self.hours(DAY, [9], 43.60)
+        self.hours(DAY, range(10, 19), 1.2)
+
+    def hours(self, day, hours, kwh):
+        for hour in hours:
+            start = datetime.combine(day, time(hour))
+            HourlySiteReading.objects.create(
+                associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+                unit_consumption=kwh, reading_from=start, reading_to=start.replace(minute=59, second=59),
+            )
+
+    def test_copied_daily_total_with_a_catch_up_raises_nothing(self, notify):
+        copied = 43.60 + 9 * 1.2  # what main's daily row said
+        self.assertFalse(check_intraday_bypass(self.site, self.aisle, DAY, copied, now=datetime(2026, 10, 15, 17, 22)))
+        day = DailySiteReading.objects.create(
+            associated_Site=self.site, aisle_group=self.aisle, leg_id=self.aisle.attached_leg_id,
+            unit_consumption=copied, reading_for=DAY, is_visible=True,
+        )
+        self.assertEqual(evaluate_daily_alarms(self.site, self.aisle, day), [])
+        self.assertFalse(AlarmNotifications.objects.filter(Alarm_type__in=(7, 11)).exists())
+
+    def test_real_overuse_in_the_hours_still_raises(self, notify):
+        self.hours(DAY, range(19, 24), 8.0)  # 40 kWh of real use after 19:00
+        cache.clear()
+        self.assertTrue(check_intraday_bypass(self.site, self.aisle, DAY, 100.0, now=datetime(2026, 10, 15, 23, 59)))
+        alarm = AlarmNotifications.objects.get(Alarm_type=11)
+        self.assertIn("consumption so far=50.80", alarm.to_do)  # 9 x 1.2 + 5 x 8, the catch-up left out

@@ -56,7 +56,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from wareApp.mqtt.services import alarm_policy
-from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading, hour_counts_in_day
+from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading
 from wareApp.mqtt.services.baseline import baseline_info, effective_hours, is_emergency_supply
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email
@@ -151,12 +151,37 @@ def spike_hours(site, aisle_group, day, daily_baseline):
       24; 1 kWh without a baseline) - it carries the gap's consumption. A
       normal-sized hour after a gap (e.g. our own server was down) still counts.
     """
+    return verified_day_total(site, aisle_group, day, daily_baseline)[1]
+
+
+def _hour_rows(site, aisle_group, day):
+    """``(reading_from, kWh)`` of the aisle from two days before ``day`` to its end:
+    yesterday's hours show whether ``day`` starts after a data gap."""
     start = datetime.combine(day, time.min)
-    rows = list(HourlySiteReading.objects.filter(
+    return list(HourlySiteReading.objects.filter(
         associated_Site=site, leg_id=aisle_group.attached_leg_id,
         reading_from__gte=start - timedelta(days=2), reading_from__lt=start + timedelta(days=1),
     ).order_by("reading_from").values_list("reading_from", "unit_consumption"))
-    return [(spike.at, spike.kwh) for spike in find_spikes(rows, start, daily_baseline)]
+
+
+def verified_day_total(site, aisle_group, day, daily_baseline, stored_total=None):
+    """``(counted kWh, [(hour, kWh)] spikes)`` of ``day``, from the hourly rows.
+
+    Bypassed / High are verified with this, not with the stored daily row
+    (decided 2026-11-16): a copied or old daily total can still contain a
+    catch-up or a meter jump. The day's hours are added up and every spike
+    hour (a jump, or a catch-up after a gap found by looking back into
+    yesterday's hours) is left out. A day without any hourly row (e.g. stored
+    by a daily recovery packet) cannot be verified: ``stored_total`` is used.
+    """
+    start = datetime.combine(day, time.min)
+    rows = _hour_rows(site, aisle_group, day)
+    spikes = [(spike.at, spike.kwh) for spike in find_spikes(rows, start, daily_baseline)]
+    end = start + timedelta(days=1)
+    day_rows = [kwh or 0.0 for at, kwh in rows if start <= at < end]
+    if not day_rows and stored_total is not None:
+        return stored_total, spikes
+    return sum(day_rows) - sum(kwh for _, kwh in spikes), spikes
 
 
 class Spike:
@@ -188,13 +213,6 @@ def find_spikes(rows, day_start, daily_baseline):
                     spikes.append(Spike(at, kwh, "catch_up", previous))
         previous = at
     return spikes
-
-
-def _still_in_day_total(site, spikes, daily_baseline):
-    """kWh of spike hours that the day total still contains. Meter jumps on
-    saving / submetering sites are already left out of it (decided 2026-11-05,
-    models.hour_counts_in_day); catch-up hours and other sites' spikes are not."""
-    return sum(kwh for _, kwh in spikes if hour_counts_in_day(site, kwh, daily_baseline))
 
 
 def meter_issue_on(site, aisle_group, day):
@@ -348,8 +366,9 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
 
     # Bypassed / High count only reliable hours (see module docstring).
     unreliable_day = meter_issue_on(site, aisle_group, day)
-    spikes = spike_hours(site, aisle_group, day, baseline)
-    counted = consumption - _still_in_day_total(site, spikes, baseline)
+    # Verified from the hourly rows, not the stored daily total (see verified_day_total).
+    counted, spikes = verified_day_total(site, aisle_group, day, baseline, stored_total=consumption)
+    common = common + [["Counted from hourly data (kWh)", f"{counted:.2f}", True]]
     if spikes:
         common = common + [["Not counted (spike hours)", _spike_note(spikes), False]]
 
@@ -457,8 +476,9 @@ def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
     if meter_issue_on(site, aisle_group, day):
         cache.set(recheck_key, 1, 10 * 60)
         return False
-    spikes = spike_hours(site, aisle_group, day, baseline)
-    counted = consumption - _still_in_day_total(site, spikes, baseline)
+    # The live total only triggers the check; the alarm is verified from the
+    # hourly rows, incl. yesterday's (a copied daily row may hold a catch-up).
+    counted, spikes = verified_day_total(site, aisle_group, day, baseline, stored_total=consumption)
     if counted < threshold:
         cache.set(recheck_key, 1, 10 * 60)
         return False

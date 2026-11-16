@@ -102,10 +102,23 @@ missed data) is it treated as a spike and left out.
 The gateway's daily recovery packet sends a ready-made day total, not hours, so
 rule 2 cannot apply there (rule 1 does).
 
-**Alarms.** High Consumption and Bypassed already left spike hours out. They
-now subtract only the spike hours that are still in the day total (catch-up
-hours, and spikes on other site types), so a meter jump is never subtracted
-twice (`mqtt/services/consumption_alarms.py` `_still_in_day_total`).
+**Alarms (since 2026-11-16).** High Consumption and Bypassed are **verified
+from the hourly rows, not from the stored daily total**
+(`mqtt/services/consumption_alarms.py` `verified_day_total`): the day's hours
+are added up and every spike hour is left out - a meter jump, or a catch-up
+after a gap, which is found by looking back into the two previous days' hours
+(a gap that started yesterday). A stored daily total can still hold a catch-up
+(e.g. a daily row copied from main's old code), so it only triggers the check
+during the day. A day without any hourly row (stored by a daily recovery
+packet) cannot be verified and uses the stored total. The alarm e-mail shows
+"Counted from hourly data (kWh)" and the spike hours not counted.
+
+Case that led to it: site 114 (Myntra BGLR Inventory), F1-Outward&Hub area,
+16 Nov. The gateway stored nothing from 14 Nov 20:00 to 16 Nov 08:00; the
+09:00 hour carried the gap (43.60 kWh). A daily total copied from main (54.56,
+old code) raised a false Bypassed on test; from the hours the day is 11.40 kWh,
+below the 36.72 kWh baseline. To move such energy to the days it belongs to,
+use the catch-up spread (see [CATCH_UP_SPREAD.md](CATCH_UP_SPREAD.md)).
 
 **Dashboard note.** On a day with a spike hour, the day total does not equal a
 manual sum of the 24 hourly bars. The difference is exactly the spike hour(s),
