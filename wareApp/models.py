@@ -452,6 +452,9 @@ class HourlySiteReading(CleanReadingMixin, models.Model):
     reading_from = models.DateTimeField(blank=True, null=True)
     reading_to = models.DateTimeField(blank=True, null=True)
     is_visible = models.BooleanField(default=False)
+    # True for an hour created or changed by a catch-up spread (wareApp/catch_up_spread.py):
+    # its value is the catch-up hour's kWh shared over the gap, not a meter reading.
+    is_estimated = models.BooleanField(default=False)
 
 
     class Meta:
@@ -1509,6 +1512,26 @@ class PendingEmail(models.Model):
 
     def __str__(self):
         return f"{self.function_name}: {self.summary} (attempts {self.attempts})"
+
+
+class CatchUpSpread(models.Model):
+    """One catch-up hour spread over the data gap before it (wareApp/catch_up_spread.py,
+    POST /api/catchUpSpread/; decided 2026-11-16). Kept for the record and for undo."""
+
+    site = models.ForeignKey(Site, on_delete=models.CASCADE)
+    aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
+    leg_id = models.CharField(max_length=50)
+    catch_up_at = models.DateTimeField()
+    original_kwh = models.FloatField()
+    gap_from = models.DateTimeField()
+    hours = models.PositiveIntegerField()  # the catch-up hour + the missing hours
+    share_kwh = models.FloatField()
+    applied_by = models.CharField(max_length=150, blank=True, default="")
+    applied_at = models.DateTimeField(auto_now_add=True)
+    undone_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"site {self.site_id} leg {self.leg_id} {self.catch_up_at:%Y-%m-%d %H:%M}: {self.original_kwh} kWh / {self.hours} h"
 
 
 class MonitoringMarker(models.Model):
