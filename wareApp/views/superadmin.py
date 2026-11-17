@@ -32,7 +32,8 @@ class FetchAllCustomersForSuperAdmin(APIView):
             except Exception:
                 pass
 
-        default_super_admin_customers = [2, 4, 27, 28, 29, 31, 32, 38, 39, 55, 60, 68]
+        # Same list as main (74 YusenLogistics added on main after the views split, 2026-11).
+        default_super_admin_customers = [2, 4, 27, 28, 29, 31, 32, 38, 39, 55, 60, 68, 74]
         allowed_customers_by_user = {
             22: default_super_admin_customers,
         }
