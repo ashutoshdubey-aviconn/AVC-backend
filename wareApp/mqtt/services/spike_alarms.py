@@ -22,7 +22,7 @@ from datetime import datetime, time, timedelta
 from itertools import groupby
 
 from wareApp.models import AisleGroup, AlarmNotifications, HourlySiteReading, MonitoringMarker, Site
-from wareApp.mqtt.services import alarm_policy
+from wareApp.mqtt.services import alarm_policy, alarm_sites
 from wareApp.mqtt.services.baseline import baseline_info
 from wareApp.mqtt.services.consumption_alarms import find_spikes, meter_issue_on
 from wareApp.mqtt.services.notifications import notify
@@ -34,13 +34,14 @@ CONSUMPTION_SPIKE = AlarmNotifications.CONSUMPTION_SPIKE
 GATEWAY_ALARMS = (AlarmNotifications.GATEWAY_DISCONNECTED, AlarmNotifications.GATEWAY_SERVICE_ISSUE)
 
 
-def _gap_reason(site_id, gap_from, gap_to, restarts):
+def _gap_reason(site_ids, gap_from, gap_to, restarts):
     # A restart up to the end of the spike hour also ended the gap.
     if any(gap_from <= at < gap_to + timedelta(hours=2) for at in restarts):
         return "our server / listener was down (restarted in the gap)"
+    # Gateway alarms of the aisle's site or its display site (alarm_sites).
     gateway_alarm = (
         AlarmNotifications.objects.filter(
-            site_id_id=site_id, Alarm_type__in=GATEWAY_ALARMS, created_time__lte=gap_to,
+            site_id_id__in=site_ids, Alarm_type__in=GATEWAY_ALARMS, created_time__lte=gap_to,
         )
         .exclude(is_active=False, off_time__lt=gap_from)
         .exclude(to_do__startswith="FALSE")
@@ -67,7 +68,7 @@ def cause(site, aisle, day, spike, baseline, restarts):
     missing = int((spike.at - spike.previous).total_seconds() // 3600) - 1
     return (
         f"catch-up: carries {missing} missing hour(s) {gap_from:%d %b %H:%M}-{gap_to:%H:%M}; "
-        f"gap cause: {_gap_reason(site.id, gap_from, gap_to, restarts)}"
+        f"gap cause: {_gap_reason({site.id, alarm_sites.display_site_id(aisle, site.id)}, gap_from, gap_to, restarts)}"
     )
 
 
@@ -87,7 +88,8 @@ def scan(now=None):
     today = now.date()
     days = (today - timedelta(days=1), today)
     window_start = datetime.combine(days[0], time.min) - timedelta(days=2)
-    sites = {site.id: site for site in Site.objects.filter(is_live=True)}
+    # Live sites and sites merged into a live site (alarm_sites).
+    sites = {site.id: site for site in Site.objects.filter(id__in=alarm_sites.monitored_site_ids())}
     aisles = {
         (aisle.site_id, str(aisle.attached_leg_id)): aisle
         for aisle in AisleGroup.objects.filter(site_id__in=sites)
@@ -108,6 +110,10 @@ def scan(now=None):
         aisle = aisles.get((site_id, str(leg_id)))
         if aisle is None or alarm_policy.is_off(site_id, CONSUMPTION_SPIKE):
             continue
+        # Stored and e-mailed under the aisle's display site.
+        target_id = alarm_sites.display_site_id(aisle, site_id)
+        if target_id != site_id and (target_id not in sites or alarm_policy.is_off(target_id, CONSUMPTION_SPIKE)):
+            continue
         series = [(at, kwh) for _, _, at, kwh in group]
         site = sites[site_id]
         for day in days:
@@ -123,21 +129,21 @@ def scan(now=None):
             )
             day_start = datetime.combine(day, time.min)
             existing = AlarmNotifications.objects.filter(
-                site_id=site, aisle_group=aisle, Alarm_type=CONSUMPTION_SPIKE, created_time=day_start,
+                aisle_group=aisle, Alarm_type=CONSUMPTION_SPIKE, created_time=day_start,
             )
             if existing.exists():
                 updated += existing.exclude(to_do=text[:200]).update(to_do=text[:200], last_seen=now)
                 continue
             meter_id = str(aisle.attached_leg_id or "")
             AlarmNotifications.objects.create(
-                user_level=2, site_id=site, object_type=4, aisle_group=aisle,
+                user_level=2, site_id_id=target_id, object_type=4, aisle_group=aisle,
                 object_id=int(meter_id) if meter_id.isdigit() else None,
                 Alarm_type=CONSUMPTION_SPIKE, Alarm_priority=AlarmNotifications.PRIORITY_HIGH,
                 created_time=day_start, last_seen=now, to_do=text[:200],
                 notified_value=max(spike.kwh for spike in spikes),
             )
             raised += 1
-            new_by_site.setdefault(site_id, []).extend(
+            new_by_site.setdefault(target_id, []).extend(
                 [f"{aisle.aisleGroupName} {spike.at:%d %b %H:%M}", f"{spike.kwh:.2f} kWh - {reason}", True]
                 for spike, reason in zip(spikes, reasons)
             )

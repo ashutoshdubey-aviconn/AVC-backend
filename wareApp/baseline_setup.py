@@ -154,7 +154,7 @@ def plan(site, sample_from, sample_to, effective_from=None, legs=None, overrides
     meter_issues = set(
         (str(leg), created.date())
         for leg, created in AlarmNotifications.objects.filter(
-            site_id=site, Alarm_type=AlarmNotifications.METER_READING_ISSUE,
+            Alarm_type=AlarmNotifications.METER_READING_ISSUE,
             aisle_group__in=aisles,
             created_time__gte=datetime.combine(sample_from, time.min),
             created_time__lt=datetime.combine(sample_to + timedelta(days=1), time.min),

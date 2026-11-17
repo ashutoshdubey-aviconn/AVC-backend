@@ -75,8 +75,8 @@ add("F04", "Estimated hours on the hourly chart", "API / frontend", "Planned",
 add("F05", "Alarm e-mails: Gmail login refused", "Alarms / e-mail", "Waiting for input",
     "Gmail has refused the alarm account's SMTP login since 6 Nov 14:55 (test and main share the account). Retries keep "
     "failed e-mails for 24 h; 8 e-mails sent before the retries existed were lost.",
-    "2026-11-06", "2026-11-16", "Retries running", "Same account affected",
-    "Fix the Gmail account (app password / security block); then re-send the 8 lost e-mails if wanted.", "User (Gmail account)",
+    "2026-11-06", "2026-11-17", "Sending again (e-mails sent 17 Nov 10:26 and 10:46)", "Same account",
+    "Login works again; decide whether to re-send the 8 e-mails lost before the retries existed.", "User (Gmail account)",
     "docs/mqtt-flows/EMAIL_RETRIES.md", "807ff4b3")
 add("F06", "Midnight check after a day change", "Operations", "Waiting for input",
     "One-time check of the consumption batch at a day change (flush tasks, daily = sum of hourly, day-change alarms). The "
@@ -128,6 +128,11 @@ add("O02", "Automatic catch-up spreading", "Consumption", "Out of scope",
     "2026-11-16", "-", "-", "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "-")
 
 # ---- Done -------------------------------------------------------------------------------------------
+add("D24", "Alarms on merged sites (virtual aisle groups)", "Alarms", "Done",
+    "A site not live whose aisles show under a live site is still checked (gateway 15 / 16, meter 14, spike 17); "
+    "gateway and aisle alarms are stored and e-mailed under the site the customer sees. Found: gateway ..._185_2 "
+    "(site 185, shown under 183) silent since 6 Nov without an alarm.", "2026-11-17", "2026-11-17",
+    "Deployed 17 Nov; main's 12 newest gateways copied to test; 10:46 alarm raised for ..._185_2 under site 183 and e-mailed", T, "-", "-", "docs/alarms/MERGED_SITES.md", "-")
 add("D01", "Catch-up spread API", "Consumption", "Done",
     "POST /api/catchUpSpread/ (Super_Admin): preview / apply / undo; spread hours marked is_estimated; days recomputed; "
     "spike alarm closed; CatchUpSpread log.", "2026-11-16", "2026-11-16", "Deployed 16 Nov (migration 0114)", T, "Frontend: F02", "-",

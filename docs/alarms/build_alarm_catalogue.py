@@ -160,6 +160,19 @@ ALARMS = [
 L1 = "celerylogs1/celery_logs_of_server.log"
 L2 = "celerylogs2/celery_logs_of_server.log"
 MAIN_OLD = "Not deployed: main runs the older code (old table / rules); rollout not permitted yet"
+# Merged sites (virtual aisle groups), since 2026-11-17: docs/alarms/MERGED_SITES.md.
+MERGED_AISLE = ("Merged sites (since 2026-11-17): stored and e-mailed under the aisle's display site "
+                "(AisleGroup.virtual_siteID), so it shows where the customer sees the aisle; thresholds from the "
+                "aisle's own site; Off on either site = off (docs/alarms/MERGED_SITES.md).")
+MERGED_GATEWAY = ("Merged sites (since 2026-11-17): checked also when the gateway's site is not live but its aisles "
+                  "show under a live site; then stored and e-mailed under that live site with 'Gateway's site' and "
+                  "'Aisles' (case: gateway ..._185_2 of site 185 shown under 183; docs/alarms/MERGED_SITES.md).")
+for _row in ALARMS:
+    if _row[0] in (7, 8, 10, 11, 12, 17):
+        _row[-1] = (_row[-1] + " " if _row[-1] else "") + MERGED_AISLE
+    elif _row[0] in (14, 15, 16):
+        _row[-1] = (_row[-1] + " " if _row[-1] else "") + MERGED_GATEWAY
+
 STATUS = {
     0: ("Done - waiting for a live case", "test_load_handler, test_alarm_policy (Auto / Manual / Off, repeat rule)",
         "No live High Voltage on test yet (no site above its maximum since the rules went live)", MAIN_OLD,
@@ -224,8 +237,8 @@ MODELS_BY_TYPE = {
     12: f"{ALARM_ROW}; {SETTING}; HourlySiteReading (active hours); AisleGroup; Site (NL hours / window)",
     13: f"{ALARM_ROW}; {SETTING}; Site; HomeGatewayId (gateway number)",
     14: f"{ALARM_ROW}; {SETTING}; MeterDisconnectionEvent (gateway's meter events); Site (is_live)",
-    15: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus (last_data_at, last_ping_at, status); HomeGatewayId; SiteConsumptionPing; Site (is_live)",
-    16: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus; HomeGatewayId; Site",
+    15: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus (last_data_at, last_ping_at, status); HomeGatewayId; SiteConsumptionPing; Site (is_live); AisleGroup (virtual_siteID: display site); AisleSyncRecoveryStatus (aisles a gateway feeds)",
+    16: f"{ALARM_ROW}; {SETTING}; HomeGatewayStatus; HomeGatewayId; Site; AisleGroup (virtual_siteID: display site); AisleSyncRecoveryStatus (aisles a gateway feeds)",
     17: f"{ALARM_ROW}; {SETTING}; HourlySiteReading (hours); SiteBaseline; AisleGroup; MonitoringMarker (our restarts); AlarmNotifications 10 / 15 / 16 (cause); CatchUpSpread (spread log, new 0114); DailySiteReading (recomputed by a spread)",
     "-": "FirePumpAlarm (pump state); Email_History (sent e-mails); no AlarmNotifications row",
 }

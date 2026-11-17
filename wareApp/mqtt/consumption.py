@@ -10,7 +10,7 @@ from django.db.models.lookups import GreaterThan
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from wareApp.mqtt.services import alarm_policy
+from wareApp.mqtt.services import alarm_policy, alarm_sites
 from wareApp.models import (
     MAX_READING_KWH,
     hour_counts_in_day,
@@ -126,11 +126,18 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     # The same issue is still open (it stays until fixed, see alarm_closer):
     # count it on that alarm instead of storing (and e-mailing) another row
     # every cooldown window.
+    # Stored under the aisle's display site (merged sites, alarm_sites); an
+    # aisle's open issue is found by the aisle, whichever site holds it.
+    target = alarm_sites.display_site(aisle_group, site)
+    if target.id != site.id and alarm_policy.is_off(target.id, 10):
+        return
+    open_issue = (
+        dict(aisle_group=aisle_group) if aisle_group is not None else dict(site_id=site, object_id=int(meter_id))
+    )
     repeated = AlarmNotifications.objects.filter(
-        site_id=site,
-        object_id=int(meter_id),
         Alarm_type=10,
         is_active=True,
+        **open_issue,
     ).update(last_seen=occurred_at, occurrences=F("occurrences") + 1)
     if repeated:
         logger.warning(
@@ -146,7 +153,7 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     AlarmNotifications.objects.create(
         created_by=None,
         user_level=2,
-        site_id=site,
+        site_id=target,
         object_type=4,
         object_id=int(meter_id),
         aisle_group=aisle_group,
@@ -159,9 +166,10 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
     notify(
         send_alarm_email,
         "Meter Reading Issue",
-        site.id,
+        target.id,
         [
             ["Gateway", gateway_id, False],
+            *([["Aisle's site", f"{site.site_name} ({site.id})", False]] if target.id != site.id else []),
             ["Leg / meter", meter_id, False],
             ["Aisle group", aisle_group_name, False],
             ["Issue", "New meter reading is smaller than the previous one", True],

@@ -39,8 +39,8 @@ from django.core.cache import cache
 from django.db.models import Max
 
 from wareApp.alarm_feed import open_for
-from wareApp.models import AlarmNotifications, HomeGatewayStatus, MeterDisconnectionEvent, MonitoringMarker, Site
-from wareApp.mqtt.services import alarm_policy
+from wareApp.models import AisleGroup, AlarmNotifications, HomeGatewayStatus, MeterDisconnectionEvent, MonitoringMarker
+from wareApp.mqtt.services import alarm_policy, alarm_sites
 from wareApp.mqtt.services.notifications import notify
 from wareApp.sendmail import send_alarm_email
 
@@ -48,6 +48,9 @@ logger = logging.getLogger(__name__)
 
 METER_OBJECT = 4
 GATEWAY_OBJECT = 5
+# A gateway shown under another site whose number is already used there
+# (two "..._1" gateways under one display site) gets object_id = this + its id.
+GATEWAY_PK_OFFSET = 10000
 PING_READ_MARKER = "broker_log_read_at"
 LISTENER_STARTED_MARKER = "mqtt_listener_started_at"
 LOG_OFFSET_KEY = "gateway-health:log-offset:{path}"
@@ -201,12 +204,17 @@ class Report:
         return f"{text} (gateways skipped: {self.skipped})" if self.skipped else text
 
 
-def _raise(report, site_id, alarm_type, object_type, object_id, detail, details, now, priority, started):
+def _raise(report, site_id, alarm_type, object_type, object_id, detail, details, now, priority, started,
+           physical_site_id=None):
     """Raise or keep an outage alarm. ``started`` is when the outage began
     (stored as created_time, so lists show since when it is not solved).
     While it stays open it is e-mailed again once a day
-    (GATEWAY_HEALTH_REMINDER_HOURS, 24) until it is solved."""
-    if alarm_policy.is_off(site_id, alarm_type):
+    (GATEWAY_HEALTH_REMINDER_HOURS, 24) until it is solved. ``site_id`` is
+    the site it is stored under (alarm_sites); Off on it or on the physical
+    site means not raised."""
+    if alarm_policy.is_off(site_id, alarm_type) or (
+        physical_site_id not in (None, site_id) and alarm_policy.is_off(physical_site_id, alarm_type)
+    ):
         return
     issue = dict(site_id_id=site_id, Alarm_type=alarm_type, object_type=object_type, object_id=object_id)
     title = dict(AlarmNotifications.alarm_type)[alarm_type]
@@ -266,6 +274,45 @@ def skipped_sites():
     return list(getattr(settings, "GATEWAY_HEALTH_SKIP_SITES", []))
 
 
+def _gateway_plan(statuses, live):
+    """``{status.pk: [(target_site_id, object_id), ...]}`` and the sites to clear per status.
+
+    Targets come from alarm_sites (display sites of the aisles the gateway
+    feeds). object_id is the gateway number (..._<n>), unless that number is
+    already used by another gateway under the same target site.
+    """
+    targets, candidates, by_target = {}, {}, {}
+    for status in statuses:
+        hgw = status.home_gateway
+        aisles = alarm_sites.gateway_aisles(hgw)
+        targets[status.pk] = alarm_sites.site_targets(hgw.connected_to_id, aisles, live)
+        candidates[status.pk] = alarm_sites.candidate_sites(hgw.connected_to_id, aisles)
+        for target in targets[status.pk]:
+            by_target.setdefault(target, []).append(hgw)
+    plan = {}
+    for status in statuses:
+        hgw = status.home_gateway
+        number = gateway_number(hgw.hgw_id)
+        plan[status.pk] = []
+        for target in targets[status.pk]:
+            same = [other for other in by_target[target] if gateway_number(other.hgw_id) == number]
+            object_id = number
+            if len(same) > 1 and hgw.connected_to_id != target:
+                object_id = GATEWAY_PK_OFFSET + hgw.pk
+                logger.warning("Gateway number %s used twice under site %s: %s stored as object %s",
+                               number, target, hgw.hgw_id, object_id)
+            plan[status.pk].append((target, object_id))
+    return plan, candidates
+
+
+def _gateway_details(hgw, target, aisles_text):
+    if hgw.connected_to_id == target:
+        return []
+    site = hgw.connected_to
+    return [["Gateway's site", f"{getattr(site, 'site_name', '')} ({hgw.connected_to_id})", False],
+            ["Aisles", aisles_text, False]]
+
+
 def evaluate_gateways(report, now):
     # No gateway at all has sent data lately: our side (listeners, broker,
     # network) is down, not the gateways. Judge nothing until data flows again.
@@ -279,12 +326,23 @@ def evaluate_gateways(report, now):
     # disconnected because our server or listener was down.
     listening_since = marker(LISTENER_STARTED_MARKER)
     with_pings = ping_information_fresh(now)
-    statuses = HomeGatewayStatus.objects.select_related("home_gateway").filter(
-        home_gateway__connected_to__is_live=True, last_data_at__isnull=False,
-    ).exclude(home_gateway__connected_to_id__in=skipped_sites())
+    live = alarm_sites.live_site_ids()
+    # Live sites, and sites merged into a live site (alarm_sites).
+    statuses = list(
+        HomeGatewayStatus.objects.select_related("home_gateway", "home_gateway__connected_to").filter(
+            home_gateway__connected_to_id__in=alarm_sites.monitored_site_ids(live), last_data_at__isnull=False,
+        ).exclude(home_gateway__connected_to_id__in=skipped_sites())
+    )
+    plan, candidates = _gateway_plan(statuses, live)
     for status in statuses:
         hgw = status.home_gateway
-        site_id, number = hgw.connected_to_id, gateway_number(hgw.hgw_id)
+        site_id = hgw.connected_to_id
+        targets = plan[status.pk]
+        # Alarms of this gateway stored under a site it no longer belongs to.
+        stale = candidates[status.pk] - {target for target, _ in targets}
+        for old_site in stale:
+            for alarm_type in (AlarmNotifications.GATEWAY_DISCONNECTED, AlarmNotifications.GATEWAY_SERVICE_ISSUE):
+                _clear(report, old_site, alarm_type, GATEWAY_OBJECT, gateway_number(hgw.hgw_id), now)
         # real_age: since the gateway's last data. data_age: the same, but not
         # before our own restart (grace). Raising uses data_age; clearing needs
         # real data again, so a restart never closes a real outage.
@@ -301,35 +359,39 @@ def evaluate_gateways(report, now):
             # In the grace after our restart while the gateway is still silent:
             # keep any open alarm as it is, raise nothing new.
             continue
+        aisles_text = ", ".join(sorted(a.aisleGroupName for a in alarm_sites.gateway_aisles(hgw))) or "-"
         # 15 needs proof the gateway also stopped pinging (broker log read).
         # Pings but no data, or no ping information at all (the test server:
         # gateways ping main only), is a Service / Modbus issue (16), never 15
         # (decided 2026-11-02).
         no_pings = with_pings and (ping_age is None or ping_age >= disconnected_after)
-        if data_age >= disconnected_after and no_pings:
-            last_ping = f"{status.last_ping_at:%d %b %H:%M}" if status.last_ping_at else "unknown"
-            _raise(
-                report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
-                f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
-                common + [["Last ping", last_ping, False]],
-                now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at,
-            )
-            _clear(report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
-        elif data_age >= service_after and not no_pings:
-            if ping_age is not None:
-                detail = f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}"
-                extra = [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]]
+        for target, number in targets:
+            extra_site = _gateway_details(hgw, target, aisles_text)
+            if data_age >= disconnected_after and no_pings:
+                last_ping = f"{status.last_ping_at:%d %b %H:%M}" if status.last_ping_at else "unknown"
+                _raise(
+                    report, target, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number,
+                    f"Gateway {hgw.hgw_id}: no data and no ping for {_hours(real_age)}",
+                    common + [["Last ping", last_ping, False]] + extra_site,
+                    now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at, physical_site_id=site_id,
+                )
+                _clear(report, target, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
+            elif data_age >= service_after and not no_pings:
+                if ping_age is not None:
+                    detail = f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}"
+                    extra = [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]]
+                else:
+                    detail = f"Gateway {hgw.hgw_id}: no consumption / recovery / load data for {_hours(real_age)} (ping status unknown)"
+                    extra = [["Last ping", "not available on this server (broker log not read)", False]]
+                _raise(
+                    report, target, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number,
+                    detail, common + extra + extra_site, now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at,
+                    physical_site_id=site_id,
+                )
+                _clear(report, target, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number, now)
             else:
-                detail = f"Gateway {hgw.hgw_id}: no consumption / recovery / load data for {_hours(real_age)} (ping status unknown)"
-                extra = [["Last ping", "not available on this server (broker log not read)", False]]
-            _raise(
-                report, site_id, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number,
-                detail, common + extra, now, AlarmNotifications.PRIORITY_HIGH, status.last_data_at,
-            )
-            _clear(report, site_id, AlarmNotifications.GATEWAY_DISCONNECTED, GATEWAY_OBJECT, number, now)
-        else:
-            for alarm_type in (AlarmNotifications.GATEWAY_DISCONNECTED, AlarmNotifications.GATEWAY_SERVICE_ISSUE):
-                _clear(report, site_id, alarm_type, GATEWAY_OBJECT, number, now)
+                for alarm_type in (AlarmNotifications.GATEWAY_DISCONNECTED, AlarmNotifications.GATEWAY_SERVICE_ISSUE):
+                    _clear(report, target, alarm_type, GATEWAY_OBJECT, number, now)
         online = data_age < disconnected_after
         if status.status != online:
             HomeGatewayStatus.objects.filter(pk=status.pk).update(status=online)
@@ -340,7 +402,8 @@ def evaluate_meters(report, now):
         MeterDisconnectionEvent.objects.values("meter_id")
         .annotate(last_end=Max("detection_window_end"))
     )
-    live_sites = set(Site.objects.filter(is_live=True).values_list("id", flat=True))
+    live = alarm_sites.live_site_ids()
+    monitored = alarm_sites.monitored_site_ids(live)
     for row in latest:
         event = (
             MeterDisconnectionEvent.objects.filter(meter_id=row["meter_id"], detection_window_end=row["last_end"])
@@ -348,25 +411,36 @@ def evaluate_meters(report, now):
             .first()
         )
         site_id = event.logged_site_id or event.remote_site_id
-        if site_id not in live_sites:
+        if site_id not in monitored:
             continue
         meter = event.meter_number if event.meter_number is not None else event.meter_id
-        if event.status == "disconnected":
-            if now - event.detection_window_start >= _down_after(site_id, AlarmNotifications.METER_DISCONNECTED):
-                _raise(
-                    report, site_id, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter,
-                    f"Meter {event.meter_name} (port {event.port_id or '-'}) disconnected since "
-                    f"{event.detection_window_start:%d %b %H:%M}",
-                    [
-                        ["Meter", f"{event.meter_name} (number {meter})", False],
-                        ["Port", event.port_id or "-", False],
-                        ["Disconnected since", f"{event.detection_window_start:%d %b %H:%M}", True],
-                    ],
-                    # High since 2026-11-06, like the gateway alarms 15 / 16.
-                    now, AlarmNotifications.PRIORITY_HIGH, event.detection_window_start,
-                )
-        else:
-            _clear(report, site_id, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter, now)
+        # Under the live display site(s) of the site's aisles (alarm_sites).
+        aisles = list(AisleGroup.objects.filter(site_id=site_id, is_active=True))
+        targets = alarm_sites.site_targets(site_id, aisles, live)
+        for old_site in alarm_sites.candidate_sites(site_id, aisles) - set(targets):
+            _clear(report, old_site, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter, now)
+        for target in targets:
+            _evaluate_meter(report, now, event, site_id, target, meter)
+
+
+def _evaluate_meter(report, now, event, site_id, target, meter):
+    """Raise or clear Meter Disconnected for one meter under one target site."""
+    if event.status == "disconnected":
+        if now - event.detection_window_start >= _down_after(site_id, AlarmNotifications.METER_DISCONNECTED):
+            _raise(
+                report, target, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter,
+                f"Meter {event.meter_name} (port {event.port_id or '-'}) disconnected since "
+                f"{event.detection_window_start:%d %b %H:%M}",
+                [
+                    ["Meter", f"{event.meter_name} (number {meter})", False],
+                    ["Port", event.port_id or "-", False],
+                    ["Disconnected since", f"{event.detection_window_start:%d %b %H:%M}", True],
+                ],
+                # High since 2026-11-06, like the gateway alarms 15 / 16.
+                now, AlarmNotifications.PRIORITY_HIGH, event.detection_window_start, physical_site_id=site_id,
+            )
+    else:
+        _clear(report, target, AlarmNotifications.METER_DISCONNECTED, METER_OBJECT, meter, now)
 
 
 def evaluate(now=None):

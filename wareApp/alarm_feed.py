@@ -12,9 +12,10 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from django.conf import settings
-from django.db.models import Max, Min, Q, Sum
+from django.db.models import F, Max, Min, Q, Sum
 
 from wareApp.models import (
+    AisleGroup,
     AisleSyncRecoveryStatus,
     AlarmNotifications,
     HomeGatewayId,
@@ -92,6 +93,24 @@ def active_alarms(site_ids):
         connected_to__in=site_ids
     ).values_list("connected_to", "hgw_id"):
         site_gateways[site_id].append(hgw_id)
+    # Gateways of sites merged into these sites (virtual aisle groups,
+    # mqtt/services/alarm_sites.py): their alarms are listed here too.
+    merged = set(
+        AisleGroup.objects.filter(virtual_siteID_id__in=site_ids)
+        .exclude(site_id=F("virtual_siteID_id"))
+        .values_list("site_id", "virtual_siteID_id")
+    )
+    merged_into = defaultdict(set)
+    for physical, display in merged:
+        merged_into[physical].add(display)
+    gateway_by_pk = {}
+    for pk, physical, hgw_id in HomeGatewayId.objects.filter(
+        connected_to__in=set(merged_into)
+    ).values_list("id", "connected_to", "hgw_id"):
+        gateway_by_pk[pk] = hgw_id
+        for display in merged_into[physical]:
+            if hgw_id not in site_gateways[display]:
+                site_gateways[display].append(hgw_id)
 
     rows = []
     groups = list(
@@ -118,7 +137,6 @@ def active_alarms(site_ids):
     }
     aisle_gateways = dict(
         AisleSyncRecoveryStatus.objects.filter(
-            site_id__in=site_ids,
             aisle_group_id__in={
                 g["aisle_group_id"] for g in groups if g["aisle_group_id"]
             },
@@ -145,7 +163,10 @@ def active_alarms(site_ids):
         if alarm.source == "gateway":
             # object_id is the gateway number (…_<n> in the home gateway id).
             number = group["object_id"]
-            home_gateway = next(
+            # A merged gateway whose number is used twice: 10000 + its id
+            # (gateway_health.GATEWAY_PK_OFFSET).
+            by_pk = gateway_by_pk.get((number or 0) - 10000)
+            home_gateway = by_pk or next(
                 (
                     g
                     for g in site_gateways.get(site.id, [])

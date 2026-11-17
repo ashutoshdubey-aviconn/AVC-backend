@@ -55,7 +55,7 @@ from datetime import datetime, time, timedelta
 from django.conf import settings
 from django.core.cache import cache
 
-from wareApp.mqtt.services import alarm_policy
+from wareApp.mqtt.services import alarm_policy, alarm_sites
 from wareApp.models import AlarmNotifications, AlarmSetting, HourlySiteReading
 from wareApp.mqtt.services.baseline import baseline_info, effective_hours, is_emergency_supply
 from wareApp.mqtt.services.notifications import notify
@@ -216,9 +216,10 @@ def find_spikes(rows, day_start, daily_baseline):
 
 
 def meter_issue_on(site, aisle_group, day):
+    # By aisle only: the alarm may be stored under the aisle's display site (alarm_sites).
     start = datetime.combine(day, time.min)
     return AlarmNotifications.objects.filter(
-        site_id=site, aisle_group=aisle_group, Alarm_type=METER_READING_ISSUE,
+        aisle_group=aisle_group, Alarm_type=METER_READING_ISSUE,
         created_time__gte=start, created_time__lt=start + timedelta(days=1),
     ).exists()
 
@@ -269,10 +270,14 @@ def operation_hours_check(site, aisle_group, day):
 def _record(site, aisle_group, day, alarm_type, title, to_do, details,
             value=None, worse_when_higher=True):
     day_start = datetime.combine(day, datetime.min.time())
+    # Stored and e-mailed under the aisle's display site (merged sites,
+    # alarm_sites); looked up by aisle, which belongs to one site only.
+    target = alarm_sites.display_site(aisle_group, site)
+    if target.id != site.id and alarm_policy.is_off(target.id, alarm_type):
+        return False
     # One alarm per aisle, type and day - also after it was closed at the end
     # of its day (the after-midnight day-end check must not add a second one).
     if AlarmNotifications.objects.filter(
-        site_id=site,
         aisle_group=aisle_group,
         Alarm_type=alarm_type,
         created_time__gte=day_start,
@@ -283,7 +288,6 @@ def _record(site, aisle_group, day, alarm_type, title, to_do, details,
     # The same alarm the day before (not cleared): compare with its last e-mail.
     last_value = (
         AlarmNotifications.objects.filter(
-            site_id=site,
             aisle_group=aisle_group,
             Alarm_type=alarm_type,
             created_time=day_start - timedelta(days=1),
@@ -302,7 +306,7 @@ def _record(site, aisle_group, day, alarm_type, title, to_do, details,
     AlarmNotifications.objects.create(
         created_by=None,
         user_level=2,
-        site_id=site,
+        site_id=target,
         object_type=4,
         object_id=int(meter_id) if meter_id.isdigit() else None,
         aisle_group=aisle_group,
@@ -317,9 +321,10 @@ def _record(site, aisle_group, day, alarm_type, title, to_do, details,
         notify(
             send_alarm_email,
             title,
-            site.id,
+            target.id,
             [
                 ["Aisle group", getattr(aisle_group, "aisleGroupName", ""), False],
+                *([["Aisle's site", f"{site.site_name} ({site.id})", False]] if target.id != site.id else []),
                 ["Leg", meter_id, False],
                 ["Date", str(day), False],
                 *details,
@@ -328,7 +333,7 @@ def _record(site, aisle_group, day, alarm_type, title, to_do, details,
         )
     logger.warning(
         "Consumption alarm stored: site=%s leg_id=%s aisle_group_name=%s date=%s alarm=%s emailed=%s %s",
-        site.id,
+        target.id if target.id == site.id else f"{target.id} (aisle's site {site.id})",
         meter_id,
         getattr(aisle_group, "aisleGroupName", ""),
         day,

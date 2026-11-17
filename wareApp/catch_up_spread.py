@@ -241,7 +241,7 @@ def apply(site, items, user=None):
             )
             recompute_days(site, aisle, [m.date() for m in item.missing] + [item.at.date()])
             AlarmNotifications.objects.filter(
-                site_id=site, aisle_group=aisle, Alarm_type=AlarmNotifications.CONSUMPTION_SPIKE,
+                aisle_group=aisle, Alarm_type=AlarmNotifications.CONSUMPTION_SPIKE,
                 created_time=datetime.combine(item.at.date(), time.min), is_active=True,
             ).update(
                 is_active=False, off_time=datetime.now(),

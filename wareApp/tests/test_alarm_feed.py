@@ -80,7 +80,7 @@ class AlarmFeedTests(TestCase):
         self.assertEqual(active_alarms([self.site.id]), [])
 
     def test_query_count_does_not_grow_with_rows(self):
-        with self.assertNumQueries(5):  # one alarm table
+        with self.assertNumQueries(6):  # one alarm table; +1 merged sites (virtual aisle groups)
             active_alarms([self.site.id])
 
     def test_type_api_returns_one_row_per_issue(self):
