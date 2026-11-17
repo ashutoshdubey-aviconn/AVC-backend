@@ -37,6 +37,16 @@ test server (Celery beat, every 5 min)
   ping data goes stale after 15 min; the check then falls back to the old rule
   (16, "ping status unknown"), never a wrong 15.
 - Cost on main: one SSH login and a `tail` of 4 MB every 5 minutes.
+- **Reconnect (since 2026-11-17).** When a Disconnected gateway (15) comes
+  back, its first ping can be read before its queued data is written
+  (`last_data_at` is written at most once a minute). The check then saw
+  "recent ping, no data" and raised a new 16 with an e-mail, closed 5 minutes
+  later. Now an open 15 whose pings are back is kept as it is for
+  `GATEWAY_HEALTH_RECONNECT_MINUTES` (default 10) after its last no-ping check:
+  data in that time closes it; no data after it means a real 16. Case: site
+  130 `avc_DHL_Okhla_000130_1`, 17 Nov. Offline 08:48–10:26 (15, correct), data
+  of 06:00–10:00 recovered at 10:26:37, false 16 at 10:26:45, cleared 10:31.
+  The same happened at 06:16. Both false rows were marked `FALSE - reconnect …`.
 
 ## Settings (test server `.env`)
 

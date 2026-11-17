@@ -18,6 +18,10 @@ Manual threshold in hours; Off = not raised):
 * 16: pings arrive but no data for >= threshold. Also used when there is no
   ping information (e.g. the test server, gateways ping main only): without
   proof that pings stopped it is never called disconnected (decided 2026-11-02).
+  A disconnected gateway (open 15) whose pings come back is NOT switched to 16
+  for GATEWAY_HEALTH_RECONNECT_MINUTES (10): its first ping arrives before its
+  queued data is written (last_data_at is written at most once a minute), so
+  every reconnect raised a false 16 + e-mail (site 130, 17 Nov 06:16 / 10:26).
 
 An alarm is one active row per issue, created_time = when the outage began
 (lists show since when it is not solved). It is e-mailed when raised and
@@ -305,6 +309,21 @@ def _gateway_plan(statuses, live):
     return plan, candidates
 
 
+def _reconnecting(site_id, number, now):
+    """An open Gateway Disconnected whose last no-ping check is recent: the
+    gateway has just reconnected and its data is on the way."""
+    grace = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_RECONNECT_MINUTES", 10))
+    open_alarm = (
+        AlarmNotifications.objects.filter(
+            site_id_id=site_id, Alarm_type=AlarmNotifications.GATEWAY_DISCONNECTED,
+            object_type=GATEWAY_OBJECT, object_id=number, is_active=True,
+        )
+        .values_list("last_seen", flat=True)
+        .first()
+    )
+    return open_alarm is not None and now - open_alarm < grace
+
+
 def _gateway_details(hgw, target, aisles_text):
     if hgw.connected_to_id == target:
         return []
@@ -377,6 +396,12 @@ def evaluate_gateways(report, now):
                 )
                 _clear(report, target, AlarmNotifications.GATEWAY_SERVICE_ISSUE, GATEWAY_OBJECT, number, now)
             elif data_age >= service_after and not no_pings:
+                if _reconnecting(target, number, now):
+                    # Pings are back after a disconnection: keep 15 open and
+                    # wait for the data that follows (no 16, no e-mail).
+                    report.repeated.append((target, AlarmNotifications.GATEWAY_DISCONNECTED, number))
+                    logger.info("Gateway reconnected, waiting for its data: site=%s gateway=%s", target, hgw.hgw_id)
+                    continue
                 if ping_age is not None:
                     detail = f"Gateway {hgw.hgw_id}: pings OK, no consumption / recovery / load data for {_hours(real_age)}"
                     extra = [["Last ping", f"{status.last_ping_at:%d %b %H:%M}", False]]

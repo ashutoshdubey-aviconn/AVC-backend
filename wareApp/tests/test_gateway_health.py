@@ -196,6 +196,39 @@ class GatewayAlarmTests(TestCase):
         gateway_health.evaluate(NOW)
         self.assertEqual(self.active(), [(15, 2)])
 
+    def test_reconnect_is_not_a_service_issue_while_its_data_arrives(self, notify):
+        # Site 130, 17 Nov: disconnected 08:48-10:26; at 10:26:45 the ping was
+        # back but last_data_at not written yet (once a minute) -> false 16.
+        self.log_read()
+        self.set(data_minutes_ago=100, ping_minutes_ago=100)
+        gateway_health.evaluate(NOW)
+        self.assertEqual(self.active(), [(15, 2)])
+        later = NOW + timedelta(minutes=5)
+        self.status.last_ping_at = later - timedelta(seconds=10)  # reconnected, data not written yet
+        self.status.save()
+        gateway_health.mark(gateway_health.PING_READ_MARKER, later)
+        HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=later)
+        gateway_health.evaluate(later)
+        self.assertEqual(self.active(), [(15, 2)])  # still 15, no 16
+        self.assertEqual(notify.call_count, 1)
+        self.status.last_data_at = later + timedelta(minutes=1)
+        self.status.save()
+        gateway_health.evaluate(later + timedelta(minutes=5))
+        self.assertEqual(self.active(), [])  # data came: closed
+
+    def test_pings_back_without_data_past_the_grace_is_a_service_issue(self, notify):
+        self.log_read()
+        self.set(data_minutes_ago=100, ping_minutes_ago=100)
+        gateway_health.evaluate(NOW)
+        for minutes in (5, 10, 15):
+            at = NOW + timedelta(minutes=minutes)
+            self.status.last_ping_at = at
+            self.status.save()
+            gateway_health.mark(gateway_health.PING_READ_MARKER, at)
+            HomeGatewayStatus.objects.filter(pk=self.healthy.pk).update(last_data_at=at)
+            gateway_health.evaluate(at)
+        self.assertEqual(self.active(), [(16, 2)])  # 10 min after the last no-ping check
+
     def test_one_e_mail_per_outage_then_cleared_and_restored_line_next_time(self, notify):
         self.set(data_minutes_ago=90)
         gateway_health.evaluate(NOW)
