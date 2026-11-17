@@ -6,6 +6,12 @@ Every call (login, data, alarms, catch-up spread, baseline setup) goes to the
 same server's `/api/` (nginx → Django on 127.0.0.1:8000), so it shows the
 **test database** only. Main is not used.
 
+## Local dev server
+
+Since 2026-11-17 `environment.ts` and `environment.prod.ts` also point `apiUrl`
+to `http://43.204.53.81/api/`, so `ng serve` (localhost:4200) uses the test
+server for every call too (it used to log in against main).
+
 ## Build configuration
 
 `ng build --configuration testserver`:
