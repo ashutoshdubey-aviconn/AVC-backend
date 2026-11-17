@@ -97,7 +97,7 @@ class SiteAlarmApiTests(TestCase):
         self.assertEqual(body["total_alarm"], 7)
         self.assertEqual(body["high_priority"], 1)
         self.assertEqual(body["medium_priority"], 6)
-        self.assertEqual(body["active_alarms"], 7)
+        self.assertEqual(body["active_alarms"], 3)  # open alarms (rows); total_alarm counts their repeats
         by_type = {row["alarm_type"]: row for row in body["data"]}
         self.assertEqual(set(by_type), {0, 2, 11})
         self.assertEqual(by_type[2], {"name": "PF Bad Value Alarm", "count": 5, "priority": "Medium", "alarm_type": 2})

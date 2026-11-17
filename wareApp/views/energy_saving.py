@@ -2814,8 +2814,9 @@ class ParticularSiteSnapshotEnergySavingApiVB(APIView):
         else:
             baseline_date = site.baseline_date.date()
         date = datetime.strftime(baseline_date, "%d-%b-%Y")
-        alarm = AlarmNotifications.objects.filter(site_id=site, user_level=4).count()
-        # print("alarm count on site page: ", alarm)
+        # Open alarms of the site, as its alarm list (alarmList/) shows them. It
+        # counted user_level=4 rows that nothing writes, so it was always 0 (fixed 2026-11-17).
+        alarm = AlarmNotifications.objects.filter(site_id=site, is_active=True).count()
         # daily = DailySiteReading.objects.filter(associated_Site=site)
         if site.live_date:
             # print("inside live date if condition: ")

@@ -79,6 +79,11 @@ class CustomerAlarmApiTests(TestCase):
         body = self.post("/api/customerSnapShotEnergySavingApi/", {"id": self.customer.id, "user_type": 4})
         self.assertEqual(body["alarms"], 3)  # 2 + 1 open on the customer's two sites
 
+    def test_site_snapshot_alarm_count(self):
+        # Site page ALARMS tile (fixed 2026-11-17; it read user_level=4 rows too).
+        body = self.post("/api/siteSnapShotEnergySavingApi/", {"site_id": self.site.id, "user_type": 1})
+        self.assertEqual(body["alarms"], 2)  # the closed Bypassed is not counted
+
     def test_empty_when_no_open_alarms(self):
         AlarmNotifications.objects.update(is_active=False)
         self.assertEqual(self.post("/api/alarmListOnCustomerPage/", {"id": self.customer.id})["data"], [])

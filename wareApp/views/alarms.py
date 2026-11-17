@@ -14,7 +14,8 @@ class AlarmsList(APIView):
     """Alarm summary of one site: active alarms only (decided 2026-11-02).
 
     Response keys unchanged; counts are occurrences of the alarms that are
-    still happening (closed alarms are not shown, see alarm_closer).
+    still happening (closed alarms are not shown, see alarm_closer), except
+    active_alarms: the number of open alarms.
     """
 
     def post(self, request):
@@ -47,7 +48,9 @@ class AlarmsList(APIView):
                 "total_alarm": total(alarms),
                 "high_priority": total(alarms.filter(Alarm_priority=AlarmNotifications.PRIORITY_HIGH)),
                 "medium_priority": total(alarms.filter(Alarm_priority=AlarmNotifications.PRIORITY_MEDIUM)),
-                "active_alarms": total(alarms.filter(is_active=True)),
+                # Open alarms (rows); total_alarm adds their repeats (occurrences).
+                # Was the same sum as total_alarm until 2026-11-17.
+                "active_alarms": alarms.count(),
                 "data": data,
             }
         )

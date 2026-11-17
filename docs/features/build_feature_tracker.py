@@ -128,6 +128,16 @@ add("O02", "Automatic catch-up spreading", "Consumption", "Out of scope",
     "2026-11-16", "-", "-", "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "-")
 
 # ---- Done -------------------------------------------------------------------------------------------
+add("D26", "Alarm counts consistent on every page", "Alarms / frontend", "Done",
+    "Super-admin, customer and site ALARMS tiles, the customer alarm table / chart and the site panel all read the "
+    "alarm server and count open alarms; customer table grouped Gateway / Consumption / Power; sign-in guard.",
+    "2026-11-17", "2026-11-17", "Deployed 17 Nov; checked in Chrome (34 / 1 / 1)", T,
+    "Frontend: commit in Aviconncorp-new-migrated-frontend", "-", "docs/CHANGELOG.md (17 Nov)", "-")
+add("D25", "No false Service / Modbus Issue at gateway reconnect", "Alarms", "Done",
+    "A gateway that was Disconnected and pings again gets 10 min for its queued data before it can be called a "
+    "Service / Modbus Issue (its first ping arrives before its data is written). Found: site 130, false 16 + e-mail at "
+    "06:16 and 10:26 on 17 Nov.", "2026-11-17", "2026-11-17", "Deployed 17 Nov", T, "-", "-",
+    "docs/mqtt-flows/GATEWAY_PINGS_FROM_MAIN.md", "-")
 add("D24", "Alarms on merged sites (virtual aisle groups)", "Alarms", "Done",
     "A site not live whose aisles show under a live site is still checked (gateway 15 / 16, meter 14, spike 17); "
     "gateway and aisle alarms are stored and e-mailed under the site the customer sees. Found: gateway ..._185_2 "
