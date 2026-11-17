@@ -139,8 +139,17 @@ class CatchUpSpreadApiTests(SpreadTestData):
         self.assertTrue(applied.data["applied"])
         spread_id = applied.data["spreads"][0]["id"]
         self.assertEqual(CatchUpSpread.objects.get(id=spread_id).applied_by, "admin")
+        # A later preview of the day lists the spread (for an Undo button) and nothing left to spread.
+        again = self.client.post("/api/catchUpSpread/", body, format="json")
+        self.assertEqual(again.data["catch_ups"], [])
+        (listed,) = again.data["applied_spreads"]
+        self.assertEqual((listed["id"], listed["aisle_name"], listed["hours"], listed["original_kwh"]),
+                         (spread_id, "F1-Outward&Hub area", 38, 43.6))
+        self.assertEqual(listed["gap_from"], "2026/11/14 20:00")
         undone = self.client.post("/api/catchUpSpread/", {"undo": spread_id}, format="json")
         self.assertEqual(undone.data["estimated_hours_removed"], 37)
+        after = self.client.post("/api/catchUpSpread/", body, format="json")
+        self.assertEqual((len(after.data["catch_ups"]), after.data["applied_spreads"]), (1, []))
 
     def test_permissions_and_errors(self):
         other = APIClient()

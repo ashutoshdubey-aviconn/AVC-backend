@@ -55,12 +55,12 @@ add("F01", "Gateway health report topic", "MQTT / gateway", "Waiting for input",
     "Build the 4 parts once the questions are answered (or with the proposed defaults if told to).",
     "Colleague: payload format (JSON or Python-dict text), send interval, which service states are healthy ('exited' for pymodbus?)",
     "-", "-")
-add("F02", "Catch-up spread screen", "Frontend", "Waiting for frontend",
-    "Button on the site page: preview catch-up hours of a day, tick aisles, apply, undo. Moves a gap's energy from the "
-    "catch-up hour to the missing hours and closes the Consumption Spike alarm.",
-    "2026-11-16", "2026-11-16", "API deployed 16 Nov; preview tried on site 114, nothing applied", T,
-    "Frontend builds the screen from the spec (doc, 'Frontend').", "Frontend team",
-    "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9")
+add("F02", "Catch-up spread screen", "Frontend", "Done",
+    "Site page: Spread catch-up button and Spread... on Consumption Spike rows; preview, tick aisles, apply, undo "
+    "(inline confirmations). First real spread 17 Nov: site 114 F1-Outward&Hub area, 43.60 kWh over 38 h, total energy unchanged, "
+    "spike alarm closed (proof: .work/spread_114_20261117/).",
+    "2026-11-16", "2026-11-17", "Used on test 17 Nov (site 114 hours 9-15 Nov copied from main first); 19 more site-114 catch-ups spreadable",
+    T, "Push the frontend commit; spread the other 19 when wanted.", "User", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9 + frontend")
 add("F03", "Baseline setup screen", "Frontend", "Waiting for frontend",
     "Screen for POST /api/baselineSetup/: pick sample days, preview per-aisle averages, apply (baselines, aisles active, "
     "site live, backfill of baseline and saving).",

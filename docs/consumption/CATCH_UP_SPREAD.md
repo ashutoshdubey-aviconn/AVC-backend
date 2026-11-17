@@ -88,26 +88,38 @@ Response (preview):
   "not_spreadable": [
     {"leg_id": "...", "aisle_name": "...", "at": "2026/11/16 09:00", "kwh": 31.17, "normal_hour_kwh": 0.9,
      "reason": "no reading in the 7 days before it: the gap's start is unknown"}
+  ],
+  "applied_spreads": [
+    {"id": 12, "leg_id": "692", "aisle_name": "F1-Outward&Hub area", "catch_up_at": "2026/11/16 09:00", "original_kwh": 43.6,
+     "gap_from": "2026/11/14 20:00", "hours": 38, "share_kwh": 1.147, "applied_by": "AVCadmin", "applied_at": "2026/11/17 12:00"}
   ]
 }
 ```
+
+`applied_spreads` (since 2026-11-17) lists the spreads of the site's catch-up hours on
+that day that are not undone, so the screen can offer Undo after a reload.
 
 Apply adds `"applied": true, "spreads": [{"id": 12, "leg_id": "692", "catch_up_at": "...", "hours": 38, "share_kwh": 1.147}]`.
 Undo returns `{"status": 200, "undone": 12, "estimated_hours_removed": 37}`.
 Errors: HTTP 400 `{"status": 400, "error": "..."}` (bad day, unknown site / leg / spread, nothing to spread, changed since preview, already undone).
 
-## Frontend (suggested)
+## Frontend (built 2026-11-17)
 
-On the site page, next to the Consumption Spike alarms or the daily chart:
+`Aviconncorp-new-migrated-frontend`, `src/app/alarm/catch-up-spread.component.*`
+(Super Admin only; calls the alarm server, `environment.alarmApiUrl`):
 
-1. **"Spread catch-up"** → pick the day (pre-filled with the spike's day) →
-   preview table: aisle, catch-up hour, kWh, gap from → to, missing hours,
-   share, normal hour, and per touched day the total before → after; warnings
-   in yellow; `not_spreadable` in a grey list with the reason.
-2. Tick the aisles to spread (sent as `legs`) → **Apply** (confirm dialog).
-3. Show the result and keep the spread id; offer **Undo** for it.
-4. Charts may show `is_estimated` hours differently (e.g. hatched) once the
-   hourly API returns the flag.
+1. Site page: **Spread catch-up** button next to Select Site (today), or
+   **Spread…** on a Consumption Spike row whose text says "catch-up" in the
+   alarm panel (opens on that spike's day).
+2. Day picker → preview table: aisle, catch-up hour, kWh, gap from → to, hours,
+   kWh per hour after, normal hour, and per touched day the total before → after.
+   Rows with a warning (probably a meter jump) are highlighted and not ticked;
+   `not_spreadable` is a grey list with the reason.
+3. Tick aisles → **Spread N catch-up hour(s)…** → inline confirmation
+   (**Yes, spread**; no browser dialog) → result message, preview reloads.
+4. **Spread on this day** lists `applied_spreads` with **Undo** (inline confirmation).
+5. Charts may later show `is_estimated` hours differently once the hourly API
+   returns the flag (feature tracker F04).
 
 ## Tests
 

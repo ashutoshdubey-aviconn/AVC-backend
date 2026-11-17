@@ -11,6 +11,21 @@ from wareApp.models import CatchUpSpread, Site
 __all__ = ["CatchUpSpreadApi"]
 
 
+def _applied_spreads(site, day):
+    """Spreads of this site's catch-up hours on ``day`` that are not undone (for an Undo button)."""
+    rows = (
+        CatchUpSpread.objects.filter(site=site, catch_up_at__date=day, undone_at__isnull=True)
+        .select_related("aisle_group").order_by("catch_up_at", "id")
+    )
+    return [
+        {"id": s.id, "leg_id": s.leg_id, "aisle_name": getattr(s.aisle_group, "aisleGroupName", ""),
+         "catch_up_at": f"{s.catch_up_at:%Y/%m/%d %H:%M}", "original_kwh": round(s.original_kwh, 2),
+         "gap_from": f"{s.gap_from:%Y/%m/%d %H:%M}", "hours": s.hours, "share_kwh": round(s.share_kwh, 3),
+         "applied_by": s.applied_by, "applied_at": f"{s.applied_at:%Y/%m/%d %H:%M}"}
+        for s in rows
+    ]
+
+
 class CatchUpSpreadApi(APIView):
     """Preview / apply / undo spreading catch-up hours over their gap (Super_Admin only).
 
@@ -39,12 +54,14 @@ class CatchUpSpreadApi(APIView):
             not_spreadable = []
             items = catch_up_spread.plan(site, data.get("day"), data.get("legs"), not_spreadable)
             body = {"status": 200, "applied": False, "catch_ups": [preview for _, preview in items],
-                    "not_spreadable": not_spreadable}
+                    "not_spreadable": not_spreadable,
+                    "applied_spreads": _applied_spreads(site, catch_up_spread.parse_day(data.get("day")))}
             if str(data.get("apply", "")).lower() in ("1", "true", "yes"):
                 if not items:
                     return Response({"status": 400, "error": "no catch-up hour to spread"}, status=400)
                 done = catch_up_spread.apply(site, items, request.user)
                 body["applied"] = True
+                body["applied_spreads"] = _applied_spreads(site, catch_up_spread.parse_day(data.get("day")))
                 body["spreads"] = [{"id": s.id, "leg_id": s.leg_id, "catch_up_at": f"{s.catch_up_at:%Y/%m/%d %H:%M}",
                                     "hours": s.hours, "share_kwh": round(s.share_kwh, 3)} for s in done]
         except catch_up_spread.SpreadError as error:
