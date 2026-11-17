@@ -61,12 +61,12 @@ add("F02", "Catch-up spread screen", "Frontend", "Done",
     "spike alarm closed (proof: .work/spread_114_20261117/).",
     "2026-11-16", "2026-11-17", "Used on test 17 Nov (site 114 hours 9-15 Nov copied from main first); 19 more site-114 catch-ups spreadable",
     T, "Push the frontend commit; spread the other 19 when wanted.", "User", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9 + frontend")
-add("F03", "Baseline setup screen", "Frontend", "Waiting for frontend",
-    "Screen for POST /api/baselineSetup/: pick sample days, preview per-aisle averages, apply (baselines, aisles active, "
-    "site live, backfill of baseline and saving).",
-    "2026-11-05", "2026-11-06", "API deployed 5 Nov; preview tried on site 198", T,
-    "Frontend builds the screen from the spec; confirm whether it is started.", "Frontend team",
-    "docs/consumption/BASELINE_SETUP_FRONTEND.md", "4bd8744e, 7c28b0f9")
+add("F03", "Baseline setup screen", "Frontend", "Done",
+    "Baseline page: Automatic baseline -> sample days -> Calculate (preview, changes nothing) -> edit per aisle -> "
+    "Set baseline (inline confirmation). Errors block it; warnings shown; site total follows edits.",
+    "2026-11-05", "2026-11-17", "API deployed 5 Nov; screen checked 17 Nov on site 114 (preview, cancelled; nothing set)", T,
+    "Push the frontend commit; set a real baseline when a site needs one.", "-",
+    "docs/consumption/BASELINE_SETUP_FRONTEND.md", "4bd8744e + frontend")
 add("F04", "Estimated hours on the hourly chart", "API / frontend", "Planned",
     "Hourly API returns HourlySiteReading.is_estimated so charts can show spread hours differently (e.g. hatched).",
     "2026-11-16", "2026-11-16", "-", T,

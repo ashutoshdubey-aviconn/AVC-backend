@@ -1,5 +1,12 @@
 # Baseline setup: frontend spec
 
+**Built 2026-11-17** in `Aviconncorp-new-migrated-frontend`:
+`src/app/baseline/baseline-setup.component.*` and `baseline-setup.service.ts`
+(calls `environment.alarmApiUrl`, the test server). On the Baseline page
+(Super Admin) the **Automatic baseline** button opens the panel; the old
+per-aisle form is kept as "Set Baseline (one aisle)". Confirmations are inline
+(no browser dialog). Checked in Chrome on site 114 (preview only, cancelled).
+
 For the frontend developer. Backend rules and workflow:
 [BASELINE_SETUP.md](BASELINE_SETUP.md). The API is live on the test server
 (`http://43.204.53.81/api/baselineSetup/`).
