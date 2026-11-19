@@ -54,6 +54,7 @@ SKIP_DIRS = {"migrations", "tests", "backups", "__pycache__", "venv", "virtualwa
              "static", "templates", "docs", "unit_tests", "logges"}
 SKIP_FILE = re.compile(r"(bck|backup|_before_|\.save$|^\d|views\d|tasks\d|copy|_old\b|test_settings)", re.I)
 CODE_DIRS = ("wareApp", "warehouse")
+EXTRA_DIRS = ()  # --dirs: more top-level folders to compare (e.g. mqtt_pipeline)
 
 RISK = {
     "Both changed": "HIGH", "Theirs only": "HIGH", "Only theirs changed": "MEDIUM", "They removed it": "MEDIUM",
@@ -88,7 +89,9 @@ def tree(spec):
 
 
 def live_files(root):
-    for d in CODE_DIRS:
+    for d in CODE_DIRS + EXTRA_DIRS:
+        if not (root / d).is_dir():
+            continue
         for f in sorted((root / d).rglob("*.py")):
             rel = f.relative_to(root)
             if SKIP_DIRS & set(rel.parts[:-1]) or SKIP_FILE.search(f.name):
@@ -206,7 +209,10 @@ def main(argv=None):
     ap.add_argument("--ours", default=str(ROOT))
     ap.add_argument("--out", default=str(ROOT / ".work" / "merge_overlap.csv"))
     ap.add_argument("--show-same", action="store_true", help="also write the 'Same' rows")
+    ap.add_argument("--dirs", nargs="*", default=[], help="more top-level folders to compare besides wareApp, warehouse")
     args = ap.parse_args(argv)
+    global EXTRA_DIRS
+    EXTRA_DIRS = tuple(args.dirs)
 
     ours, theirs = items(tree(args.ours)), items(tree(args.theirs))
     bases = [items(tree(b)) for b in (args.base or DEFAULT_BASES)]

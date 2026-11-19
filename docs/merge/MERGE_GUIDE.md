@@ -11,6 +11,7 @@ Files here:
 |---|---|
 | [`CODE_INVENTORY.xlsx`](CODE_INVENTORY.xlsx) | Everything this branch has: features, alarms, APIs, Celery tasks, commands, DB models, migrations, modules, every function (what it does, new / changed / moved, tests, fingerprint), tests, and why it is better than the legacy code. Built by `build_code_inventory.py`. |
 | [`overlap_main_server_20261119.csv`](overlap_main_server_20261119.csv) | Function-level comparison of ours against main's current code, copied read-only on 19 Nov. It is also the "Merge overlap (main)" sheet. |
+| [`COLLEAGUE_CODE_REVIEW.md`](COLLEAGUE_CODE_REVIEW.md) | Read-only review of the colleague's repo (`Daksh007-batman/New-asem-merger` @ `54313d5`): what to port, problems found, recommendation. Overlap: [`overlap_colleague_20261119.csv`](overlap_colleague_20261119.csv). |
 | [`../../scripts/merge/overlap_check.py`](../../scripts/merge/overlap_check.py) | Makes that comparison against any code base (a folder or a git ref). |
 
 ## Marking our code before the merge
@@ -59,7 +60,7 @@ Overlap counts (main's code vs ours, all our branches as bases):
 | MEDIUM | 1 | They removed it: `CustomerSnapshotApiOld`. |
 | LOW | 277 | Only ours changed, we replaced it, or main has an older copy without it. Keep ours. |
 
-**The colleague's code is not on `origin/main` yet.** When it is pushed (to `main` or another branch), run the check on it (step 2). Its new work will show up as "Theirs only", "Only theirs changed" or "Both changed".
+**The colleague's code** is in its own repo, `github.com/Daksh007-batman/New-asem-merger` (branches `main` and `Ashutosh`, both `54313d5`). It has no git history in common with ours, so it is merged by porting, not with `git merge`. See [COLLEAGUE_CODE_REVIEW.md](COLLEAGUE_CODE_REVIEW.md).
 
 ## Steps
 

@@ -105,10 +105,11 @@ add("F10", "Merge with the colleague's code", "Merge", "Waiting for input",
     "fov2-pre-merge-20261119, code inventory (every feature, alarm, API, model, migration and function with a fingerprint), "
     "function-level overlap check. Main's server = legacy origin/main + our DG fuel / LoadData branches + a few hotfixes "
     "(user type 6, monitoringCustomerSites/ API, Redis CACHES, admin pages, AisleGroup DG fuel fields); migrations "
-    "0073-0076 diverged. The colleague's code is not on origin/main yet.",
+    "0073-0076 diverged. Colleague's repo Daksh007-batman/New-asem-merger @ 54313d5 reviewed read-only 19 Nov: no common "
+    "history, port his features onto ours (docs/merge/COLLEAGUE_CODE_REVIEW.md).",
     "2026-11-19", "2026-11-19", "-", "-",
-    "Colleague pushes his code (to main or a branch); run overlap_check.py on it; merge on an integration branch.",
-    "Colleague: his code (repo / branch); team lead: who merges",
+    "Team lead decides the base (recommended: ours); then port his features one by one with tests.",
+    "Team lead: base and who ports; colleague: credentials in his repo rotated",
     "docs/merge/MERGE_GUIDE.md", "-")
 
 # ---- On hold / not started / out of scope ---------------------------------------------------------

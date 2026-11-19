@@ -127,6 +127,61 @@ WHY_BETTER = [
      "Removed ({deleted_lines} lines); history stays in git.", "Removed files sheet.", "-"),
 ]
 
+# Side by side with the colleague's code (github.com/Daksh007-batman/New-asem-merger, main = Ashutosh = 54313d5,
+# 18 Nov 2026), read only on 19 Nov; his code was not run. (Area, Ours, Colleague, Merge decision)
+COLLEAGUE_COMPARISON = [
+    ["History / base", "Branch of origin/main (legacy, Dec 2025); 178 commits, each change documented in docs/CHANGELOG.md.",
+     "Separate repo, no shared git history: 3 commits (24 Jul 'first commit' + 'optimized backend code' 159k lines; 18 Nov "
+     "'feat: complete alarm analysis flow, monitoring dashboard APIs, and notification policy' 82 files).",
+     "Git cannot merge them: one code base must be the base and the other's features are ported into it."],
+    ["Deployed / verified", "Running on the test server with live gateway data; parts on main since Oct (MQTT queues, LoadData, DG fuel).",
+     "Not deployed anywhere we know of; not run here (read-only check).", "Base = the deployed one (ours)."],
+    ["Code structure", "wareApp/models.py (one module), wareApp/views/ 18 area modules, wareApp/mqtt/ + mqtt/services/, tasks.py.",
+     "wareApp/models/ package (8 modules), wareApp/views/ 7 *_views.py, wareApp/services/, wareApp/tasks/ package, "
+     "constants.py with typed Enums, separate mqtt_pipeline/ project.",
+     "models/ package and models.py cannot both exist (the package wins, models.py is ignored); same for tasks/ vs "
+     "tasks.py. Keep one layout."],
+    ["Migrations", "Legacy 0001-0072 + ours up to 0114 (main's DB has 0001-0076: reconciliation planned).",
+     "0001_initial same as main, then his own 0002-0032 (different files, same tables).",
+     "Two lineages from 0001 = Django 'conflicting migrations'; his 0002-0032 cannot run on main's DB. Port his model "
+     "changes as new migrations after ours."],
+    ["APIs", "110 routes; new: baselineSetup/, catchUpSpread/, gateway-status/, v1/recovery/, temp/dispatch/mail/; "
+     "alarm counts fixed (customer / site pages).",
+     "111 routes; new: dashboard/alarms/summary/, live/, acknowledge/, daily-digest/, tokens/. 10 views are placeholders "
+     "that return a fixed message (all Excel downloads, e.g. downloadExcelLoadData/, dgFuelDataExcelExport/); 60 views are "
+     "less than half the size of ours (simplified); CustomerSnapshotApi returns alarms: 0 (fixed).",
+     "Keep our views; port his 4 dashboard alarm APIs + tokens/; do not take his placeholder / simplified views."],
+    ["Alarms", "One table (AlarmNotifications), 18 types incl. Meter Disconnected 14, Gateway Disconnected 15, Service / "
+     "Modbus Issue 16, Consumption Spike 17; merged sites; auto-close; Auto / Manual / Off per site; 24 h reminders.",
+     "Two tables: NewAlarmsNotifications (0-6: voltage, PF, DG overtime, fuel under level, mains higher consumption, fuel "
+     "drain) + legacy AlarmNotifications (0-9). Acknowledge, daily digest, live feed. No gateway / meter outage or spike alarms.",
+     "Keep our one table; port acknowledge + digest + live feed onto it; port Fuel Drain and Mains Higher Consumption rules "
+     "(ours: type 5 not started)."],
+    ["Notifications", "notifications queue; PendingEmail retries with back-off 24 h; repeat only when > 5 % worse; per-site "
+     "recipients and software / ground team switches.",
+     "Notification policy: e-mail immediately only for HIGH priority (DEFAULT_MIN_EMAIL_PRIORITY), 6 h cooldown per site + "
+     "type, others in a daily digest.", "Port the priority threshold and the digest as settings on top of our rules."],
+    ["MQTT pipeline", "Two listeners (queue 1 business, queue 2 LoadData), processing workers, 60 s consumption batch, "
+     "idempotency, dead letters, recovery status; in production since Oct (part).",
+     "Standalone bridge MQTT -> Redis list -> dispatcher every 2 s -> 6 queues (consumption, load params, LoadData, fire, "
+     "supply time, recovery); handlers rewritten in mqtt_pipeline/handlers.",
+     "Same goal, two designs. Keep ours (tested, deployed); his Redis buffer idea can be evaluated later as a separate change."],
+    ["Caching", "Django cache for cooldowns / site config / alarm policy (default backend).",
+     "Redis (django-redis) used across the pipeline and alarms.", "Port Redis CACHES setting (also on main's server)."],
+    ["Database", "Indexes from measured queries, 4 redundant indexes dropped, no FKs on telemetry tables, bulk writes; "
+     "measured on test.", "Indexes listed in ARCHITECTURE.md; bulk_create used in places.", "Keep ours; compare his indexes."],
+    ["Tests", "514 test functions in 45 modules, query counts pinned.", "44 test functions (test_alarms 34, test_models 5, "
+     "test_services 5); not run here.", "Port his alarm tests with the features."],
+    ["Deployment", "systemd units, logrotate, rollout docs per server.", "Dockerfile, docker-compose, nginx.conf, start scripts.",
+     "Docker files can be added as-is later (no conflict)."],
+    ["Security", "Settings and provider credentials from .env (python-decouple); DEBUG off by default when ENV is PROD; "
+     "ALLOWED_HOSTS / CORS from .env, but their defaults are open too (* / allow all) - same gap as his.",
+     "Live provider credentials written in ARCHITECTURE.md and in settings.py / fetch_fuel*.py / loconav.py / "
+     "reset_password.py (GitHub repo); DEBUG = True for PROD too; ALLOWED_HOSTS * and CORS allow all hard-coded; 72 .pyc "
+     "files committed.",
+     "Do not merge any of these; the exposed credentials should be rotated (F09)."],
+]
+
 # Modules without a docstring: what they are for.
 MODULE_NOTES = {
     "wareApp/admin.py": "Django admin registrations for every model (lists, filters, search).",
@@ -612,15 +667,20 @@ def main():
         test_rows.append([f.name, n_tests, first_sentence(ast.get_docstring(t) or "")])
 
     # ---- merge overlap ----
-    overlap_rows = []
-    overlap_files = sorted(HERE.glob("overlap_main_server_*.csv"))
-    if overlap_files:
-        with overlap_files[-1].open() as fh:
-            for r in csv.DictReader(fh):
-                if r["Status"] in ("Ours only",):
-                    continue  # new on our side: listed in the Functions sheet
-                overlap_rows.append([r["Risk"], r["Status"], r["Kind"], r["Name"], r["Their file"], r["Their line"],
-                                     r["Our file"], r["Our line"], r["Action"]])
+    def read_overlap(pattern):
+        files = sorted(HERE.glob(pattern))
+        rows = []
+        if files:
+            with files[-1].open() as fh:
+                for r in csv.DictReader(fh):
+                    if r["Status"] in ("Ours only",):
+                        continue  # new on our side: listed in the Functions sheet
+                    rows.append([r["Risk"], r["Status"], r["Kind"], r["Name"], r["Their file"], r["Their line"],
+                                 r["Our file"], r["Our line"], r["Action"]])
+        return rows, files
+
+    overlap_rows, overlap_files = read_overlap("overlap_main_server_*.csv")
+    colleague_rows, colleague_files = read_overlap("overlap_colleague_*.csv")
 
     # ---- removed ----
     removed_rows = []
@@ -681,6 +741,9 @@ def main():
         ["Backend tests", f"{total_tests} in {len(test_rows)} modules (legacy: {legacy_tests})"],
         ["Merge overlap with main's code", ", ".join(f"{k} {v}" for k, v in sorted(risk.items())) +
          (f" (from {overlap_files[-1].name})" if overlap_files else " (no overlap CSV yet)")],
+        ["Merge overlap with the colleague's code", ", ".join(
+            f"{k} {v}" for k, v in sorted(Counter(r[0] for r in colleague_rows).items())) +
+         (f" (from {colleague_files[-1].name}; repo Daksh007-batman/New-asem-merger @ 54313d5)" if colleague_files else "")],
         ["How to read", "Functions sheet: Origin New = written in this branch; Changed = exists in legacy, rewritten; "
                         "Moved, unchanged = same code in a new file. 'Description source' says whether the text is the "
                         "code's own docstring / comment or derived from its name, route and the models it uses."],
@@ -714,6 +777,11 @@ def main():
     sheet(book, "Merge overlap (main)", [("Risk", 8), ("Status", 20), ("Kind", 10), ("Name", 50), ("Their file", 32),
                                          ("Their line", 8), ("Our file", 36), ("Our line", 8), ("Action", 60)],
           overlap_rows, fill_col=0, fills=RISK_FILL)
+    sheet(book, "Ours vs colleague", [("Area", 22), ("Ours (full-optimization-v2)", 60), ("Colleague (New-asem-merger)", 60),
+                                      ("Merge decision", 50)], COLLEAGUE_COMPARISON)
+    sheet(book, "Merge overlap (colleague)", [("Risk", 8), ("Status", 20), ("Kind", 10), ("Name", 50), ("Their file", 32),
+                                              ("Their line", 8), ("Our file", 36), ("Our line", 8), ("Action", 60)],
+          colleague_rows, fill_col=0, fills=RISK_FILL)
     sheet(book, "Removed files", [("File", 70), ("Why", 70)], removed_rows)
     out = HERE / "CODE_INVENTORY.xlsx"
     book.save(out)
