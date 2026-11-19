@@ -71,7 +71,7 @@ All documentation is in [`docs/`](docs/):
 | Folder | Contents |
 | --- | --- |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Every implemented / modified / removed behaviour, newest first |
-| [`docs/merge/`](docs/merge/MERGE_GUIDE.md) | Merge with the colleague's code: code inventory (`CODE_INVENTORY.xlsx`), function-level overlap with main's code, merge steps |
+| [`docs/merge/`](docs/merge/MERGE_GUIDE.md) | Merge with the colleague's code: code inventory (`CODE_INVENTORY.xlsx`), function-level overlap with main's code, the colleague's code vs ours and vs main's (API contract check), merge steps |
 | [`docs/features/`](docs/features/README.md) | Feature tracker: every feature done, in progress, waiting, planned or on hold (`FEATURE_TRACKER.xlsx`) |
 | [`docs/consumption/`](docs/consumption/READING_RULES.md) | Consumption reading rules (10,000 kWh glitch limit, spike hours in day totals), the automatic baseline setup API and the catch-up spread |
 | [`docs/mqtt-flows/`](docs/mqtt-flows/README.md) | Every MQTT topic and alarm flow, with draw.io diagrams |

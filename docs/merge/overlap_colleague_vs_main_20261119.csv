@@ -1,0 +1,801 @@
+Risk,Status,Kind,Name,Their file,Their line,Our file,Our line,Action
+HIGH,Both changed,function,CustomerSnapshotApi.post,wareApp/views/metering_views.py,745,wareApp/views.py,2275,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,CustomerSnapshotApi.post,wareApp/views/site_views.py,116,wareApp/views.py,2275,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,LoadGraphApiForDailyData.post,wareApp/views/load_views.py,307,wareApp/views.py,5183,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,LoadGraphApiForMainsDgDailyData.post,wareApp/views/load_views.py,318,wareApp/views.py,5538,Merge by hand: compare both versions with the base.
+HIGH,Both changed,setting,wareApp.urls:urlpatterns,wareApp/urls.py,5,wareApp/urls.py,6,Merge by hand: compare both versions with the base.
+HIGH,Theirs only,class body,AlarmService,wareApp/services/alarm_service.py,32,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,DashboardAcknowledgeAlarmView,wareApp/views/alert_views.py,253,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,DashboardAlarmSummaryView,wareApp/views/alert_views.py,180,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,DashboardLiveAlarmsView,wareApp/views/alert_views.py,209,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,DashboardTriggerDigestView,wareApp/views/alert_views.py,291,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,EmailService,wareApp/services/email_service.py,122,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,FirePumpMode,wareApp/constants.py,96,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,FuelService,wareApp/services/fuel_service.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,LegacyAlarmPriority,wareApp/constants.py,71,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,LegacyAlarmType,wareApp/constants.py,41,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,NewAlarmPriority,wareApp/constants.py,34,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,NewAlarmType,wareApp/constants.py,10,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,NotificationPolicy,wareApp/services/email_service.py,31,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,ParsedTopic,mqtt_pipeline/mqtt_pipeline/handlers/topic_parser.py,16,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,SiteType,wareApp/constants.py,77,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.acknowledge_alarm,wareApp/services/alarm_service.py,573,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.generate_daily_digest_data,wareApp/services/alarm_service.py,609,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.get_active_alarms,wareApp/services/alarm_service.py,393,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.get_alarm_summary_for_customer,wareApp/services/alarm_service.py,430,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.get_alarm_summary_for_site,wareApp/services/alarm_service.py,410,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.get_dashboard_summary,wareApp/services/alarm_service.py,454,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.get_live_alarms_feed,wareApp/services/alarm_service.py,509,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_consumption_alarm,wareApp/services/alarm_service.py,348,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_dg_overtime_alarm,wareApp/services/alarm_service.py,183,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_fuel_drain_alarm,wareApp/services/alarm_service.py,270,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_fuel_under_level_alarm,wareApp/services/alarm_service.py,229,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_mains_higher_consumption_alarm,wareApp/services/alarm_service.py,294,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_pf_alarm,wareApp/services/alarm_service.py,127,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.raise_voltage_alarm,wareApp/services/alarm_service.py,41,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_alarm,wareApp/services/alarm_service.py,373,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_alarm_notification,wareApp/services/alarm_service.py,381,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_dg_overtime_alarms,wareApp/services/alarm_service.py,215,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_fuel_under_level_alarms,wareApp/services/alarm_service.py,261,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_mains_higher_consumption_alarms,wareApp/services/alarm_service.py,332,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_pf_alarms,wareApp/services/alarm_service.py,166,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,AlarmService.resolve_voltage_alarms,wareApp/services/alarm_service.py,101,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardAcknowledgeAlarmView.post,wareApp/views/alert_views.py,260,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardAlarmSummaryView._handle,wareApp/views/alert_views.py,193,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardAlarmSummaryView.get,wareApp/views/alert_views.py,187,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardAlarmSummaryView.post,wareApp/views/alert_views.py,190,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardLiveAlarmsView._handle,wareApp/views/alert_views.py,222,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardLiveAlarmsView.get,wareApp/views/alert_views.py,216,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardLiveAlarmsView.post,wareApp/views/alert_views.py,219,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DashboardTriggerDigestView.post,wareApp/views/alert_views.py,297,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,EmailService.generate_daily_digest_html,wareApp/services/email_service.py,151,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,EmailService.send_daily_digest,wareApp/services/email_service.py,255,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,EmailService.send_html_email,wareApp/services/email_service.py,126,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,FuelService.check_fuel_thresholds,wareApp/services/fuel_service.py,45,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,FuelService.record_fuel_drain,wareApp/services/fuel_service.py,86,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,FuelService.record_fuel_reading,wareApp/services/fuel_service.py,26,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,LegacyAlarmType.get_display_name,wareApp/constants.py,55,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,NewAlarmType.get_display_name,wareApp/constants.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,NotificationPolicy.clear_cooldowns,wareApp/services/email_service.py,102,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,NotificationPolicy.record_alarm_email_sent,wareApp/services/email_service.py,91,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,NotificationPolicy.should_send_alarm_email,wareApp/services/email_service.py,47,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,NotificationPolicy.should_send_mode_switch_email,wareApp/services/email_service.py,107,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_check_pf_alarm,mqtt_pipeline/mqtt_pipeline/handlers/load_params_handler.py,156,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_check_voltage_alarms,mqtt_pipeline/mqtt_pipeline/handlers/load_params_handler.py,56,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_evaluate_saving_site_consumption,wareApp/alarms.py,91,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_evaluate_standard_site_consumption,wareApp/alarms.py,211,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_fetch_loconav,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,254,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_fetch_roadcaste,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,236,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_handle_daily_recovery,mqtt_pipeline/mqtt_pipeline/handlers/recovery_handler.py,52,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_handle_dg_unit_consumption,mqtt_pipeline/mqtt_pipeline/handlers/consumption_handler.py,89,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_handle_hourly_recovery,mqtt_pipeline/mqtt_pipeline/handlers/recovery_handler.py,155,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_handle_load_runtime_recovery,mqtt_pipeline/mqtt_pipeline/handlers/recovery_handler.py,262,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_is_duplicate_packet,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,217,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_pickle_get,mqtt_pipeline/mqtt_pipeline/cache_layer.py,66,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_pickle_set,mqtt_pipeline/mqtt_pipeline/cache_layer.py,76,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_process_daily_load_rollover,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,333,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_push_to_redis,mqtt_pipeline/mqtt_pipeline/bridge.py,74,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_route,mqtt_pipeline/mqtt_pipeline/dispatcher.py,41,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_signal_handler,mqtt_pipeline/mqtt_pipeline/bridge.py,159,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_update_last_dg_fuel,mqtt_pipeline/mqtt_pipeline/handlers/consumption_handler.py,141,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_update_site_power_and_monthly_minmax,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,243,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,aggregate_daily_load_all_sites,mqtt_pipeline/mqtt_pipeline/tasks/daily_load_task.py,27,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,buffer_daily_update,mqtt_pipeline/mqtt_pipeline/buffer.py,188,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,buffer_hourly_update,mqtt_pipeline/mqtt_pipeline/buffer.py,175,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,buffer_len,mqtt_pipeline/mqtt_pipeline/buffer.py,93,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,check_consumption_alarms,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py; wareApp/alarms.py,29,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,check_dg_overtime_alarm,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,122,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,check_intraday_baseline_breach,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,24,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,check_mains_high_load_alarm,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,178,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,check_site_voltage_alarms_task,wareApp/tasks/alarm_tasks.py,29,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,clear_hourly_bucket,mqtt_pipeline/mqtt_pipeline/cache_layer.py,187,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,daily_entry_exists,mqtt_pipeline/mqtt_pipeline/cache_layer.py,198,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,dispatch_mqtt_batch,mqtt_pipeline/mqtt_pipeline/dispatcher.py,104,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,fetch_fuel,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,217,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_buffer,mqtt_pipeline/mqtt_pipeline/buffer.py,105,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_daily_load,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,121,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_daily_reading,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,173,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_daily_updates,mqtt_pipeline/mqtt_pipeline/buffer.py; mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,265,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_hourly_load,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,73,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_hourly_reading,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,145,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_hourly_updates,mqtt_pipeline/mqtt_pipeline/buffer.py; mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,204,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_load_params,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,287,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_mains_dg_load,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,97,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_pf_data,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,260,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_raw_load,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,48,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,flush_sensor_aisle,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,233,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_aisle,mqtt_pipeline/mqtt_pipeline/cache_layer.py,135,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_aisle_map,mqtt_pipeline/mqtt_pipeline/cache_layer.py,117,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_all_aisles,mqtt_pipeline/mqtt_pipeline/cache_layer.py,140,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_baseline,mqtt_pipeline/mqtt_pipeline/cache_layer.py,153,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_cached_daily_value,mqtt_pipeline/mqtt_pipeline/cache_layer.py,203,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_hourly_cumulative,mqtt_pipeline/mqtt_pipeline/cache_layer.py,221,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_monthly_minmax,mqtt_pipeline/mqtt_pipeline/cache_layer.py,239,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_site,mqtt_pipeline/mqtt_pipeline/cache_layer.py,87,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_consumption,mqtt_pipeline/mqtt_pipeline/handlers/consumption_handler.py,164,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_fire_alarm,mqtt_pipeline/mqtt_pipeline/handlers/fire_alarm_handler.py,25,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_load_data,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,420,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_load_params,mqtt_pipeline/mqtt_pipeline/handlers/load_params_handler.py,208,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_recovery,mqtt_pipeline/mqtt_pipeline/handlers/recovery_handler.py,23,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,handle_supply_time,mqtt_pipeline/mqtt_pipeline/handlers/supply_time_handler.py,42,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,hourly_bucket_exists,mqtt_pipeline/mqtt_pipeline/cache_layer.py,177,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,invalidate_aisle_map,mqtt_pipeline/mqtt_pipeline/cache_layer.py,145,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,invalidate_site,mqtt_pipeline/mqtt_pipeline/cache_layer.py,108,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,load_power_exists,mqtt_pipeline/mqtt_pipeline/cache_layer.py,267,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,mark_hourly_bucket,mqtt_pipeline/mqtt_pipeline/cache_layer.py,182,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,mark_load_power_exists,mqtt_pipeline/mqtt_pipeline/cache_layer.py,272,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,on_connect,mqtt_pipeline/mqtt_pipeline/bridge.py,115,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,on_disconnect,mqtt_pipeline/mqtt_pipeline/bridge.py,124,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,on_message,mqtt_pipeline/mqtt_pipeline/bridge.py,129,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,parse_consumption_payload,mqtt_pipeline/mqtt_pipeline/handlers/consumption_handler.py,36,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,parse_load_data_payload,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,53,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,parse_load_payload,mqtt_pipeline/mqtt_pipeline/handlers/load_params_handler.py,25,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,parse_supply_time_payload,mqtt_pipeline/mqtt_pipeline/handlers/supply_time_handler.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,parse_topic,mqtt_pipeline/mqtt_pipeline/handlers/topic_parser.py,26,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,pop_batch,mqtt_pipeline/mqtt_pipeline/buffer.py,69,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_consumption,mqtt_pipeline/mqtt_pipeline/tasks/consumption_task.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_fire_alarm,mqtt_pipeline/mqtt_pipeline/tasks/fire_alarm_task.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_load_data,mqtt_pipeline/mqtt_pipeline/tasks/load_data_task.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_load_params,mqtt_pipeline/mqtt_pipeline/tasks/load_params_task.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_recovery,mqtt_pipeline/mqtt_pipeline/tasks/recovery_task.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,process_supply_time,mqtt_pipeline/mqtt_pipeline/tasks/supply_time_task.py,21,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,publish_mqtt_message,mqtt_pipeline/mqtt_pipeline/publisher.py,25,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,push_row,mqtt_pipeline/mqtt_pipeline/buffer.py,53,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,resolve_aisle_group,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,150,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,run_bridge,mqtt_pipeline/mqtt_pipeline/bridge.py,172,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,send_alarm_email_notification_task,wareApp/tasks/alarm_tasks.py,84,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,send_daily_alarm_digest_task,wareApp/tasks/alarm_tasks.py,96,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,send_mail_for_consumption_alarm,wareApp/sendmail.py,630,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,set_cached_daily_value,mqtt_pipeline/mqtt_pipeline/cache_layer.py,209,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,set_hourly_cumulative,mqtt_pipeline/mqtt_pipeline/cache_layer.py,227,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,set_monthly_minmax,mqtt_pipeline/mqtt_pipeline/cache_layer.py,252,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.bridge:BASE_DIR,mqtt_pipeline/mqtt_pipeline/bridge.py,32,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.bridge:_running,mqtt_pipeline/mqtt_pipeline/bridge.py,156,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.bridge:_stats,mqtt_pipeline/mqtt_pipeline/bridge.py,71,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.bridge:logger,mqtt_pipeline/mqtt_pipeline/bridge.py,53,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.bridge:redis_client,mqtt_pipeline/mqtt_pipeline/bridge.py,58,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.buffer:_UPD_DAILY_KEY,mqtt_pipeline/mqtt_pipeline/buffer.py,172,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.buffer:_UPD_HOURLY_KEY,mqtt_pipeline/mqtt_pipeline/buffer.py,171,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.buffer:_redis,mqtt_pipeline/mqtt_pipeline/buffer.py,46,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.buffer:logger,mqtt_pipeline/mqtt_pipeline/buffer.py,44,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.cache_layer:_redis,mqtt_pipeline/mqtt_pipeline/cache_layer.py,56,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.cache_layer:_redis_raw,mqtt_pipeline/mqtt_pipeline/cache_layer.py,59,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.cache_layer:logger,mqtt_pipeline/mqtt_pipeline/cache_layer.py,53,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.celery_beat_schedule:MQTT_PIPELINE_BEAT_SCHEDULE,mqtt_pipeline/mqtt_pipeline/celery_beat_schedule.py,15,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:AVICONN_ALERT_EMAIL,mqtt_pipeline/mqtt_pipeline/config.py,45,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUFFER_FLUSH_SIZE,mqtt_pipeline/mqtt_pipeline/config.py,60,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUFFER_MAX_SIZE,mqtt_pipeline/mqtt_pipeline/config.py,61,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_DAILY_LOAD,mqtt_pipeline/mqtt_pipeline/config.py,66,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_DAILY_READ,mqtt_pipeline/mqtt_pipeline/config.py,68,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_HOURLY_LOAD,mqtt_pipeline/mqtt_pipeline/config.py,64,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_HOURLY_READ,mqtt_pipeline/mqtt_pipeline/config.py,67,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_LOAD_PARAMS,mqtt_pipeline/mqtt_pipeline/config.py,71,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_MAINS_DG_LOAD,mqtt_pipeline/mqtt_pipeline/config.py,65,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_PF_DATA,mqtt_pipeline/mqtt_pipeline/config.py,70,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_RAW_LOAD,mqtt_pipeline/mqtt_pipeline/config.py,63,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:BUF_SENSOR_AISLE,mqtt_pipeline/mqtt_pipeline/config.py,69,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_AISLE,mqtt_pipeline/mqtt_pipeline/config.py,81,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_BASELINE,mqtt_pipeline/mqtt_pipeline/config.py,82,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_DAILY_EXISTS,mqtt_pipeline/mqtt_pipeline/config.py,84,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_DAILY_VAL,mqtt_pipeline/mqtt_pipeline/config.py,88,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_HOURLY_EXISTS,mqtt_pipeline/mqtt_pipeline/config.py,83,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_HOURLY_VAL,mqtt_pipeline/mqtt_pipeline/config.py,87,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_LOAD_POWER,mqtt_pipeline/mqtt_pipeline/config.py,86,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_MONTHLY_MM,mqtt_pipeline/mqtt_pipeline/config.py,85,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:CACHE_TTL_SITE,mqtt_pipeline/mqtt_pipeline/config.py,80,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:DISPATCHER_BATCH_SIZE,mqtt_pipeline/mqtt_pipeline/config.py,50,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:MQTT_BROKER_HOST,mqtt_pipeline/mqtt_pipeline/config.py,13,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:MQTT_BROKER_PORT,mqtt_pipeline/mqtt_pipeline/config.py,14,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:MQTT_CLIENT_ID_BRIDGE,mqtt_pipeline/mqtt_pipeline/config.py,17,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:MQTT_KEEPALIVE,mqtt_pipeline/mqtt_pipeline/config.py,15,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:MQTT_TOPIC,mqtt_pipeline/mqtt_pipeline/config.py,16,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_CONSUMPTION,mqtt_pipeline/mqtt_pipeline/config.py,29,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_FIRE_ALARM,mqtt_pipeline/mqtt_pipeline/config.py,32,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_FLUSH,mqtt_pipeline/mqtt_pipeline/config.py,35,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_LOAD_DATA,mqtt_pipeline/mqtt_pipeline/config.py,31,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_LOAD_PARAMS,mqtt_pipeline/mqtt_pipeline/config.py,30,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_RECOVERY,mqtt_pipeline/mqtt_pipeline/config.py,34,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:QUEUE_SUPPLY_TIME,mqtt_pipeline/mqtt_pipeline/config.py,33,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:REDIS_MAX_QUEUE,mqtt_pipeline/mqtt_pipeline/config.py,24,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:REDIS_QUEUE_KEY,mqtt_pipeline/mqtt_pipeline/config.py,23,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:REDIS_URL,mqtt_pipeline/mqtt_pipeline/config.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.config:ROADCASTE_SITE_IDS,mqtt_pipeline/mqtt_pipeline/config.py,40,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.dispatcher:_redis,mqtt_pipeline/mqtt_pipeline/dispatcher.py,38,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.dispatcher:logger,mqtt_pipeline/mqtt_pipeline/dispatcher.py,36,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.alarm_utils:logger,mqtt_pipeline/mqtt_pipeline/handlers/alarm_utils.py,17,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.consumption_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/consumption_handler.py,29,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.fire_alarm_handler:MAIL_COOLDOWN_SECONDS,mqtt_pipeline/mqtt_pipeline/handlers/fire_alarm_handler.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.fire_alarm_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/fire_alarm_handler.py,20,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.load_data_handler:_SEEN_EPOCHS_DEQUE,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,49,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.load_data_handler:_SEEN_EPOCHS_SET,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,50,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.load_data_handler:_redis_client,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,46,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.load_data_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/load_data_handler.py,43,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.load_params_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/load_params_handler.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.recovery_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/recovery_handler.py,20,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.handlers.supply_time_handler:logger,mqtt_pipeline/mqtt_pipeline/handlers/supply_time_handler.py,19,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.publisher:logger,mqtt_pipeline/mqtt_pipeline/publisher.py,22,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.__init__:__all__,mqtt_pipeline/mqtt_pipeline/tasks/__init__.py,17,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.consumption_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/consumption_task.py,9,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.daily_load_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/daily_load_task.py,18,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.fire_alarm_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/fire_alarm_task.py,9,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.flush_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/flush_task.py,35,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.load_data_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/load_data_task.py,10,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.load_params_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/load_params_task.py,9,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.recovery_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/recovery_task.py,9,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,mqtt_pipeline.mqtt_pipeline.tasks.supply_time_task:logger,mqtt_pipeline/mqtt_pipeline/tasks/supply_time_task.py,9,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.alarms:logger,wareApp/alarms.py,26,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:ALARM_DEDUPLICATION_WINDOW_DG_OVERTIME_HOURS,wareApp/constants.py,109,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:ALARM_DEDUPLICATION_WINDOW_FUEL_UNDER_LEVEL_HOURS,wareApp/constants.py,110,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:ALARM_DEDUPLICATION_WINDOW_MAINS_LOAD_MINUTES,wareApp/constants.py,111,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:ALARM_DEDUPLICATION_WINDOW_PF_MINUTES,wareApp/constants.py,108,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:ALARM_DEDUPLICATION_WINDOW_VOLTAGE_MINUTES,wareApp/constants.py,107,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_B_PHASE_VOLTAGE_MAX,wareApp/constants.py,131,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_B_PHASE_VOLTAGE_MIN,wareApp/constants.py,134,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_EMAIL_NOTIFICATION_COOLDOWN_SECONDS,wareApp/constants.py,121,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_ENABLE_ALARM_EMAILS,wareApp/constants.py,124,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_ENABLE_DAILY_DIGEST,wareApp/constants.py,126,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_ENABLE_ROUTINE_MODE_SWITCH_EMAILS,wareApp/constants.py,125,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_MIN_EMAIL_PRIORITY,wareApp/constants.py,118,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_PF_THRESHOLD,wareApp/constants.py,135,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_R_PHASE_VOLTAGE_MAX,wareApp/constants.py,129,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_R_PHASE_VOLTAGE_MIN,wareApp/constants.py,132,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_Y_PHASE_VOLTAGE_MAX,wareApp/constants.py,130,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:DEFAULT_Y_PHASE_VOLTAGE_MIN,wareApp/constants.py,133,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.constants:FIRE_ALARM_MAIL_COOLDOWN_SECONDS,wareApp/constants.py,112,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.sendmail:DEFAULT_ALARM_CC,wareApp/sendmail.py,28,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.sendmail:DEFAULT_ALARM_TO,wareApp/sendmail.py,27,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.sendmail:logger,wareApp/sendmail.py,15,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.services.alarm_service:logger,wareApp/services/alarm_service.py,29,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.services.email_service:logger,wareApp/services/email_service.py,28,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.services.fuel_service:logger,wareApp/services/fuel_service.py,19,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.tasks.alarm_tasks:logger,wareApp/tasks/alarm_tasks.py,24,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.views.auth_views:logger,wareApp/views/auth_views.py,14,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.celery:pipeline_path,warehouse/celery.py,11,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CELERY_ACCEPT_CONTENT,warehouse/settings.py,171,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CELERY_BROKER_URL,warehouse/settings.py,169,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CELERY_RESULT_BACKEND,warehouse/settings.py,170,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CELERY_RESULT_SERIALIZER,warehouse/settings.py,173,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CELERY_TASK_SERIALIZER,warehouse/settings.py,172,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CORS_ALLOW_ALL_ORIGINS,warehouse/settings.py,41,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:use_sqlite,warehouse/settings.py,95,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,dashboard/alarms/acknowledge/,wareApp/urls.py,125,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,dashboard/alarms/daily-digest/,wareApp/urls.py,126,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,dashboard/alarms/live/,wareApp/urls.py,124,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,dashboard/alarms/summary/,wareApp/urls.py,123,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,tokens/,wareApp/urls.py,11,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,tokens/<int:pk>/,wareApp/urls.py,12,,,New on their side: port it into our code base.
+MEDIUM,Different base versions,class body,AlarmNotifications,wareApp/models/alerts.py,8,wareApp/models.py,462,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,AlarmsList,wareApp/views/alert_views.py,131,wareApp/views.py,6935,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,AlarmsListDetail,wareApp/views/alert_views.py,152,wareApp/views.py,6978,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,BaselineData,wareApp/views/metering_views.py,653,wareApp/views.py,4023,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,BaselineHistory,wareApp/views/metering_views.py,698,wareApp/views.py,3989,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ChangePassword,wareApp/views/auth_views.py,134,wareApp/views.py,1587,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ConsumptionAlarmsAPI,wareApp/views/alert_views.py,159,wareApp/views.py,10898,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CreateAisleGroupUsingProvisioning,wareApp/views/site_views.py,300,wareApp/views.py,4387,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CreateCustomerUsingProvisioning,wareApp/views/site_views.py,251,wareApp/views.py,4307,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CreateHomeGatewayIdUsingProvisioning,wareApp/views/site_views.py,323,wareApp/views.py,4427,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CreateSiteUsingProvisioning,wareApp/views/site_views.py,270,wareApp/views.py,4341,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CustomerSiteManager,wareApp/models/user.py,55,wareApp/models.py,138,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CustomerSnapshotApi,wareApp/views/metering_views.py,742,wareApp/views.py,2273,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,CustomerView,wareApp/views/site_views.py,17,wareApp/views.py,1607,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DGAlertsData,wareApp/models/dg_fuel.py,10,wareApp/models.py,783,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DGFuelAlertsData,wareApp/models/dg_fuel.py,51,wareApp/models.py,839,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DGFuelDataExcelExport,wareApp/views/dg_fuel_views.py,292,wareApp/views.py,8511,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DailyLoadData,wareApp/models/load.py,92,wareApp/models.py,735,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DemoApi,wareApp/views/alert_views.py,169,wareApp/views.py,3064,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DgAlertsPushInterface,wareApp/views/dg_fuel_views.py,493,wareApp/views.py,8340,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DgFuelConsumptionData,wareApp/models/dg_fuel.py,18,wareApp/models.py,792,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DgFuelConsumptionData.Meta,wareApp/models/dg_fuel.py,25,wareApp/models.py,802,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DgFuelConsumptionDataApi_new,wareApp/views/dg_fuel_views.py,41,wareApp/views.py,818,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DgFuelConsumptionDataCustomRangeApiUsingPushAPIs,wareApp/views/dg_fuel_views.py,269,wareApp/views.py,8204,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DownloadExcelVB,wareApp/views/metering_views.py,464,wareApp/views.py,10274,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DownloadExcel_new,wareApp/views/load_views.py,400,wareApp/views.py,8363,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DownloadFluctuatedPowerFactor,wareApp/views/load_views.py,384,wareApp/views.py,5459,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,DownloadMinMaxMonthlyLoadData,wareApp/views/load_views.py,377,wareApp/views.py,5405,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,EmailHistory,wareApp/views/fire_views.py,35,wareApp/views.py,4596,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,EnergySavingMonthlyBarChartTestVB,wareApp/views/metering_views.py,299,wareApp/views.py,9395,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,EnergySavingMonthlyTrendExcelDownload,wareApp/views/metering_views.py,630,wareApp/views.py,3253,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,EnergySavingsHourlyExcelDownloadVB,wareApp/views/metering_views.py,457,wareApp/views.py,9487,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ExpiredDevicesListApi,wareApp/views/fire_views.py,170,wareApp/views.py,4776,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FansDataApi,wareApp/views/fire_views.py,148,wareApp/views.py,4836,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchAisleGroupsForParticularSiteUsingProvisioning,wareApp/views/site_views.py,313,wareApp/views.py,4462,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchAllCustomers,wareApp/views/site_views.py,242,wareApp/views.py,4289,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchAllSitesForProvisoning,wareApp/views/site_views.py,291,wareApp/views.py,4367,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchDGAlertData,wareApp/views/dg_fuel_views.py,23,wareApp/views.py,5578,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchFluctuatedPowerFactor,wareApp/views/load_views.py,340,wareApp/views.py,5312,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchHGID,wareApp/views/site_views.py,357,wareApp/views.py,4476,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchLastRsshPort,wareApp/views/site_views.py,348,wareApp/views.py,4528,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchMinMaxMonthlyLoadData,wareApp/views/load_views.py,359,wareApp/views.py,5351,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FetchParticularCustomerUsingProvisioningScript,wareApp/views/site_views.py,336,wareApp/views.py,4510,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FireAlarm,wareApp/views/fire_views.py,14,wareApp/views.py,4537,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FireEquiSystemTypeAdd,wareApp/views/fire_views.py,57,wareApp/views.py,4718,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FireEquiSystemTypefetch,wareApp/views/fire_views.py,48,wareApp/views.py,4700,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FireEquipmentSystemAdd,wareApp/views/fire_views.py,70,wareApp/views.py,4626,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FireEquipmentSystemFetch,wareApp/views/fire_views.py,88,wareApp/views.py,4672,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ForgetPassword,wareApp/views/auth_views.py,99,wareApp/views.py,1521,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,GroupViewSet,wareApp/views/auth_views.py,22,wareApp/views.py,110,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,HourlyLoadData,wareApp/models/load.py,73,wareApp/models.py,710,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,HourlySiteReadingForOneSite,wareApp/views/metering_views.py,173,wareApp/views.py,1826,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LiveDataApi,wareApp/views/load_views.py,234,wareApp/views.py,8967,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadDataApi,wareApp/views/load_views.py,220,wareApp/views.py,8780,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadDataApiMultipleSourceV2,wareApp/views/load_views.py,227,wareApp/views.py,8876,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadDataExcelDownload,wareApp/views/load_views.py,326,wareApp/views.py,5223,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadDataExcelDownloadMonthlyRange,wareApp/views/load_views.py,333,wareApp/views.py,9116,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadGrapghAPI,wareApp/views/load_views.py,209,wareApp/views.py,5067,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadGraphApiForDailyData,wareApp/views/load_views.py,304,wareApp/views.py,5180,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadGraphApiForEverySecond,wareApp/views/load_views.py,241,wareApp/views.py,5123,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadGraphApiForMainsDgDailyData,wareApp/views/load_views.py,315,wareApp/views.py,5517,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MainsDgLoadData,wareApp/models/load.py,104,wareApp/models.py,747,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MeterDisconnectionIngestView,wareApp/views/metering_views.py,1082,wareApp/views.py,10946,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MeterDisconnectionListView,wareApp/views/metering_views.py,1103,wareApp/views.py,11016,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MeterReadings,wareApp/models/metering.py,142,wareApp/models.py,593,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MonthlyLoadSharePercentage,wareApp/models/load.py,49,wareApp/models.py,580,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,NewEnergySavingMonthlyTrendApi,wareApp/views/metering_views.py,623,wareApp/views.py,3475,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,OTP,wareApp/models/system.py,24,wareApp/models.py,509,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ParticularCustomerInfo,wareApp/views/site_views.py,198,wareApp/views.py,2416,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ParticularSiteSnapshotEnergySavingApiVB,wareApp/views/metering_views.py,770,wareApp/views.py,10374,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerDistributionHourlyBarChart,wareApp/views/load_views.py,188,wareApp/views.py,2123,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerDistributionHourlyBarChartTime,wareApp/views/load_views.py,202,wareApp/views.py,1980,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerSource,wareApp/views/load_views.py,62,wareApp/views.py,8750,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerSourceDistributionMonthlyBarChart,wareApp/views/load_views.py,181,wareApp/views.py,2038,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerSourceDistributionMonthlyBarChartTime,wareApp/views/load_views.py,195,wareApp/views.py,1871,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,PowerSupplyInfo,wareApp/views/load_views.py,52,wareApp/views.py,1451,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ResetPasswordApi,wareApp/views/auth_views.py,113,wareApp/views.py,1560,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SavingBaselineData,wareApp/views/metering_views.py,637,wareApp/views.py,4059,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,Site,wareApp/models/site.py,6,wareApp/models.py,65,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteAisleGroupsWithLastEntries,wareApp/views/site_views.py,602,wareApp/views.py,10737,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteApiBasedOnSiteType,wareApp/views/site_views.py,226,wareApp/views.py,4259,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteCeleryPing,wareApp/models/system.py,52,wareApp/models.py,921,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteConsumptionPing,wareApp/models/system.py,36,wareApp/models.py,911,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteConsumptionPingApi,wareApp/views/site_views.py,582,wareApp/views.py,10515,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteCurrentLoadInfo,wareApp/views/load_views.py,16,wareApp/views.py,1318,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteInfo,wareApp/views/site_views.py,34,wareApp/views.py,1814,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SitePhaseCurrentsInfo,wareApp/views/load_views.py,45,wareApp/views.py,1417,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SitePhaseVoltagesInfo,wareApp/views/load_views.py,38,wareApp/views.py,1381,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteTotalGraphDataDaily,wareApp/views/metering_views.py,13,wareApp/views.py,544,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteTotalGraphDataHourly,wareApp/views/metering_views.py,83,wareApp/views.py,709,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteTotalGraphDataHourlyWHTM,wareApp/views/metering_views.py,105,wareApp/views.py,775,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SnapshotApi,wareApp/views/site_views.py,494,wareApp/views.py,4733,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SubMeteringMonthlyTrendApi,wareApp/views/metering_views.py,787,wareApp/views.py,6049,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SuperAdminSnapShot,wareApp/views/site_views.py,477,wareApp/views.py,312,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SuperUserAllAlarmsPriorityBasedOnCustomersList,wareApp/views/alert_views.py,83,wareApp/views.py,408,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SuperUserAllAlarmsTypeBasedOnCustomersList,wareApp/views/alert_views.py,104,wareApp/views.py,438,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SupplyLoadTimeShare,wareApp/models/load.py,6,wareApp/models.py,169,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,TotalAlarmsOnCustomerPageTabularForm,wareApp/views/alert_views.py,10,wareApp/views.py,2428,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,TotalAlarmsOnSitePageTabularForm,wareApp/views/alert_views.py,36,wareApp/views.py,4216,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,TotalAlarmsTypeCountOnCustomerPage,wareApp/views/alert_views.py,59,wareApp/views.py,2470,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,UserViewSet,wareApp/views/auth_views.py,17,wareApp/views.py,100,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,ValidatedToken,wareApp/views/auth_views.py,83,wareApp/views.py,1495,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,avgDataApi,wareApp/views/load_views.py,391,wareApp/views.py,4919,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,fireEquiSystemDelete,wareApp/views/fire_views.py,111,wareApp/views.py,4800,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,AlarmsList.post,wareApp/views/alert_views.py,134,wareApp/views.py,6936,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,AlarmsListDetail.post,wareApp/views/alert_views.py,155,wareApp/views.py,6979,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,ChangePassword.post,wareApp/views/auth_views.py,137,wareApp/views.py,1591,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,ConsumptionAlarmsAPI.post,wareApp/views/alert_views.py,162,wareApp/views.py,10899,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CreateAisleGroupUsingProvisioning.post,wareApp/views/site_views.py,303,wareApp/views.py,4391,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CreateCustomerUsingProvisioning.post,wareApp/views/site_views.py,254,wareApp/views.py,4311,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CreateHomeGatewayIdUsingProvisioning.post,wareApp/views/site_views.py,326,wareApp/views.py,4431,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CreateSiteUsingProvisioning.post,wareApp/views/site_views.py,273,wareApp/views.py,4345,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CustomerInfo.__str__,wareApp/models/user.py,51,wareApp/models.py,61,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,CustomerView.get,wareApp/views/site_views.py,20,wareApp/views.py,1611,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DGFuelAlertsData.__str__,wareApp/models/dg_fuel.py,59,wareApp/models.py,848,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DGFuelDataExcelExport.post,wareApp/views/dg_fuel_views.py,295,wareApp/views.py,8514,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DemoApi.get,wareApp/views/alert_views.py,172,wareApp/views.py,3066,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DgAlertsPushInterface.post,wareApp/views/dg_fuel_views.py,496,wareApp/views.py,8343,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DgFuelConsumptionData.__str__,wareApp/models/dg_fuel.py,30,wareApp/models.py,816,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DgFuelConsumptionDataApi_new.post,wareApp/views/dg_fuel_views.py,44,wareApp/views.py,1126,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.post,wareApp/views/dg_fuel_views.py,272,wareApp/views.py,8214,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DownloadExcelVB.post,wareApp/views/metering_views.py,467,wareApp/views.py,10277,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DownloadExcel_new.post,wareApp/views/load_views.py,403,wareApp/views.py,8366,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DownloadFluctuatedPowerFactor.post,wareApp/views/load_views.py,387,wareApp/views.py,5460,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,DownloadMinMaxMonthlyLoadData.post,wareApp/views/load_views.py,380,wareApp/views.py,5406,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Email.__str__,wareApp/models/alerts.py,102,wareApp/models.py,645,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,EmailHistory.post,wareApp/views/fire_views.py,38,wareApp/views.py,4599,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Email_History.__str__,wareApp/models/alerts.py,91,wareApp/models.py,634,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,EnergySavingMonthlyBarChartTestVB.post,wareApp/views/metering_views.py,302,wareApp/views.py,9398,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,EnergySavingMonthlyTrendExcelDownload.post,wareApp/views/metering_views.py,633,wareApp/views.py,3254,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,EnergySavingsHourlyBarChartVB.post,wareApp/views/metering_views.py,453,wareApp/views.py,10156,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,EnergySavingsHourlyExcelDownloadVB.post,wareApp/views/metering_views.py,460,wareApp/views.py,9857,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FansData.__str__,wareApp/models/fire.py,70,wareApp/models.py,695,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchAisleGroupsForParticularSiteUsingProvisioning.post,wareApp/views/site_views.py,316,wareApp/views.py,4466,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchAllCustomers.get,wareApp/views/site_views.py,245,wareApp/views.py,4293,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchAllSitesForProvisoning.get,wareApp/views/site_views.py,294,wareApp/views.py,4371,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchDGAlertData.post,wareApp/views/dg_fuel_views.py,26,wareApp/views.py,5582,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchFluctuatedPowerFactor.post,wareApp/views/load_views.py,343,wareApp/views.py,5313,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchHGID.get,wareApp/views/site_views.py,360,wareApp/views.py,4479,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchLastRsshPort.get,wareApp/views/site_views.py,351,wareApp/views.py,4532,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchMinMaxMonthlyLoadData.post,wareApp/views/load_views.py,362,wareApp/views.py,5352,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FetchParticularCustomerUsingProvisioningScript.post,wareApp/views/site_views.py,339,wareApp/views.py,4514,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FireAlarm.post,wareApp/views/fire_views.py,17,wareApp/views.py,4539,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FireEquiSystemTypeAdd.post,wareApp/views/fire_views.py,60,wareApp/views.py,4720,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FireEquipmentSystemAdd.post,wareApp/views/fire_views.py,73,wareApp/views.py,4628,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FireEquipmentsSystem.__str__,wareApp/models/fire.py,43,wareApp/models.py,668,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FireEquipmentsSystemType.__str__,wareApp/models/fire.py,29,wareApp/models.py,654,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,FirePumpAlarm.__str__,wareApp/models/fire.py,20,wareApp/models.py,623,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Floor.__str__,wareApp/models/site.py,126,wareApp/models.py,224,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Floor.__unicode__,wareApp/models/site.py,129,wareApp/models.py,227,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,ForgetPassword.post,wareApp/views/auth_views.py,102,wareApp/views.py,1526,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,HourlySiteReadingForOneSite.post,wareApp/views/metering_views.py,176,wareApp/views.py,1829,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Image.__str__,wareApp/models/site.py,90,wareApp/models.py,188,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Image.__unicode__,wareApp/models/site.py,93,wareApp/models.py,191,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LightsData.__str__,wareApp/models/fire.py,58,wareApp/models.py,683,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LiveDataApi.post,wareApp/views/load_views.py,237,wareApp/views.py,8970,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LoadDataApi.post,wareApp/views/load_views.py,223,wareApp/views.py,8783,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LoadDataApiMultipleSourceV2.post,wareApp/views/load_views.py,230,wareApp/views.py,8879,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LoadDataExcelDownloadMonthlyRange.post,wareApp/views/load_views.py,336,wareApp/views.py,9119,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,LoadGraphApiForEverySecond.post,wareApp/views/load_views.py,244,wareApp/views.py,5124,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MeterDisconnectionEvent.__str__,wareApp/models/metering.py,181,wareApp/models.py,1010,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MeterDisconnectionListView.get,wareApp/views/metering_views.py,1106,wareApp/views.py,11017,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MeterReadings.__str__,wareApp/models/metering.py,153,wareApp/models.py,604,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MeterReadings.__unicode__,wareApp/models/metering.py,150,wareApp/models.py,601,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MonthlyLoadSharePercentage.__str__,wareApp/models/load.py,58,wareApp/models.py,589,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,MonthlyMinMaxLoadData.__str__,wareApp/models/load.py,136,wareApp/models.py,779,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,NewAlarmsNotifications.save,wareApp/models/alerts.py,71,wareApp/models.py,878,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,NewEnergySavingMonthlyTrendApi.post,wareApp/views/metering_views.py,626,wareApp/views.py,3477,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Panel.__str__,wareApp/models/site.py,113,wareApp/models.py,211,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,Panel.__unicode__,wareApp/models/site.py,116,wareApp/models.py,214,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,ParticularSiteSnapshotEnergySavingApiVB.post,wareApp/views/metering_views.py,773,wareApp/views.py,10376,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerDistributionHourlyBarChart.post,wareApp/views/load_views.py,191,wareApp/views.py,2125,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerDistributionHourlyBarChartTime.post,wareApp/views/load_views.py,205,wareApp/views.py,1981,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerSource.post,wareApp/views/load_views.py,65,wareApp/views.py,8753,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerSourceDistributionMonthlyBarChart.post,wareApp/views/load_views.py,184,wareApp/views.py,2040,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerSourceDistributionMonthlyBarChartTime.post,wareApp/views/load_views.py,198,wareApp/views.py,1872,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,PowerSupplyInfo.post,wareApp/views/load_views.py,55,wareApp/views.py,1453,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,RecoveryMonitor.__str__,wareApp/models/system.py,116,wareApp/models.py,979,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,ResetPasswordApi.post,wareApp/views/auth_views.py,116,wareApp/views.py,1564,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SavingBaselineData.post,wareApp/views/metering_views.py,640,wareApp/views.py,4061,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteAisleGroupsWithLastEntries.post,wareApp/views/site_views.py,605,wareApp/views.py,10894,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteApiBasedOnSiteType.post,wareApp/views/site_views.py,229,wareApp/views.py,4261,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteConsumptionPingApi.post,wareApp/views/site_views.py,585,wareApp/views.py,10519,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteCurrentLoadInfo.post,wareApp/views/load_views.py,19,wareApp/views.py,1320,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteLoadParameters.__str__,wareApp/models/load.py,160,wareApp/models.py,907,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteLoadParameters.save,wareApp/models/load.py,151,wareApp/models.py,901,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteLoadPower.__str__,wareApp/models/load.py,45,wareApp/models.py,549,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SitePhaseCurrentsInfo.post,wareApp/views/load_views.py,48,wareApp/views.py,1419,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SitePhaseVoltagesInfo.post,wareApp/views/load_views.py,41,wareApp/views.py,1383,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SiteTotalGraphDataHourly.post,wareApp/views/metering_views.py,86,wareApp/views.py,711,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,SnapshotApi.post,wareApp/views/site_views.py,497,wareApp/views.py,4735,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,_tpl_header,wareApp/sendmail.py,114,wareApp/sendmail.py,96,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,aisle_group_update_leg_id,wareApp/models/site.py,176,wareApp/models.py,287,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,avgDataApi.post,wareApp/views/load_views.py,394,wareApp/views.py,4920,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,fireEquiSystemDelete.post,wareApp/views/fire_views.py,114,wareApp/views.py,4802,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:ALLOWED_HOSTS,warehouse/settings.py,39,warehouse/settings.py,31,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:CSRF_COOKIE_SECURE,warehouse/settings.py,182,warehouse/settings.py,172,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:DEFAULT_FROM_EMAIL,warehouse/settings.py,164,warehouse/settings.py,153,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_BACKEND,warehouse/settings.py,165,warehouse/settings.py,154,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_HOST,warehouse/settings.py,160,warehouse/settings.py,149,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_HOST_PASSWORD,warehouse/settings.py,162,warehouse/settings.py,151,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_HOST_USER,warehouse/settings.py,161,warehouse/settings.py,150,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_PORT,warehouse/settings.py,163,warehouse/settings.py,152,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:EMAIL_USE_TLS,warehouse/settings.py,159,warehouse/settings.py,148,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:LOGGING,warehouse/settings.py,244,warehouse/settings.py,196,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:SECRET_KEY,warehouse/settings.py,30,warehouse/settings.py,22,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:SECURE_BROWSER_XSS_FILTER,warehouse/settings.py,181,warehouse/settings.py,171,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:SECURE_CONTENT_TYPE_NOSNIFF,warehouse/settings.py,183,warehouse/settings.py,173,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:SECURE_SSL_REDIRECT,warehouse/settings.py,179,warehouse/settings.py,169,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:SESSION_COOKIE_SECURE,warehouse/settings.py,180,warehouse/settings.py,170,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:env,warehouse/settings.py,24,warehouse/settings.py,17,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,url route,monthly/data/test,wareApp/urls.py,110,wareApp/urls.py,112,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Only theirs changed,class body,DgFuelConsumptionDataApiUsingLoconavAPI_new,wareApp/views/dg_fuel_views.py,59,wareApp/views.py,7989,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,DgFuelMonthlyTrend_test,wareApp/views/dg_fuel_views.py,400,wareApp/views.py,8994,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,EnergySavingsHourlyBarChartV2,wareApp/views/metering_views.py,306,wareApp/views.py,3879,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,EnergySavingsHourlyBarChartVB,wareApp/views/metering_views.py,450,wareApp/views.py,10149,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,LightsDataApi,wareApp/views/fire_views.py,120,wareApp/views.py,4812,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,LoadGraphApiForHourlyData,wareApp/views/load_views.py,248,wareApp/views.py,5149,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,LoginApi,wareApp/views/auth_views.py,32,wareApp/views.py,1478,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,NewAlarmsNotifications,wareApp/models/alerts.py,42,wareApp/models.py,859,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,NewSubMeteringMonthlyTrendApi,wareApp/views/metering_views.py,1000,wareApp/views.py,6748,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,PowerDistributionPieChartV2,wareApp/views/load_views.py,69,wareApp/views.py,8632,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,PowerSource,wareApp/constants.py,86,wareApp/views.py,8750,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,SubmeteringHourlyBarChartNew,wareApp/views/metering_views.py,1004,wareApp/views.py,6358,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,SubmeteringMonthlyBarChart_new,wareApp/views/metering_views.py,918,wareApp/views.py,1247,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,SubmeteringSnapshotAPI,wareApp/views/site_views.py,510,wareApp/views.py,6204,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,TokenViewSet,wareApp/views/auth_views.py,26,wareApp/views.py,1515,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,Add_group_to_user,wareApp/models/user.py,21,wareApp/models.py,31,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,BaselineData.post,wareApp/views/metering_views.py,656,wareApp/views.py,4025,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,BaselineHistory.post,wareApp/views/metering_views.py,701,wareApp/views.py,3991,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,Create_Group,wareApp/models/user.py,14,wareApp/models.py,25,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,CustomerAllSiteInfo.post,wareApp/views/site_views.py,92,wareApp/views.py,1719,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,DGfuelMonthlyTrendMultipleAisles,wareApp/views/dg_fuel_views.py,299,wareApp/views.py,6530,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,DgFuelConsumptionDataApiUsingLoconavAPI_new.post,wareApp/views/dg_fuel_views.py,63,wareApp/views.py,7997,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,DgFuelMonthlyTrend_test.post,wareApp/views/dg_fuel_views.py,403,wareApp/views.py,8997,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,EnergySavingMonthlyBarChart_new.post,wareApp/views/metering_views.py,215,wareApp/views.py,7717,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,EnergySavingMonthlyTrendApi.post,wareApp/views/metering_views.py,474,wareApp/views.py,3085,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,EnergySavingsHourlyBarChartV2.post,wareApp/views/metering_views.py,309,wareApp/views.py,3882,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,FansDataApi.post,wareApp/views/fire_views.py,152,wareApp/views.py,4838,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,LightsDataApi.post,wareApp/views/fire_views.py,124,wareApp/views.py,4814,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,LoadGrapghAPI.post,wareApp/views/load_views.py,212,wareApp/views.py,5068,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,LoadGraphApiForHourlyData.post,wareApp/views/load_views.py,251,wareApp/views.py,5150,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,LoginApi.post,wareApp/views/auth_views.py,37,wareApp/views.py,1484,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,ParticularCustomerInfo.post,wareApp/views/site_views.py,201,wareApp/views.py,2418,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SiteInfo.post,wareApp/views/site_views.py,37,wareApp/views.py,1817,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SiteTotalGraphDataDaily.post,wareApp/views/metering_views.py,16,wareApp/views.py,546,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SiteTotalGraphDataHourlyWHTM.post,wareApp/views/metering_views.py,108,wareApp/views.py,776,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SubMeteringMonthlyTrendApi.post,wareApp/views/metering_views.py,790,wareApp/views.py,6053,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SubmeteringHourlyBarChartNew.post,wareApp/views/metering_views.py,1007,wareApp/views.py,6361,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SubmeteringMonthlyBarChart_new.post,wareApp/views/metering_views.py,921,wareApp/views.py,1251,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SubmeteringSnapshotAPI.post,wareApp/views/site_views.py,513,wareApp/views.py,6207,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SuperAdminSnapShot.post,wareApp/views/site_views.py,490,wareApp/views.py,313,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SuperUserAllAlarmsPriorityBasedOnCustomersList.post,wareApp/views/alert_views.py,86,wareApp/views.py,409,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,SuperUserAllAlarmsTypeBasedOnCustomersList.post,wareApp/views/alert_views.py,107,wareApp/views.py,439,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,TotalAlarmsOnCustomerPageTabularForm.post,wareApp/views/alert_views.py,13,wareApp/views.py,2430,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,TotalAlarmsOnSitePageTabularForm.post,wareApp/views/alert_views.py,39,wareApp/views.py,4218,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,TotalAlarmsTypeCountOnCustomerPage.post,wareApp/views/alert_views.py,62,wareApp/views.py,2472,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,ValidatedToken.post,wareApp/views/auth_views.py,86,wareApp/views.py,1499,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,_send_smtp_email,wareApp/sendmail.py,32,wareApp/sendmail.py,25,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_alarm_for_dg_overtime,wareApp/sendmail.py,586,wareApp/sendmail.py,498,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_alarm_for_high_voltage,wareApp/sendmail.py,446,wareApp/sendmail.py,399,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_alarm_for_low_voltage,wareApp/sendmail.py,496,wareApp/sendmail.py,435,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_alarm_aviconn_user,wareApp/sendmail.py,192,wareApp/sendmail.py,174,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_alarm_user,wareApp/sendmail.py,250,wareApp/sendmail.py,244,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_equipments_system,wareApp/sendmail.py,387,wareApp/sendmail.py,375,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_equipments_system_30days_before,wareApp/sendmail.py,240,wareApp/sendmail.py,231,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_equipments_system_45days_before,wareApp/sendmail.py,230,wareApp/sendmail.py,217,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_equipments_system_8days_before,wareApp/sendmail.py,210,wareApp/sendmail.py,191,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_fire_equipments_system_after4days,wareApp/sendmail.py,220,wareApp/sendmail.py,204,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_for_dg_fuel_under_level,wareApp/sendmail.py,546,wareApp/sendmail.py,471,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_for_motor_aviconn_user,wareApp/sendmail.py,340,wareApp/sendmail.py,329,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_for_pf_fluctuation,wareApp/sendmail.py,405,wareApp/sendmail.py,393,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,send_mail_for_sensor_by_pass,wareApp/sendmail.py,140,wareApp/sendmail.py,122,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,setting,warehouse.settings:REST_FRAMEWORK,warehouse/settings.py,187,warehouse/settings.py,177,Port their change into our version (file shown under 'Our file').
+MEDIUM,They removed it,class body,AisleLevelBaseline,,,wareApp/views.py,4157,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,CustomerMonthlyGraphicalData,,,wareApp/views.py,1678,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,CustomerTotalConsumption,,,wareApp/views.py,1630,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DgFuelConsumptionDataApi,,,wareApp/views.py,5594,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DgFuelConsumptionDataCustomRangeApi,,,wareApp/views.py,5714,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DgFuelMonthlyTrend,,,wareApp/views.py,6632,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DownloadExcel,,,wareApp/views.py,5006,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,EnergySavingMonthlyBarChart,,,wareApp/views.py,7394,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,EnergySavingMonthlyBarChartOld,,,wareApp/views.py,2644,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,EnergySavingMonthlyBarChartbackup,,,wareApp/views.py,7153,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,EnergySavingsHourlyBarChart,,,wareApp/views.py,3792,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,EnergySavingsHourlyBarChartOld,,,wareApp/views.py,3637,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,LoadDataApiMultipleSource,,,wareApp/views.py,8815,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,LoadGrapghAPITestingPurpose,,,wareApp/views.py,5095,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,ParticularSiteSnapshotEnergySavingApi,,,wareApp/views.py,2500,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,SubmeteringHourlyBarChart,,,wareApp/views.py,6260,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,SubmeteringMonthlyBarChart,,,wareApp/views.py,2905,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,AisleLevelBaseline.post,,,wareApp/views.py,4159,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,CustomerMonthlyGraphicalData.post,,,wareApp/views.py,1680,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,CustomerTotalConsumption.post,,,wareApp/views.py,1632,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,DgFuelConsumptionDataApi.post,,,wareApp/views.py,5598,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,DgFuelConsumptionDataCustomRangeApi.post,,,wareApp/views.py,5718,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,DgFuelMonthlyTrend.post,,,wareApp/views.py,6635,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,DownloadExcel.post,,,wareApp/views.py,5009,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,EnergySavingMonthlyBarChart.post,,,wareApp/views.py,7398,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,EnergySavingMonthlyBarChartOld.post,,,wareApp/views.py,2646,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,EnergySavingMonthlyBarChartbackup.post,,,wareApp/views.py,7157,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,EnergySavingsHourlyBarChart.post,,,wareApp/views.py,3796,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,EnergySavingsHourlyBarChartOld.post,,,wareApp/views.py,3639,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,ExpiredDevicesListApi.post,,,wareApp/views.py,4777,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,FireEquiSystemTypefetch.post,,,wareApp/views.py,4702,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,FireEquipmentSystemFetch.post,,,wareApp/views.py,4674,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,LoadDataApiMultipleSource.post,,,wareApp/views.py,8818,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,LoadGrapghAPITestingPurpose.post,,,wareApp/views.py,5096,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,NewSubMeteringMonthlyTrendApi.post,,,wareApp/views.py,6752,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,ParticularSiteSnapshotEnergySavingApi.post,,,wareApp/views.py,2502,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,SiteInfo.get,,,wareApp/views.py,1622,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,SiteLoadParameters.__unicode__,,,wareApp/models.py,898,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,SiteLoadPower.__unicode__,,,wareApp/models.py,555,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,SubmeteringHourlyBarChart.post,,,wareApp/views.py,6262,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,SubmeteringMonthlyBarChart.post,,,wareApp/views.py,2907,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,roadcasteAPI,,,wareApp/tasks.py,31,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,warehouse.settings:LOG_FILE,,,warehouse/settings.py,195,They deleted it: check whether our code still needs it.
+LOW,Not on their side yet,class body,DGFuelAlertsData.Meta,,,wareApp/models.py,851,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,GatewayTopic,,,wareApp/mqtt/topics.py,9,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,HomeGatewayStatus,,,wareApp/models.py,1013,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,HomeGatewayStatusApi,,,wareApp/views.py,11074,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,LoadReading,,,wareApp/load_data/parser.py,6,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,MeterDisconnectionEventSerializer,,,wareApp/serializers.py,105,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,MeterDisconnectionEventSerializer.Meta,,,wareApp/serializers.py,106,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,RecoveryService,,,wareApp/recovery/service.py,11,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,RecoveryUploadAPIView,,,wareApp/recovery/views.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,SecondaryDBRouter,,,wareApp/routers.py,1,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,TopicParseError,,,wareApp/mqtt/topics.py,4,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._day_bounds,,,wareApp/views.py,844,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._dg_graph_base_time,,,wareApp/views.py,839,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._expired_graph_response,,,wareApp/views.py,950,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._fuel_level_series_for_day,,,wareApp/views.py,1000,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._fuel_level_series_for_range,,,wareApp/views.py,1067,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._fuel_point_from_row,,,wareApp/views.py,854,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._get_provider_status,,,wareApp/views.py,929,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._graph_epoch_ms,,,wareApp/views.py,832,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._latest_known_fuel_before,,,wareApp/views.py,869,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._loconav_subscription_expired,,,wareApp/views.py,911,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._normalized_alert_series,,,wareApp/views.py,1089,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._roadcast_subscription_expired,,,wareApp/views.py,890,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataApi_new._row_value,,,wareApp/views.py,826,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,DgFuelConsumptionDataCustomRangeApiUsingPushAPIs._normalized_alert_series,,,wareApp/views.py,8208,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,EnergySavingsHourlyExcelDownloadVB.get,,,wareApp/views.py,9491,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,HomeGatewayStatus.__str__,,,wareApp/models.py,1019,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,HomeGatewayStatusApi.get,,,wareApp/views.py,11078,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,HomeGatewayStatusApi.post,,,wareApp/views.py,11150,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,LoadGraphApiForMainsDgDailyData._series_color,,,wareApp/views.py,5519,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,RecoveryService.process,,,wareApp/recovery/service.py,27,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,RecoveryService.process_daily,,,wareApp/recovery/service.py,51,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,RecoveryService.process_hourly,,,wareApp/recovery/service.py,41,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,RecoveryService.process_runtime,,,wareApp/recovery/service.py,56,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SecondaryDBRouter.allow_migrate,,,wareApp/routers.py,21,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SecondaryDBRouter.allow_relation,,,wareApp/routers.py,17,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SecondaryDBRouter.db_for_read,,,wareApp/routers.py,7,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SecondaryDBRouter.db_for_write,,,wareApp/routers.py,12,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SiteAisleGroupsWithLastEntries._build_response,,,wareApp/views.py,10815,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SiteAisleGroupsWithLastEntries._get_latest_daily_entries,,,wareApp/views.py,10784,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SiteAisleGroupsWithLastEntries._get_latest_hourly_entries,,,wareApp/views.py,10751,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SiteAisleGroupsWithLastEntries._serialize_daily_entry,,,wareApp/views.py,10740,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,SiteAisleGroupsWithLastEntries.get,,,wareApp/views.py,10890,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_best_dg_end_time_for_unit,,,wareApp/dg_fuel/sessions.py,112,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_created_from_epoch,,,wareApp/dg_fuel/ingestion.py,17,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_daily_unit_consumption_for_unit,,,wareApp/dg_fuel/sessions.py,73,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_daily_window,,,wareApp/dg_fuel/sessions.py,102,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_dg_fuel_queryset,,,wareApp/views.py,96,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_epoch_sort_key,,,wareApp/load_data/rollups.py,27,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_extrema,,,wareApp/load_data/rollups.py,34,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_fetch_loconav_fuel,,,wareApp/dg_fuel/sessions.py,341,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_fetch_loconav_report,,,wareApp/dg_fuel/sessions.py,350,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_fetch_roadcast_fuel,,,wareApp/dg_fuel/sessions.py,332,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_group_by_bucket,,,wareApp/load_data/rollups.py,76,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_handle_load_data_message,,,wareApp/load_data/handler.py,15,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_hour_bucket,,,wareApp/load_data/rollups.py,23,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_items,,,wareApp/dg_fuel/providers.py,13,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_lookback_minutes,,,wareApp/load_data/rollups.py,12,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_main_database_alias,,,wareApp/dg_fuel/sessions.py,62,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_materialized_buckets,,,wareApp/load_data/rollups.py,44,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_minute_bucket,,,wareApp/load_data/rollups.py,19,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_parallel_events,,,wareApp/dg_fuel/providers.py,223,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_persist_provider_alerts,,,wareApp/dg_fuel/sessions.py,359,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_publish_consumption_recovery,,,wareApp/tasks.py,3824,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_publish_supply_time_recovery,,,wareApp/tasks.py,3820,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_refill_timestamp_ms,,,wareApp/dg_fuel/providers.py,236,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_roadcast_telemetry_state,,,wareApp/dg_fuel/providers.py,17,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_run_mqtt_listener,,,wareApp/tasks.py,3787,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_save_extrema,,,wareApp/load_data/rollups.py,57,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_should_drop_leading_zero_fuel_level,,,wareApp/dg_fuel/providers.py,246,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_to_float,,,wareApp/fuel_providers.py,35,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_try_request,,,wareApp/fuel_providers.py,12,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,as_float,,,wareApp/dg_fuel/normalization.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,attempt_fetch_for_unit,,,wareApp/dg_fuel/sessions.py,422,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,collect_level_cycle,,,wareApp/dg_fuel/poller.py,16,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,collect_loconav_levels,,,wareApp/dg_fuel/collection.py,31,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,collect_roadcast_levels,,,wareApp/dg_fuel/collection.py,94,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,dedupe_dg_consumption,,,wareApp/dg_fuel/dedupe.py,6,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,detect_refuel_from_alerts,,,wareApp/fuel_providers.py,371,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,detect_suspicious_fuel,,,wareApp/fuel_providers.py,409,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,detect_theft_from_alerts,,,wareApp/fuel_providers.py,390,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,determine_provider,,,wareApp/dg_fuel/sessions.py,324,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,epoch_milliseconds,,,wareApp/dg_fuel/normalization.py,18,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,extract_loconav_subscription_expired_errors,,,wareApp/dg_fuel/providers.py,105,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,extract_roadcast_subscription_expired_errors,,,wareApp/dg_fuel/providers.py,42,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fetch_loconav_fuel,,,wareApp/fuel_providers.py,150,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fetch_loconav_report,,,wareApp/fuel_providers.py,346,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fetch_roadcast_fuel,,,wareApp/fuel_providers.py,47,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fetch_roadcast_pull_api,,,wareApp/fuel_providers.py,113,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fetch_roadcast_report,,,wareApp/fuel_providers.py,284,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,fuel_configuration_for_aisle,,,wareApp/dg_fuel/sessions.py,37,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,handle_load_data_message,,,wareApp/load_data/handler.py,818,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,parse_gateway_topic,,,wareApp/mqtt/topics.py,16,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,parse_load_data_message,,,wareApp/load_data/parser.py,14,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,parse_loconav_current_levels,,,wareApp/dg_fuel/providers.py,150,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,parse_roadcast_current_levels,,,wareApp/dg_fuel/providers.py,176,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,parse_roadcast_report,,,wareApp/dg_fuel/providers.py,278,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,process_hourly,,,wareApp/recovery/processor.py,379,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,process_http_recovery,,,wareApp/recovery/processor.py,34,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,process_runtime,,,wareApp/recovery/processor.py,545,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,queue_for_gateway_topic,,,wareApp/mqtt/routing.py,36,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,queue_for_parsed_topic,,,wareApp/mqtt/routing.py,41,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,reconcile_daily_unit_consumption,,,wareApp/dg_fuel/sessions.py,131,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,record_fuel_alert,,,wareApp/dg_fuel/ingestion.py,74,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,record_fuel_level,,,wareApp/dg_fuel/ingestion.py,21,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,roll_up_completed_load_data,,,wareApp/load_data/rollups.py,86,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,roll_up_load_data_if_due,,,wareApp/load_data/rollups.py,151,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,save_raw_load_reading,,,wareApp/load_data/raw.py,6,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,subscribe,,,wareApp/mqtt/routing.py,49,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,target_provider,,,wareApp/dg_fuel/collection.py,19,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,target_site,,,wareApp/dg_fuel/collection.py,15,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,target_vehicle_number,,,wareApp/dg_fuel/collection.py,25,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,update_daily_from_hourly,,,wareApp/recovery/processor.py,118,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,vehicle_variants,,,wareApp/fuel_providers.py,126,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.dg_fuel.collection:logger,,,wareApp/dg_fuel/collection.py,12,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.dg_fuel.ingestion:logger,,,wareApp/dg_fuel/ingestion.py,14,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.dg_fuel.poller:logger,,,wareApp/dg_fuel/poller.py,13,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.dg_fuel.sessions:logger,,,wareApp/dg_fuel/sessions.py,34,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.fuel_providers:LOG,,,wareApp/fuel_providers.py,9,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.handler:logger,,,wareApp/load_data/handler.py,12,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.monthly:logger,,,wareApp/load_data/monthly.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.rollups:_last_rollup_minute_by_site,,,wareApp/load_data/rollups.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.rollups:_rollup_schedule_lock,,,wareApp/load_data/rollups.py,9,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:MQTT_TOPIC_PREFIX,,,wareApp/mqtt/routing.py,25,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_ONE,,,wareApp/mqtt/routing.py,5,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_ONE_MESSAGE_TYPES,,,wareApp/mqtt/routing.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_ONE_NOOP_MESSAGE_TYPES,,,wareApp/mqtt/routing.py,23,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_ONE_SUBSCRIPTIONS,,,wareApp/mqtt/routing.py,26,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_TWO,,,wareApp/mqtt/routing.py,6,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_TWO_MESSAGE_TYPES,,,wareApp/mqtt/routing.py,19,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.routing:QUEUE_TWO_SUBSCRIPTIONS,,,wareApp/mqtt/routing.py,30,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.recovery.processor:logger,,,wareApp/recovery/processor.py,115,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.recovery.service:logger,,,wareApp/recovery/service.py,8,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.recovery.urls:urlpatterns,,,wareApp/recovery/urls.py,5,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,url route,gateway-status/,,,wareApp/urls.py,126,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,url route,hourly/data/excel/V1,,,wareApp/urls.py,114,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,url route,upload/,,,wareApp/recovery/urls.py,6,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,url route,v1/recovery/,,,wareApp/urls.py,125,Ours: they have an older copy of our work without it; keep.
+LOW,Only ours changed,class body,AisleGroup,wareApp/models/site.py,133,wareApp/models.py,231,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DgUnitConsumption,wareApp/models/dg_fuel.py,34,wareApp/models.py,820,Keep ours (they did not change it).
+LOW,Only ours changed,class body,MeterDisconnectionEvent,wareApp/models/metering.py,157,wareApp/models.py,982,Keep ours (they did not change it).
+LOW,Only ours changed,class body,MeterDisconnectionEvent.Meta,wareApp/models/metering.py,177,wareApp/models.py,1007,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SiteCeleryPingApi,wareApp/views/site_views.py,592,wareApp/views.py,10558,Keep ours (they did not change it).
+LOW,Only ours changed,function,FetchAllCustomersForSuperAdmin.post,wareApp/views/site_views.py,371,wareApp/views.py,202,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoadDataExcelDownload.post,wareApp/views/load_views.py,329,wareApp/views.py,5224,Keep ours (they did not change it).
+LOW,Only ours changed,function,MeterDisconnectionIngestView.post,wareApp/views/metering_views.py,1085,wareApp/views.py,10950,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteCeleryPingApi.post,wareApp/views/site_views.py,595,wareApp/views.py,10564,Keep ours (they did not change it).
+LOW,Only ours changed,function,get_loconav_fuel_data,wareApp/tasks/fuel_tasks.py,24,wareApp/tasks.py,59,Keep ours (they did not change it).
+LOW,Ours only,class body,HomeGatewayStatusAdmin,,,wareApp/admin.py,167,New on our side: keep.
+LOW,Ours only,class body,HomeGatewayStatusAdmin.Meta,,,wareApp/admin.py,178,New on our side: keep.
+LOW,Ours only,class body,MonitoringCustomerSitesInfo,,,wareApp/views.py,1746,New on our side: keep.
+LOW,Ours only,function,DG_fuel_for_Roadcaste,,,wareApp/tasks.py,64,New on our side: keep.
+LOW,Ours only,function,HomeGatewayStatusAdmin.status_colored,,,wareApp/admin.py,170,New on our side: keep.
+LOW,Ours only,function,MonitoringCustomerSitesInfo._get_sites,,,wareApp/views.py,1754,New on our side: keep.
+LOW,Ours only,function,MonitoringCustomerSitesInfo.get,,,wareApp/views.py,1807,New on our side: keep.
+LOW,Ours only,function,MonitoringCustomerSitesInfo.post,,,wareApp/views.py,1810,New on our side: keep.
+LOW,Ours only,function,RecoveryUploadAPIView.post,,,wareApp/recovery/views.py,14,New on our side: keep.
+LOW,Ours only,function,_deferred_mqtt_client1,,,wareApp/tasks.py,3803,New on our side: keep.
+LOW,Ours only,function,_deferred_mqtt_client2,,,wareApp/tasks.py,3816,New on our side: keep.
+LOW,Ours only,function,_deferred_task,,,wareApp/tasks.py,3780,New on our side: keep.
+LOW,Ours only,function,_dg_fuel_db_alias,,,wareApp/views.py,92,New on our side: keep.
+LOW,Ours only,function,_retired_mqtt_client2_inline_load_data,,,wareApp/tasks.py,2352,New on our side: keep.
+LOW,Ours only,function,mqtt_client1,,,wareApp/tasks.py,80,New on our side: keep.
+LOW,Ours only,function,mqtt_client2,,,wareApp/tasks.py,3928,New on our side: keep.
+LOW,Ours only,function,process_consumption_message,,,wareApp/tasks.py,3896,New on our side: keep.
+LOW,Ours only,function,process_daily_consumption_recovery_message,,,wareApp/tasks.py,3866,New on our side: keep.
+LOW,Ours only,function,process_fire_alarm_message,,,wareApp/tasks.py,3886,New on our side: keep.
+LOW,Ours only,function,process_hourly_consumption_recovery_message,,,wareApp/tasks.py,3876,New on our side: keep.
+LOW,Ours only,function,process_load_data_message,,,wareApp/tasks.py,3829,New on our side: keep.
+LOW,Ours only,function,process_load_message,,,wareApp/tasks.py,3912,New on our side: keep.
+LOW,Ours only,function,process_load_runtime_recovery_message,,,wareApp/tasks.py,3856,New on our side: keep.
+LOW,Ours only,function,process_supply_time_message,,,wareApp/tasks.py,3839,New on our side: keep.
+LOW,Ours only,function,roadcasteAPIUpdated,,,wareApp/tasks.py,54,New on our side: keep.
+LOW,Ours only,function,update_monthly_min_max_load,,,wareApp/load_data/monthly.py,11,New on our side: keep.
+LOW,Ours only,setting,wareApp.tasks:app,,,wareApp/tasks.py,27,New on our side: keep.
+LOW,Ours only,setting,wareApp.views:DG_FUEL_DB_ALIAS,,,wareApp/views.py,89,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CACHES,,,warehouse/settings.py,235,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:DATABASE_ROUTERS,,,warehouse/settings.py,85,New on our side: keep.
+LOW,Ours only,url route,monitoringCustomerSites/,,,wareApp/urls.py,127,New on our side: keep.
+LOW,Ours only,url route,monitoringSitesList/,,,wareApp/urls.py,128,New on our side: keep.
+LOW,We replaced it,class body,AlarmNotifications.Meta,wareApp/models/alerts.py,30,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,BaselineService,wareApp/services/baseline_service.py,5,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,Command,wareApp/management/commands/celery_monitor.py; wareApp/management/commands/fems_warranty_check.py; wareApp/management/commands/fetch_fuel_data.py; wareApp/management/commands/roadcaste_recovery.py,10,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,NewAlarmsNotifications.Meta,wareApp/models/alerts.py,61,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteCeleryPing.Meta,wareApp/models/system.py,61,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteConsumptionPing.Meta,wareApp/models/system.py,43,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,BaselineService.calculate_energy_saved,wareApp/services/baseline_service.py,18,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,BaselineService.sanitize_float,wareApp/services/baseline_service.py,7,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.add_arguments,wareApp/management/commands/celery_monitor.py; wareApp/management/commands/fems_warranty_check.py; wareApp/management/commands/fetch_fuel_data.py; wareApp/management/commands/roadcaste_recovery.py,13,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.check_service_expirations,wareApp/management/commands/fems_warranty_check.py,32,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.check_warranty_expirations,wareApp/management/commands/fems_warranty_check.py,71,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.fetch_fuel_report,wareApp/management/commands/roadcaste_recovery.py,71,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.fetch_loconav,wareApp/management/commands/fetch_fuel_data.py,77,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.fetch_roadcaste,wareApp/management/commands/fetch_fuel_data.py,38,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.handle,wareApp/management/commands/celery_monitor.py; wareApp/management/commands/fems_warranty_check.py; wareApp/management/commands/fetch_fuel_data.py; wareApp/management/commands/roadcaste_recovery.py,20,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Command.recover_in_db,wareApp/management/commands/roadcaste_recovery.py,44,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,ExpiredDevicesListApi.get,wareApp/views/fire_views.py,173,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,FireEquiSystemTypefetch.get,wareApp/views/fire_views.py,51,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,FireEquipmentSystemFetch.get,wareApp/views/fire_views.py,91,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Site.__str__,wareApp/models/site.py,67,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SuperAdminSnapShot.get,wareApp/views/site_views.py,480,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,aggregate_daily_readings_task,wareApp/tasks/metering_tasks.py,37,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,check_recovery_monitors_task,wareApp/tasks/system_tasks.py,28,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,process_dg_fuel_loconav,wareApp/tasks/fuel_tasks.py,49,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,process_dg_fuel_roadcaste,wareApp/tasks/fuel_tasks.py,38,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,process_hourly_readings_task,wareApp/tasks/metering_tasks.py,11,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,record_site_celery_ping_task,wareApp/tasks/system_tasks.py,12,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,roadcaste_api_updated,wareApp/tasks/fuel_tasks.py,10,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.management.commands.celery_monitor:PROD_LOG_FILE,wareApp/management/commands/celery_monitor.py,7,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.models.__init__:__all__,wareApp/models/__init__.py,68,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.services.__init__:__all__,wareApp/services/__init__.py,6,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.tasks.__init__:__all__,wareApp/tasks/__init__.py,20,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.tasks.alarm_tasks:app,wareApp/tasks/alarm_tasks.py,25,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.tasks.fuel_tasks:app,wareApp/tasks/fuel_tasks.py,7,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.tasks.metering_tasks:app,wareApp/tasks/metering_tasks.py,7,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.tasks.system_tasks:app,wareApp/tasks/system_tasks.py,8,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,warehouse.settings:LOG_DIR,warehouse/settings.py,241,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,url route,hourly/data/excel/test,wareApp/urls.py,112,,,Nothing: we moved / removed / replaced it and they did not change it.

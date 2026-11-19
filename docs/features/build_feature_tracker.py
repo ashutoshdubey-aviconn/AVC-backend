@@ -146,6 +146,14 @@ add("D27", "Code inventory and merge check", "Docs / merge", "Done",
     "function by function.",
     "2026-11-19", "2026-11-19", "-", "-", "Re-run on the colleague's code before the merge.", "-",
     "docs/merge/MERGE_GUIDE.md", "-")
+add("D28", "Colleague's code vs main's code", "Docs / merge", "Done",
+    "Static comparison of the colleague's repo (54313d5) with the code running on main's server: function level "
+    "(overlap_check.py) and API contract (new scripts/merge/api_contract_check.py: request fields and response keys of "
+    "every view, and whether the frontend calls it). 65 of 106 shared views answer differently, 42 of them called by the "
+    "frontend; 6 Excel downloads are placeholders; DG fuel v2 and LoadData packages missing; migrations don't fit main's DB; "
+    "login has no rate limit and re-activates disabled users.",
+    "2026-11-19", "2026-11-19", "-", "-", "Not run: confirm by running his code on a copy of main's DB with the frontend.", "-",
+    "docs/merge/COLLEAGUE_VS_MAIN.md", "-")
 add("D26", "Alarm counts consistent on every page", "Alarms / frontend", "Done",
     "Super-admin, customer and site ALARMS tiles, the customer alarm table / chart and the site panel all read the "
     "alarm server and count open alarms; customer table grouped Gateway / Consumption / Power; sign-in guard.",

@@ -3,7 +3,8 @@
     virtualwarehouse/bin/python docs/merge/build_code_inventory.py
 
 Sheets: Summary, Why ours is better, Features, Alarms, APIs, Celery tasks, Management commands, DB models,
-Migrations, Modules, Functions, Tests, Merge overlap (main), Removed files.
+Migrations, Modules, Functions, Tests, Merge overlap (main), Ours vs colleague, Merge overlap (colleague),
+Colleague vs main (APIs), Colleague vs main (functions), Removed files.
 
 Most sheets are read from the code itself (ast), so re-running the script after a change keeps them current.
 Hand-written parts: WHY_BETTER and MODULE_NOTES below, and the features / alarms, which come from
@@ -667,20 +668,30 @@ def main():
         test_rows.append([f.name, n_tests, first_sentence(ast.get_docstring(t) or "")])
 
     # ---- merge overlap ----
-    def read_overlap(pattern):
+    def read_overlap(pattern, skip=("Ours only",)):
         files = sorted(HERE.glob(pattern))
         rows = []
         if files:
             with files[-1].open() as fh:
                 for r in csv.DictReader(fh):
-                    if r["Status"] in ("Ours only",):
-                        continue  # new on our side: listed in the Functions sheet
+                    if r["Status"] in skip:
+                        continue  # "Ours only" of this branch: listed in the Functions sheet
                     rows.append([r["Risk"], r["Status"], r["Kind"], r["Name"], r["Their file"], r["Their line"],
                                  r["Our file"], r["Our line"], r["Action"]])
         return rows, files
 
     overlap_rows, overlap_files = read_overlap("overlap_main_server_*.csv")
-    colleague_rows, colleague_files = read_overlap("overlap_colleague_*.csv")
+    colleague_rows, colleague_files = read_overlap("overlap_colleague_2*.csv")
+    cvm_rows, cvm_files = read_overlap("overlap_colleague_vs_main_*.csv", skip=())
+    cvm_api_rows, cvm_api_files = [], sorted(HERE.glob("colleague_vs_main_apis_*.csv"))
+    if cvm_api_files:
+        with cvm_api_files[-1].open() as fh:
+            for r in csv.DictReader(fh):
+                cvm_api_rows.append([r["View"], r["Route"], r["Frontend calls it"], r["Verdict"], r["Contract differs"],
+                                     r["Our lines"], r["Their lines"], r["Response keys only ours"],
+                                     r["Response keys only theirs"], r["Request fields only ours"],
+                                     r["Request fields only theirs"], r["Our file"], r["Their file"]])
+        cvm_api_rows.sort(key=lambda r: (not r[4], not r[2], r[0]))
 
     # ---- removed ----
     removed_rows = []
@@ -744,6 +755,13 @@ def main():
         ["Merge overlap with the colleague's code", ", ".join(
             f"{k} {v}" for k, v in sorted(Counter(r[0] for r in colleague_rows).items())) +
          (f" (from {colleague_files[-1].name}; repo Daksh007-batman/New-asem-merger @ 54313d5)" if colleague_files else "")],
+        ["Colleague's code vs main's code", (
+            f"{sum(1 for r in cvm_api_rows if r[3] not in ('Only ours', 'Only theirs'))} API views on both sides, "
+            f"{sum(1 for r in cvm_api_rows if r[4] and r[3] not in ('Only ours', 'Only theirs'))} answer differently; "
+            f"{sum(1 for r in cvm_api_rows if r[2] and r[4] and r[3] not in ('Only ours', 'Only theirs'))} of them are called by the frontend. "
+            "Functions: " + ", ".join(f"{k} {v}" for k, v in sorted(Counter(r[0] for r in cvm_rows).items())) +
+            f" (from {cvm_api_files[-1].name if cvm_api_files else '-'}, {cvm_files[-1].name if cvm_files else '-'}; "
+            "see docs/merge/COLLEAGUE_VS_MAIN.md)")],
         ["How to read", "Functions sheet: Origin New = written in this branch; Changed = exists in legacy, rewritten; "
                         "Moved, unchanged = same code in a new file. 'Description source' says whether the text is the "
                         "code's own docstring / comment or derived from its name, route and the models it uses."],
@@ -782,6 +800,15 @@ def main():
     sheet(book, "Merge overlap (colleague)", [("Risk", 8), ("Status", 20), ("Kind", 10), ("Name", 50), ("Their file", 32),
                                               ("Their line", 8), ("Our file", 36), ("Our line", 8), ("Action", 60)],
           colleague_rows, fill_col=0, fills=RISK_FILL)
+    sheet(book, "Colleague vs main (APIs)", [("View", 40), ("Route", 36), ("Frontend calls it", 9), ("Verdict", 26),
+                                             ("Contract differs", 9), ("Main lines", 7), ("His lines", 7),
+                                             ("Response keys only main", 40), ("Response keys only his", 30),
+                                             ("Request fields only main", 30), ("Request fields only his", 30),
+                                             ("Main file", 28), ("His file", 28)],
+          cvm_api_rows, fill_col=4, fills={"yes": "FFC7CE"})
+    sheet(book, "Colleague vs main (functions)", [("Risk", 8), ("Status", 20), ("Kind", 10), ("Name", 50), ("His file", 32),
+                                                  ("His line", 8), ("Main file", 36), ("Main line", 8), ("Action", 60)],
+          cvm_rows, fill_col=0, fills=RISK_FILL)
     sheet(book, "Removed files", [("File", 70), ("Why", 70)], removed_rows)
     out = HERE / "CODE_INVENTORY.xlsx"
     book.save(out)

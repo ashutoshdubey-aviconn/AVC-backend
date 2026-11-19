@@ -12,6 +12,7 @@ Files here:
 | [`CODE_INVENTORY.xlsx`](CODE_INVENTORY.xlsx) | Everything this branch has: features, alarms, APIs, Celery tasks, commands, DB models, migrations, modules, every function (what it does, new / changed / moved, tests, fingerprint), tests, and why it is better than the legacy code. Built by `build_code_inventory.py`. |
 | [`overlap_main_server_20261119.csv`](overlap_main_server_20261119.csv) | Function-level comparison of ours against main's current code, copied read-only on 19 Nov. It is also the "Merge overlap (main)" sheet. |
 | [`COLLEAGUE_CODE_REVIEW.md`](COLLEAGUE_CODE_REVIEW.md) | Read-only review of the colleague's repo (`Daksh007-batman/New-asem-merger` @ `54313d5`): what to port, problems found, recommendation. Overlap: [`overlap_colleague_20261119.csv`](overlap_colleague_20261119.csv). |
+| [`COLLEAGUE_VS_MAIN.md`](COLLEAGUE_VS_MAIN.md) | His code vs the code running on main's server: 42 of the 69 shared APIs the frontend calls answer differently, DG fuel v2 / LoadData packages missing, migrations don't fit main's DB. APIs: [`colleague_vs_main_apis_20261119.csv`](colleague_vs_main_apis_20261119.csv) (made by `scripts/merge/api_contract_check.py`); functions: [`overlap_colleague_vs_main_20261119.csv`](overlap_colleague_vs_main_20261119.csv). |
 | [`../../scripts/merge/overlap_check.py`](../../scripts/merge/overlap_check.py) | Makes that comparison against any code base (a folder or a git ref). |
 
 ## Marking our code before the merge

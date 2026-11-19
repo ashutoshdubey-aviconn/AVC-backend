@@ -8,6 +8,7 @@
 
 **Side by side:** workbook [`CODE_INVENTORY.xlsx`](CODE_INVENTORY.xlsx), sheet "Ours vs colleague".
 **Function by function:** sheet "Merge overlap (colleague)", or [`overlap_colleague_20261119.csv`](overlap_colleague_20261119.csv).
+**His code vs the code on main's server** (APIs the frontend calls, DG fuel, LoadData, DB): [COLLEAGUE_VS_MAIN.md](COLLEAGUE_VS_MAIN.md).
 
 ## What his code is
 
