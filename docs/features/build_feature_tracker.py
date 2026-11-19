@@ -15,7 +15,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 HERE = pathlib.Path(__file__).resolve().parent
-UPDATED = "2026-11-17"
+UPDATED = "2026-11-19"
 
 # Status -> (meaning, cell colour). Order = order of the Summary sheet.
 STATUSES = {
@@ -100,6 +100,15 @@ add("F09", "Credential clean-up", "Security", "Planned",
     "moved out of the setup scripts (26 Oct).",
     "2026-08-18", "2026-10-26", "-", "-", "Agree which credentials to rotate.", "User",
     "docs/roadmaps/TODO.md", "4643371d (DB password)")
+add("F10", "Merge with the colleague's code", "Merge", "Waiting for input",
+    "Team lead: merge this branch with the colleague's optimized version of main's code. Prepared 19 Nov: tag "
+    "fov2-pre-merge-20261119, code inventory (every feature, alarm, API, model, migration and function with a fingerprint), "
+    "function-level overlap check. Against main's current code: 22 items changed on both sides, 23 only on main (e.g. "
+    "monitoringCustomerSites/ API), migrations 0073-0076 diverged.",
+    "2026-11-19", "2026-11-19", "-", "-",
+    "Get the colleague's code into git (branch from origin/main), run overlap_check.py on it, merge on an integration branch.",
+    "Colleague: his code (repo / branch); team lead: who merges",
+    "docs/merge/MERGE_GUIDE.md", "-")
 
 # ---- On hold / not started / out of scope ---------------------------------------------------------
 add("H01", "Stored readings above 10,000 kWh", "Consumption", "On hold",
@@ -128,6 +137,13 @@ add("O02", "Automatic catch-up spreading", "Consumption", "Out of scope",
     "2026-11-16", "-", "-", "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "-")
 
 # ---- Done -------------------------------------------------------------------------------------------
+add("D27", "Code inventory and merge check", "Docs / merge", "Done",
+    "docs/merge/CODE_INVENTORY.xlsx: features, alarms, APIs (new / changed / same), Celery tasks, commands, DB models and "
+    "fields, migrations, modules, every function (what it does, origin, tests, fingerprint), tests, why it is better than "
+    "the legacy code, overlap with main's code, removed files. scripts/merge/overlap_check.py compares any two code bases "
+    "function by function.",
+    "2026-11-19", "2026-11-19", "-", "-", "Re-run on the colleague's code before the merge.", "-",
+    "docs/merge/MERGE_GUIDE.md", "-")
 add("D26", "Alarm counts consistent on every page", "Alarms / frontend", "Done",
     "Super-admin, customer and site ALARMS tiles, the customer alarm table / chart and the site panel all read the "
     "alarm server and count open alarms; customer table grouped Gateway / Consumption / Power; sign-in guard.",

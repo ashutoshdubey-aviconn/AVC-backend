@@ -1,0 +1,893 @@
+Risk,Status,Kind,Name,Their file,Their line,Our file,Our line,Action
+HIGH,Both changed,class body,DgUnitConsumption,wareApp/models.py,820,wareApp/models.py,1176,Merge by hand: compare both versions with the base.
+HIGH,Both changed,class body,SiteConsumptionPingAdmin,wareApp/admin.py,152,wareApp/admin.py,262,Merge by hand: compare both versions with the base.
+HIGH,Both changed,class body,User,wareApp/models.py,18,wareApp/models.py,87,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,Add_group_to_user,wareApp/models.py,31,wareApp/models.py,110,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,CustomerSnapshotApi.post,wareApp/views.py,2275,wareApp/views/customer.py,234,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,LoadDataExcelDownload.post,wareApp/views.py,5224,wareApp/views/load.py,178,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,LoadGraphApiForDailyData.post,wareApp/views.py,5183,wareApp/views/load.py,143,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,LoadGraphApiForMainsDgDailyData.post,wareApp/views.py,5538,wareApp/views/load.py,484,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,SiteCeleryPingApi.post,wareApp/views.py,10564,wareApp/views/monitoring.py,88,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,handle_load_data_message,wareApp/load_data/handler.py,818,wareApp/load_data/handler.py,21,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_consumption_message,wareApp/tasks.py,3896,wareApp/tasks.py,355,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_daily_consumption_recovery_message,wareApp/tasks.py,3866,wareApp/tasks.py,340,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_fire_alarm_message,wareApp/tasks.py,3886,wareApp/tasks.py,350,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_hourly_consumption_recovery_message,wareApp/tasks.py,3876,wareApp/tasks.py,345,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_load_data_message,wareApp/tasks.py,3829,wareApp/tasks.py,312,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_load_message,wareApp/tasks.py,3912,wareApp/tasks.py,360,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_load_runtime_recovery_message,wareApp/tasks.py,3856,wareApp/tasks.py,335,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,process_supply_time_message,wareApp/tasks.py,3839,wareApp/tasks.py,330,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,roll_up_completed_load_data,wareApp/load_data/rollups.py,86,wareApp/load_data/rollups.py,161,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,roll_up_load_data_if_due,wareApp/load_data/rollups.py,151,wareApp/load_data/rollups.py,247,Merge by hand: compare both versions with the base.
+HIGH,Both changed,function,update_monthly_min_max_load,wareApp/load_data/monthly.py,11,wareApp/load_data/monthly.py,22,Merge by hand: compare both versions with the base.
+HIGH,Both changed,setting,wareApp.urls:urlpatterns,wareApp/urls.py,6,wareApp/urls.py,4,Merge by hand: compare both versions with the base.
+HIGH,Theirs only,class body,HomeGatewayStatusAdmin,wareApp/admin.py,167,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,HomeGatewayStatusAdmin.Meta,wareApp/admin.py,178,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,MeterDisconnectionEventAdmin,wareApp/admin.py,184,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,MeterDisconnectionEventAdmin.Meta,wareApp/admin.py,188,,,New on their side: port it into our code base.
+HIGH,Theirs only,class body,MonitoringCustomerSitesInfo,wareApp/views.py,1746,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,DG_fuel_for_Roadcaste,wareApp/tasks.py,64,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,HomeGatewayStatusAdmin.status_colored,wareApp/admin.py,170,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,MonitoringCustomerSitesInfo._get_sites,wareApp/views.py,1754,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,MonitoringCustomerSitesInfo.get,wareApp/views.py,1807,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,MonitoringCustomerSitesInfo.post,wareApp/views.py,1810,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_deferred_mqtt_client1,wareApp/tasks.py,3803,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_deferred_mqtt_client2,wareApp/tasks.py,3816,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_deferred_task,wareApp/tasks.py,3780,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_group_by_bucket,wareApp/load_data/rollups.py,76,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_handle_load_data_message,wareApp/load_data/handler.py,15,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,_retired_mqtt_client2_inline_load_data,wareApp/tasks.py,2352,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,get_loconav_fuel_data,wareApp/tasks.py,59,,,New on their side: port it into our code base.
+HIGH,Theirs only,function,roadcasteAPIUpdated,wareApp/tasks.py,54,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.tasks:app,wareApp/tasks.py,27,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,wareApp.views:DG_FUEL_DB_ALIAS,wareApp/views.py,89,,,New on their side: port it into our code base.
+HIGH,Theirs only,setting,warehouse.settings:CACHES,warehouse/settings.py,235,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,monitoringCustomerSites/,wareApp/urls.py,127,,,New on their side: port it into our code base.
+HIGH,Theirs only,url route,monitoringSitesList/,wareApp/urls.py,128,,,New on their side: port it into our code base.
+MEDIUM,Different base versions,class body,Email_History,wareApp/models.py,627,wareApp/models.py,914,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,FirePumpAlarm,wareApp/models.py,608,wareApp/models.py,888,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,HourlyLoadData.Meta,wareApp/models.py,719,wareApp/models.py,1044,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MonthlyLoadSharePercentage,wareApp/models.py,580,wareApp/models.py,853,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,MonthlyMinMaxLoadData,wareApp/models.py,770,wareApp/models.py,1116,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteBaseline,wareApp/models.py,421,wareApp/models.py,526,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteLoadParameters,wareApp/models.py,887,wareApp/models.py,1234,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteLoadPower,wareApp/models.py,521,wareApp/models.py,772,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SiteLoadPower.Meta,wareApp/models.py,540,wareApp/models.py,793,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,SupplyLoadTimeShare,wareApp/models.py,169,wareApp/models.py,280,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,setting,warehouse.settings:MIDDLEWARE,warehouse/settings.py,51,warehouse/settings.py,62,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Only theirs changed,class body,AisleGroup,wareApp/models.py,231,wareApp/models.py,351,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,GatewayTopic,wareApp/mqtt/topics.py,9,wareApp/mqtt/topics.py,9,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,LoadReading,wareApp/load_data/parser.py,6,wareApp/load_data/parser.py,6,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,MeterDisconnectionEvent,wareApp/models.py,982,wareApp/models.py,1445,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,MeterDisconnectionEvent.Meta,wareApp/models.py,1007,wareApp/models.py,1470,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,class body,SiteCeleryPingApi,wareApp/views.py,10558,wareApp/views/monitoring.py,83,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,MeterDisconnectionIngestView.post,wareApp/views.py,10950,wareApp/views/monitoring.py,364,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,RecoveryUploadAPIView.post,wareApp/recovery/views.py,14,wareApp/recovery/views.py,18,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,_dg_fuel_db_alias,wareApp/views.py,92,wareApp/views/common.py,62,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,_extrema,wareApp/load_data/rollups.py,34,wareApp/load_data/rollups.py,47,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,_materialized_buckets,wareApp/load_data/rollups.py,44,wareApp/load_data/rollups.py,64,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,_save_extrema,wareApp/load_data/rollups.py,57,wareApp/load_data/rollups.py,98,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,mqtt_client1,wareApp/tasks.py,80,wareApp/tasks.py,41,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,mqtt_client2,wareApp/tasks.py,3928,wareApp/tasks.py,53,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,function,parse_gateway_topic,wareApp/mqtt/topics.py,16,wareApp/mqtt/topics.py,16,Port their change into our version (file shown under 'Our file').
+MEDIUM,Only theirs changed,setting,warehouse.settings:DATABASE_ROUTERS,warehouse/settings.py,85,warehouse/settings.py,122,Port their change into our version (file shown under 'Our file').
+MEDIUM,They removed it,class body,AisleGroup.DgFuelProvider,,,wareApp/models.py,352,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,CustomerSnapshotApiOld,,,wareApp/views/customer.py,158,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DailyLoadData.Meta,,,wareApp/models.py,1073,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,DgUnitConsumption.DailyDataStatus,,,wareApp/models.py,1177,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,Email_History.Meta,,,wareApp/models.py,933,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,FirePumpAlarm.Meta,,,wareApp/models.py,908,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,MonthlyMinMaxLoadData.Meta,,,wareApp/models.py,1125,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,RawLoadData.Meta,,,wareApp/models.py,1020,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,SiteBaseline.Meta,,,wareApp/models.py,542,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,SiteLoadParameters.Meta,,,wareApp/models.py,1259,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,class body,SupplyLoadTimeShare.Meta,,,wareApp/models.py,298,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,Command._find_leg,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,82,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,Command._messages,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,92,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,Command._simulate,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,29,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_extrema_by_bucket,,,wareApp/load_data/rollups.py,136,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_is_listener_worker,,,wareApp/tasks.py,73,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_records_for_extrema,,,wareApp/load_data/rollups.py,81,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_send_throttled_motor_on_email,,,wareApp/mqtt/fire_alarm.py,44,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_task_is_active_or_reserved,,,wareApp/tasks.py,57,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,_update_monthly_share_if_due,,,wareApp/mqtt/supply_time.py,37,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,request_remote_access,,,wareApp/mqtt/remote_access.py,10,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,start_queue_one_mqtt_client,,,wareApp/tasks.py,123,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,function,start_queue_two_mqtt_client,,,wareApp/tasks.py,133,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.load_data.rollups:_last_daily_rollup_hour_by_site,,,wareApp/load_data/rollups.py,10,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.load_data.rollups:_rollup_locks_by_site,,,wareApp/load_data/rollups.py,11,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.management.commands.simulate_mqtt_queue_routing:TOPIC_PATTERN,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,10,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.consumers:logger,,,wareApp/mqtt/consumers.py,18,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.consumption:logger,,,wareApp/mqtt/consumption.py,43,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.daily_consumption_recovery:logger,,,wareApp/mqtt/daily_consumption_recovery.py,22,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.fire_alarm:logger,,,wareApp/mqtt/fire_alarm.py,11,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.hourly_consumption_recovery:logger,,,wareApp/mqtt/hourly_consumption_recovery.py,22,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.load:logger,,,wareApp/mqtt/load.py,25,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.load_runtime_recovery:logger,,,wareApp/mqtt/load_runtime_recovery.py,20,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.remote_access:REMOTE_ACCESS_ACTIONS,,,wareApp/mqtt/remote_access.py,7,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.remote_access:logger,,,wareApp/mqtt/remote_access.py,5,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.mqtt.supply_time:logger,,,wareApp/mqtt/supply_time.py,19,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.recovery.views:logger,,,wareApp/recovery/views.py,9,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.tasks:_mqtt_start_dispatched,,,wareApp/tasks.py,23,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.tasks:_mqtt_start_lock,,,wareApp/tasks.py,22,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,wareApp.tasks:logger,,,wareApp/tasks.py,20,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,warehouse.settings:CELERY_WORKER_PREFETCH_MULTIPLIER,,,warehouse/settings.py,286,They deleted it: check whether our code still needs it.
+MEDIUM,They removed it,setting,warehouse.settings:USE_SECONDARY_DATABASE,,,warehouse/settings.py,121,They deleted it: check whether our code still needs it.
+LOW,Only ours changed,class body,AisleGroupFields,wareApp/admin.py,50,wareApp/admin.py,123,Keep ours (they did not change it).
+LOW,Only ours changed,class body,AlarmListSerializer,wareApp/serializers.py,100,wareApp/serializers.py,81,Keep ours (they did not change it).
+LOW,Only ours changed,class body,AlarmListSerializer.Meta,wareApp/serializers.py,101,wareApp/serializers.py,107,Keep ours (they did not change it).
+LOW,Only ours changed,class body,AlarmNotifications,wareApp/models.py,462,wareApp/models.py,551,Keep ours (they did not change it).
+LOW,Only ours changed,class body,AlarmsList,wareApp/views.py,6935,wareApp/views/alarms.py,13,Keep ours (they did not change it).
+LOW,Only ours changed,class body,AlarmsListDetail,wareApp/views.py,6978,wareApp/views/alarms.py,59,Keep ours (they did not change it).
+LOW,Only ours changed,class body,CustomerSiteManager,wareApp/models.py,138,wareApp/models.py,233,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DGAlertsData,wareApp/models.py,783,wareApp/models.py,1137,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DGFuelAlertDataAdmin,wareApp/admin.py,108,wareApp/admin.py,234,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DailyLoadData,wareApp/models.py,735,wareApp/models.py,1060,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DailyLoadDataAdmin,wareApp/admin.py,80,wareApp/admin.py,180,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DailyReadingFields,wareApp/admin.py,36,wareApp/admin.py,98,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DailySiteReading,wareApp/models.py,362,wareApp/models.py,479,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DgFuelConsumptionData,wareApp/models.py,792,wareApp/models.py,1145,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DgFuelConsumptionDataAdmin,wareApp/admin.py,92,wareApp/admin.py,207,Keep ours (they did not change it).
+LOW,Only ours changed,class body,DgUnitConsumptionAdmin,wareApp/admin.py,98,wareApp/admin.py,212,Keep ours (they did not change it).
+LOW,Only ours changed,class body,EmailHistoryAdmin,wareApp/admin.py,70,wareApp/admin.py,161,Keep ours (they did not change it).
+LOW,Only ours changed,class body,FloorFields,wareApp/admin.py,64,wareApp/admin.py,155,Keep ours (they did not change it).
+LOW,Only ours changed,class body,ForgetPassword,wareApp/views.py,1521,wareApp/views/auth.py,81,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HomeGatewayStatus,wareApp/models.py,1013,wareApp/models.py,1478,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HourlyLoadData,wareApp/models.py,710,wareApp/models.py,1029,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HourlyLoadDataAdmin,wareApp/admin.py,75,wareApp/admin.py,166,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HourlyReadingFields,wareApp/admin.py,6,wareApp/admin.py,54,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HourlySiteReading,wareApp/models.py,311,wareApp/models.py,437,Keep ours (they did not change it).
+LOW,Only ours changed,class body,HourlySiteReading.Meta,wareApp/models.py,345,wareApp/models.py,460,Keep ours (they did not change it).
+LOW,Only ours changed,class body,MainsDgLoadData,wareApp/models.py,747,wareApp/models.py,1086,Keep ours (they did not change it).
+LOW,Only ours changed,class body,MainsDgLoadDataAdmin,wareApp/admin.py,86,wareApp/admin.py,194,Keep ours (they did not change it).
+LOW,Only ours changed,class body,RawLoadData,wareApp/models.py,699,wareApp/models.py,1007,Keep ours (they did not change it).
+LOW,Only ours changed,class body,RecoveryMonitor,wareApp/models.py,933,wareApp/models.py,1302,Keep ours (they did not change it).
+LOW,Only ours changed,class body,RecoveryMonitor.Meta,wareApp/models.py,970,wareApp/models.py,1346,Keep ours (they did not change it).
+LOW,Only ours changed,class body,ResetPasswordApi,wareApp/views.py,1560,wareApp/views/auth.py,127,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SensorAisleUnitConsumptionAdmin,wareApp/admin.py,103,wareApp/admin.py,229,Keep ours (they did not change it).
+LOW,Only ours changed,class body,Site,wareApp/models.py,65,wareApp/models.py,148,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SiteBaselineFields,wareApp/admin.py,43,wareApp/admin.py,110,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SiteCeleryPingAdmin,wareApp/admin.py,159,wareApp/admin.py,276,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SiteFields,wareApp/admin.py,57,wareApp/admin.py,139,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SuperUserAllAlarmsPriorityBasedOnCustomersList,wareApp/views.py,408,wareApp/views/superadmin.py,195,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SuperUserAllAlarmsTypeBasedOnCustomersList,wareApp/views.py,438,wareApp/views/superadmin.py,223,Keep ours (they did not change it).
+LOW,Only ours changed,class body,SupplyTimeShareFields,wareApp/admin.py,14,wareApp/admin.py,67,Keep ours (they did not change it).
+LOW,Only ours changed,class body,TotalAlarmsOnCustomerPageTabularForm,wareApp/views.py,2428,wareApp/views/customer.py,351,Keep ours (they did not change it).
+LOW,Only ours changed,class body,TotalAlarmsOnSitePageTabularForm,wareApp/views.py,4216,wareApp/views/site.py,436,Keep ours (they did not change it).
+LOW,Only ours changed,class body,TotalAlarmsTypeCountOnCustomerPage,wareApp/views.py,2470,wareApp/views/customer.py,382,Keep ours (they did not change it).
+LOW,Only ours changed,class body,WareappConfig,wareApp/apps.py,4,wareApp/apps.py,4,Keep ours (they did not change it).
+LOW,Only ours changed,function,AlarmsList.post,wareApp/views.py,6936,wareApp/views/alarms.py,21,Keep ours (they did not change it).
+LOW,Only ours changed,function,AlarmsListDetail.post,wareApp/views.py,6979,wareApp/views/alarms.py,62,Keep ours (they did not change it).
+LOW,Only ours changed,function,BaselineData.post,wareApp/views.py,4025,wareApp/views/baseline.py,51,Keep ours (they did not change it).
+LOW,Only ours changed,function,BaselineHistory.post,wareApp/views.py,3991,wareApp/views/baseline.py,17,Keep ours (they did not change it).
+LOW,Only ours changed,function,CreateCustomerUsingProvisioning.post,wareApp/views.py,4311,wareApp/views/provisioning.py,36,Keep ours (they did not change it).
+LOW,Only ours changed,function,CreateHomeGatewayIdUsingProvisioning.post,wareApp/views.py,4431,wareApp/views/provisioning.py,156,Keep ours (they did not change it).
+LOW,Only ours changed,function,Create_Group,wareApp/models.py,25,wareApp/models.py,103,Keep ours (they did not change it).
+LOW,Only ours changed,function,CustomerMonthlyGraphicalData.post,wareApp/views.py,1680,wareApp/views/customer.py,91,Keep ours (they did not change it).
+LOW,Only ours changed,function,CustomerTotalConsumption.post,wareApp/views.py,1632,wareApp/views/customer.py,41,Keep ours (they did not change it).
+LOW,Only ours changed,function,DgFuelConsumptionDataApi.post,wareApp/views.py,5598,wareApp/views/dg_fuel.py,495,Keep ours (they did not change it).
+LOW,Only ours changed,function,DgFuelConsumptionDataApi_new.post,wareApp/views.py,1126,wareApp/views/dg_fuel.py,352,Keep ours (they did not change it).
+LOW,Only ours changed,function,DgFuelConsumptionDataCustomRangeApi.post,wareApp/views.py,5718,wareApp/views/dg_fuel.py,617,Keep ours (they did not change it).
+LOW,Only ours changed,function,DgFuelConsumptionDataCustomRangeApiUsingPushAPIs.post,wareApp/views.py,8214,wareApp/views/dg_fuel.py,1201,Keep ours (they did not change it).
+LOW,Only ours changed,function,DgFuelMonthlyTrend.post,wareApp/views.py,6635,wareApp/views/dg_fuel.py,850,Keep ours (they did not change it).
+LOW,Only ours changed,function,DownloadExcel.post,wareApp/views.py,5009,wareApp/views/energy_saving.py,1360,Keep ours (they did not change it).
+LOW,Only ours changed,function,DownloadFluctuatedPowerFactor.post,wareApp/views.py,5460,wareApp/views/load.py,406,Keep ours (they did not change it).
+LOW,Only ours changed,function,DownloadMinMaxMonthlyLoadData.post,wareApp/views.py,5406,wareApp/views/load.py,352,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyBarChart.post,wareApp/views.py,7398,wareApp/views/energy_saving.py,1662,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyBarChartOld.post,wareApp/views.py,2646,wareApp/views/energy_saving.py,173,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyBarChartTestVB.post,wareApp/views.py,9398,wareApp/views/energy_saving.py,2103,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyBarChart_new.post,wareApp/views.py,7717,wareApp/views/energy_saving.py,1908,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyBarChartbackup.post,wareApp/views.py,7157,wareApp/views/energy_saving.py,1422,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyTrendApi.post,wareApp/views.py,3085,wareApp/views/energy_saving.py,436,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingMonthlyTrendExcelDownload.post,wareApp/views.py,3254,wareApp/views/energy_saving.py,607,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingsHourlyBarChart.post,wareApp/views.py,3796,wareApp/views/energy_saving.py,1164,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingsHourlyBarChartOld.post,wareApp/views.py,3639,wareApp/views/energy_saving.py,994,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingsHourlyBarChartV2.post,wareApp/views.py,3882,wareApp/views/energy_saving.py,1250,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingsHourlyBarChartVB.post,wareApp/views.py,10156,wareApp/views/energy_saving.py,2574,Keep ours (they did not change it).
+LOW,Only ours changed,function,EnergySavingsHourlyExcelDownloadVB.get,wareApp/views.py,9491,wareApp/views/energy_saving.py,2196,Keep ours (they did not change it).
+LOW,Only ours changed,function,FetchDGAlertData.post,wareApp/views.py,5582,wareApp/views/dg_fuel.py,479,Keep ours (they did not change it).
+LOW,Only ours changed,function,FetchFluctuatedPowerFactor.post,wareApp/views.py,5313,wareApp/views/load.py,259,Keep ours (they did not change it).
+LOW,Only ours changed,function,FetchMinMaxMonthlyLoadData.post,wareApp/views.py,5352,wareApp/views/load.py,298,Keep ours (they did not change it).
+LOW,Only ours changed,function,FireAlarm.post,wareApp/views.py,4539,wareApp/views/fire.py,21,Keep ours (they did not change it).
+LOW,Only ours changed,function,FireEquiSystemTypeAdd.post,wareApp/views.py,4720,wareApp/views/fire.py,180,Keep ours (they did not change it).
+LOW,Only ours changed,function,FireEquiSystemTypefetch.post,wareApp/views.py,4702,wareApp/views/fire.py,162,Keep ours (they did not change it).
+LOW,Only ours changed,function,FireEquipmentSystemAdd.post,wareApp/views.py,4628,wareApp/views/fire.py,88,Keep ours (they did not change it).
+LOW,Only ours changed,function,FireEquipmentSystemFetch.post,wareApp/views.py,4674,wareApp/views/fire.py,134,Keep ours (they did not change it).
+LOW,Only ours changed,function,ForgetPassword.post,wareApp/views.py,1526,wareApp/views/auth.py,88,Keep ours (they did not change it).
+LOW,Only ours changed,function,HourlySiteReadingForOneSite.post,wareApp/views.py,1829,wareApp/views/site.py,376,Keep ours (they did not change it).
+LOW,Only ours changed,function,LightsDataApi.post,wareApp/views.py,4814,wareApp/views/devices.py,14,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoadDataExcelDownloadMonthlyRange.post,wareApp/views.py,9119,wareApp/views/load.py,735,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoadGraphApiForEverySecond.post,wareApp/views.py,5124,wareApp/views/load.py,84,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoadGraphApiForHourlyData.post,wareApp/views.py,5150,wareApp/views/load.py,110,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoginApi.post,wareApp/views.py,1484,wareApp/views/auth.py,48,Keep ours (they did not change it).
+LOW,Only ours changed,function,LoginSerializer.validate,wareApp/serializers.py,20,wareApp/serializers.py,14,Keep ours (they did not change it).
+LOW,Only ours changed,function,NewSubMeteringMonthlyTrendApi.post,wareApp/views.py,6752,wareApp/views/submetering.py,640,Keep ours (they did not change it).
+LOW,Only ours changed,function,ParticularCustomerInfo.post,wareApp/views.py,2418,wareApp/views/customer.py,341,Keep ours (they did not change it).
+LOW,Only ours changed,function,ParticularSiteSnapshotEnergySavingApi.post,wareApp/views.py,2502,wareApp/views/energy_saving.py,29,Keep ours (they did not change it).
+LOW,Only ours changed,function,ParticularSiteSnapshotEnergySavingApiVB.post,wareApp/views.py,10376,wareApp/views/energy_saving.py,2794,Keep ours (they did not change it).
+LOW,Only ours changed,function,PowerDistributionHourlyBarChart.post,wareApp/views.py,2125,wareApp/views/power_distribution.py,276,Keep ours (they did not change it).
+LOW,Only ours changed,function,PowerDistributionHourlyBarChartTime.post,wareApp/views.py,1981,wareApp/views/power_distribution.py,132,Keep ours (they did not change it).
+LOW,Only ours changed,function,PowerSourceDistributionMonthlyBarChart.post,wareApp/views.py,2040,wareApp/views/power_distribution.py,191,Keep ours (they did not change it).
+LOW,Only ours changed,function,PowerSourceDistributionMonthlyBarChartTime.post,wareApp/views.py,1872,wareApp/views/power_distribution.py,23,Keep ours (they did not change it).
+LOW,Only ours changed,function,ResetPasswordApi.post,wareApp/views.py,1564,wareApp/views/auth.py,141,Keep ours (they did not change it).
+LOW,Only ours changed,function,SavingBaselineData.post,wareApp/views.py,4061,wareApp/views/baseline.py,87,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteApiBasedOnSiteType.post,wareApp/views.py,4261,wareApp/views/site.py,471,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteCurrentLoadInfo.post,wareApp/views.py,1320,wareApp/views/site.py,300,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteInfo.post,wareApp/views.py,1817,wareApp/views/site.py,364,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteLoadParameters.save,wareApp/models.py,901,wareApp/models.py,1248,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteTotalGraphDataDaily.post,wareApp/views.py,546,wareApp/views/site.py,24,Keep ours (they did not change it).
+LOW,Only ours changed,function,SiteTotalGraphDataHourly.post,wareApp/views.py,711,wareApp/views/site.py,189,Keep ours (they did not change it).
+LOW,Only ours changed,function,SnapshotApi.post,wareApp/views.py,4735,wareApp/views/fire.py,195,Keep ours (they did not change it).
+LOW,Only ours changed,function,SubmeteringHourlyBarChart.post,wareApp/views.py,6262,wareApp/views/submetering.py,459,Keep ours (they did not change it).
+LOW,Only ours changed,function,SubmeteringHourlyBarChartNew.post,wareApp/views.py,6361,wareApp/views/submetering.py,558,Keep ours (they did not change it).
+LOW,Only ours changed,function,SubmeteringMonthlyBarChart.post,wareApp/views.py,2907,wareApp/views/submetering.py,89,Keep ours (they did not change it).
+LOW,Only ours changed,function,SubmeteringSnapshotAPI.post,wareApp/views.py,6207,wareApp/views/submetering.py,404,Keep ours (they did not change it).
+LOW,Only ours changed,function,SuperAdminSnapShot.post,wareApp/views.py,313,wareApp/views/superadmin.py,134,Keep ours (they did not change it).
+LOW,Only ours changed,function,SuperUserAllAlarmsPriorityBasedOnCustomersList.post,wareApp/views.py,409,wareApp/views/superadmin.py,198,Keep ours (they did not change it).
+LOW,Only ours changed,function,SuperUserAllAlarmsTypeBasedOnCustomersList.post,wareApp/views.py,439,wareApp/views/superadmin.py,228,Keep ours (they did not change it).
+LOW,Only ours changed,function,TotalAlarmsOnCustomerPageTabularForm.post,wareApp/views.py,2430,wareApp/views/customer.py,359,Keep ours (they did not change it).
+LOW,Only ours changed,function,TotalAlarmsOnSitePageTabularForm.post,wareApp/views.py,4218,wareApp/views/site.py,444,Keep ours (they did not change it).
+LOW,Only ours changed,function,TotalAlarmsTypeCountOnCustomerPage.post,wareApp/views.py,2472,wareApp/views/customer.py,388,Keep ours (they did not change it).
+LOW,Only ours changed,function,ValidatedToken.post,wareApp/views.py,1499,wareApp/views/auth.py,62,Keep ours (they did not change it).
+LOW,Only ours changed,function,_send_smtp_email,wareApp/sendmail.py,25,wareApp/sendmail.py,62,Keep ours (they did not change it).
+LOW,Only ours changed,function,aisle_group_update_leg_id,wareApp/models.py,287,wareApp/models.py,416,Keep ours (they did not change it).
+LOW,Only ours changed,function,attempt_fetch_for_unit,wareApp/dg_fuel/sessions.py,422,wareApp/dg_fuel/sessions.py,424,Keep ours (they did not change it).
+LOW,Only ours changed,function,avgDataApi.post,wareApp/views.py,4920,wareApp/views/devices.py,57,Keep ours (they did not change it).
+LOW,Only ours changed,function,detect_refuel_from_alerts,wareApp/fuel_providers.py,371,wareApp/fuel_providers.py,416,Keep ours (they did not change it).
+LOW,Only ours changed,function,detect_theft_from_alerts,wareApp/fuel_providers.py,390,wareApp/fuel_providers.py,436,Keep ours (they did not change it).
+LOW,Only ours changed,function,emailcheck,wareApp/sendmail.py,346,wareApp/sendmail.py,394,Keep ours (they did not change it).
+LOW,Only ours changed,function,entryExit,wareApp/utility.py,10,wareApp/utility.py,12,Keep ours (they did not change it).
+LOW,Only ours changed,function,fetch_loconav_fuel,wareApp/fuel_providers.py,150,wareApp/fuel_providers.py,193,Keep ours (they did not change it).
+LOW,Only ours changed,function,fetch_loconav_report,wareApp/fuel_providers.py,346,wareApp/fuel_providers.py,391,Keep ours (they did not change it).
+LOW,Only ours changed,function,fetch_roadcast_fuel,wareApp/fuel_providers.py,47,wareApp/fuel_providers.py,86,Keep ours (they did not change it).
+LOW,Only ours changed,function,fetch_roadcast_pull_api,wareApp/fuel_providers.py,113,wareApp/fuel_providers.py,152,Keep ours (they did not change it).
+LOW,Only ours changed,function,fetch_roadcast_report,wareApp/fuel_providers.py,284,wareApp/fuel_providers.py,327,Keep ours (they did not change it).
+LOW,Only ours changed,function,line,wareApp/sendmail.py,86,wareApp/sendmail.py,149,Keep ours (they did not change it).
+LOW,Only ours changed,function,process_hourly,wareApp/recovery/processor.py,379,wareApp/recovery/processor.py,382,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_alarm_for_dg_overtime,wareApp/sendmail.py,498,wareApp/sendmail.py,602,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_alarm_for_high_voltage,wareApp/sendmail.py,399,wareApp/sendmail.py,500,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_alarm_for_low_voltage,wareApp/sendmail.py,435,wareApp/sendmail.py,537,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_alarm_aviconn_user,wareApp/sendmail.py,174,wareApp/sendmail.py,237,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_alarm_user,wareApp/sendmail.py,244,wareApp/sendmail.py,294,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_equipments_system,wareApp/sendmail.py,375,wareApp/sendmail.py,428,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_equipments_system_30days_before,wareApp/sendmail.py,231,wareApp/sendmail.py,288,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_equipments_system_45days_before,wareApp/sendmail.py,217,wareApp/sendmail.py,280,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_equipments_system_8days_before,wareApp/sendmail.py,191,wareApp/sendmail.py,268,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_fire_equipments_system_after4days,wareApp/sendmail.py,204,wareApp/sendmail.py,274,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_for_dg_fuel_under_level,wareApp/sendmail.py,471,wareApp/sendmail.py,574,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_for_motor_aviconn_user,wareApp/sendmail.py,329,wareApp/sendmail.py,378,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_for_pf_fluctuation,wareApp/sendmail.py,393,wareApp/sendmail.py,445,Keep ours (they did not change it).
+LOW,Only ours changed,function,send_mail_for_sensor_by_pass,wareApp/sendmail.py,122,wareApp/sendmail.py,186,Keep ours (they did not change it).
+LOW,Only ours changed,function,subscribe,wareApp/mqtt/routing.py,49,wareApp/mqtt/routing.py,65,Keep ours (they did not change it).
+LOW,Only ours changed,function,update_daily_from_hourly,wareApp/recovery/processor.py,118,wareApp/recovery/processor.py,125,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:ALLOWED_HOSTS,warehouse/settings.py,31,warehouse/settings.py,35,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:CORS_ORIGIN_ALLOW_ALL,warehouse/settings.py,32,warehouse/settings.py,36,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:CSRF_COOKIE_SECURE,warehouse/settings.py,172,warehouse/settings.py,42,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:DEFAULT_FROM_EMAIL,warehouse/settings.py,153,warehouse/settings.py,199,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_BACKEND,warehouse/settings.py,154,warehouse/settings.py,191,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_HOST,warehouse/settings.py,149,warehouse/settings.py,194,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_HOST_PASSWORD,warehouse/settings.py,151,warehouse/settings.py,198,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_HOST_USER,warehouse/settings.py,150,warehouse/settings.py,197,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_PORT,warehouse/settings.py,152,warehouse/settings.py,195,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:EMAIL_USE_TLS,warehouse/settings.py,148,warehouse/settings.py,196,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:LOGGING,warehouse/settings.py,196,warehouse/settings.py,430,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:REST_FRAMEWORK,warehouse/settings.py,177,warehouse/settings.py,93,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:SECURE_SSL_REDIRECT,warehouse/settings.py,169,warehouse/settings.py,40,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:SESSION_COOKIE_SECURE,warehouse/settings.py,170,warehouse/settings.py,41,Keep ours (they did not change it).
+LOW,Only ours changed,setting,warehouse.settings:env,warehouse/settings.py,17,warehouse/settings.py,18,Keep ours (they did not change it).
+LOW,Ours only,class body,AislePlan,,,wareApp/baseline_setup.py,63,New on our side: keep.
+LOW,Ours only,class body,AisleSyncRecoveryStatus,,,wareApp/models.py,1372,New on our side: keep.
+LOW,Ours only,class body,AisleSyncRecoveryStatus.Meta,,,wareApp/models.py,1419,New on our side: keep.
+LOW,Ours only,class body,AisleSyncRecoveryStatusAdmin,,,wareApp/admin.py,316,New on our side: keep.
+LOW,Ours only,class body,AlarmNotifications.Meta,,,wareApp/models.py,661,New on our side: keep.
+LOW,Ours only,class body,AlarmNotificationsAdmin,,,wareApp/admin.py,405,New on our side: keep.
+LOW,Ours only,class body,AlarmSetting,,,wareApp/models.py,698,New on our side: keep.
+LOW,Ours only,class body,AlarmSetting.Meta,,,wareApp/models.py,735,New on our side: keep.
+LOW,Ours only,class body,AlarmSettingAdmin,,,wareApp/admin.py,391,New on our side: keep.
+LOW,Ours only,class body,BaselineMemo,,,wareApp/mqtt/services/baseline.py,76,New on our side: keep.
+LOW,Ours only,class body,BaselineSetup,,,wareApp/views/baseline.py,248,New on our side: keep.
+LOW,Ours only,class body,BaselineSetupError,,,wareApp/baseline_setup.py,47,New on our side: keep.
+LOW,Ours only,class body,CatchUp,,,wareApp/catch_up_spread.py,70,New on our side: keep.
+LOW,Ours only,class body,CatchUpSpread,,,wareApp/models.py,1517,New on our side: keep.
+LOW,Ours only,class body,CatchUpSpreadApi,,,wareApp/views/catch_up.py,29,New on our side: keep.
+LOW,Ours only,class body,CleanReadingMixin,,,wareApp/models.py,63,New on our side: keep.
+LOW,Ours only,class body,Command,,,wareApp/management/commands/alarm_recipients.py; wareApp/management/commands/close_resolved_alarms.py; wareApp/management/commands/gateway_health.py; wareApp/management/commands/rebuild_hourly_baseline.py; wareApp/management/commands/recovery_status_sweep.py; wareApp/management/commands/replay_consumption_alarms.py; wareApp/management/commands/replay_dead_letters.py; wareApp/management/commands/report_reading_duplicates.py; wareApp/management/commands/resync_daily_totals.py; wareApp/management/commands/simulate_mqtt_gateway_traffic.py; wareApp/management/commands/simulate_mqtt_queue_routing.py,18,New on our side: keep.
+LOW,Ours only,class body,ConsumptionHandler,,,wareApp/mqtt/handlers.py,46,New on our side: keep.
+LOW,Ours only,class body,DailyConsumptionRecoveryHandler,,,wareApp/mqtt/handlers.py,86,New on our side: keep.
+LOW,Ours only,class body,EmailFailure,,,wareApp/sendmail.py,41,New on our side: keep.
+LOW,Ours only,class body,FireAlarmHandler,,,wareApp/mqtt/handlers.py,72,New on our side: keep.
+LOW,Ours only,class body,GatewayOverheatAlertApi,,,wareApp/views/gateway_overheat.py,25,New on our side: keep.
+LOW,Ours only,class body,GatewayOverheatThrottle,,,wareApp/views/gateway_overheat.py,19,New on our side: keep.
+LOW,Ours only,class body,HourlyConsumptionRecoveryHandler,,,wareApp/mqtt/handlers.py,79,New on our side: keep.
+LOW,Ours only,class body,InvalidOverheatAlert,,,wareApp/gateway_overheat.py,37,New on our side: keep.
+LOW,Ours only,class body,KeyValuePayload,,,wareApp/mqtt/payloads.py,35,New on our side: keep.
+LOW,Ours only,class body,LoadHandler,,,wareApp/mqtt/handlers.py,65,New on our side: keep.
+LOW,Ours only,class body,LoadRuntimeRecoveryHandler,,,wareApp/mqtt/handlers.py,93,New on our side: keep.
+LOW,Ours only,class body,MessageHandler,,,wareApp/mqtt/handlers.py,28,New on our side: keep.
+LOW,Ours only,class body,MonitoringMarker,,,wareApp/models.py,1537,New on our side: keep.
+LOW,Ours only,class body,MonthlyLoadSharePercentageAdmin,,,wareApp/admin.py,86,New on our side: keep.
+LOW,Ours only,class body,MqttDeadLetter,,,wareApp/models.py,1552,New on our side: keep.
+LOW,Ours only,class body,MqttDeadLetter.Meta,,,wareApp/models.py,1563,New on our side: keep.
+LOW,Ours only,class body,MqttDeadLetterAdmin,,,wareApp/admin.py,383,New on our side: keep.
+LOW,Ours only,class body,MqttEnvelope,,,wareApp/mqtt/envelope.py,17,New on our side: keep.
+LOW,Ours only,class body,MqttPublisher,,,wareApp/mqtt/services/publisher.py,20,New on our side: keep.
+LOW,Ours only,class body,OverheatAlert,,,wareApp/gateway_overheat.py,42,New on our side: keep.
+LOW,Ours only,class body,Packet,,,wareApp/mqtt/consumption_batch.py,136,New on our side: keep.
+LOW,Ours only,class body,PendingEmail,,,wareApp/models.py,1499,New on our side: keep.
+LOW,Ours only,class body,PendingEmailAdmin,,,wareApp/admin.py,419,New on our side: keep.
+LOW,Ours only,class body,Plan,,,wareApp/baseline_setup.py,89,New on our side: keep.
+LOW,Ours only,class body,RecoveryDecision,,,wareApp/mqtt/services/recovery_status.py,88,New on our side: keep.
+LOW,Ours only,class body,RecoveryMonitorAdmin,,,wareApp/admin.py,347,New on our side: keep.
+LOW,Ours only,class body,RecoveryScope,,,wareApp/mqtt/services/recovery_status.py,48,New on our side: keep.
+LOW,Ours only,class body,RecoverySlot,,,wareApp/mqtt/services/recovery_status.py,94,New on our side: keep.
+LOW,Ours only,class body,RecoveryStatusService,,,wareApp/mqtt/services/recovery_status.py,101,New on our side: keep.
+LOW,Ours only,class body,Report,,,wareApp/mqtt/services/gateway_health.py,200,New on our side: keep.
+LOW,Ours only,class body,SiteLoadPowerAdmin,,,wareApp/admin.py,80,New on our side: keep.
+LOW,Ours only,class body,SlotWriteResult,,,wareApp/mqtt/slot_writes.py,21,New on our side: keep.
+LOW,Ours only,class body,Spike,,,wareApp/mqtt/services/consumption_alarms.py,187,New on our side: keep.
+LOW,Ours only,class body,SpreadError,,,wareApp/catch_up_spread.py,50,New on our side: keep.
+LOW,Ours only,class body,SupplyTimeHandler,,,wareApp/mqtt/handlers.py,56,New on our side: keep.
+LOW,Ours only,class body,_AisleState,,,wareApp/mqtt/consumption_batch.py,152,New on our side: keep.
+LOW,Ours only,class body,_BaselineMemo,,,wareApp/mqtt/consumption.py,248,New on our side: keep.
+LOW,Ours only,class body,_MailGate,,,wareApp/management/commands/replay_consumption_alarms.py,32,New on our side: keep.
+LOW,Ours only,class body,_Parsed,,,wareApp/mqtt/consumption_batch.py,143,New on our side: keep.
+LOW,Ours only,class body,_Rollback,,,wareApp/management/commands/gateway_health.py,22,New on our side: keep.
+LOW,Ours only,class body,_nothing,,,wareApp/management/commands/gateway_health.py,62,New on our side: keep.
+LOW,Ours only,function,AislePlan.as_dict,,,wareApp/baseline_setup.py,75,New on our side: keep.
+LOW,Ours only,function,AislePlan.value,,,wareApp/baseline_setup.py,72,New on our side: keep.
+LOW,Ours only,function,AisleSyncRecoveryStatus.__str__,,,wareApp/models.py,1441,New on our side: keep.
+LOW,Ours only,function,AisleSyncRecoveryStatusAdmin.retry_failed_recovery,,,wareApp/admin.py,336,New on our side: keep.
+LOW,Ours only,function,AlarmListSerializer._open,,,wareApp/serializers.py,97,New on our side: keep.
+LOW,Ours only,function,AlarmListSerializer.get_open_days,,,wareApp/serializers.py,101,New on our side: keep.
+LOW,Ours only,function,AlarmListSerializer.get_open_for,,,wareApp/serializers.py,104,New on our side: keep.
+LOW,Ours only,function,AlarmNotifications.save,,,wareApp/models.py,684,New on our side: keep.
+LOW,Ours only,function,AlarmNotifications.source,,,wareApp/models.py,676,New on our side: keep.
+LOW,Ours only,function,AlarmSetting.__str__,,,wareApp/models.py,740,New on our side: keep.
+LOW,Ours only,function,BaselineMemo.__init__,,,wareApp/mqtt/services/baseline.py,79,New on our side: keep.
+LOW,Ours only,function,BaselineMemo.for_day,,,wareApp/mqtt/services/baseline.py,85,New on our side: keep.
+LOW,Ours only,function,BaselineSetup.post,,,wareApp/views/baseline.py,264,New on our side: keep.
+LOW,Ours only,function,CatchUp.as_dict,,,wareApp/catch_up_spread.py,87,New on our side: keep.
+LOW,Ours only,function,CatchUp.hours,,,wareApp/catch_up_spread.py,80,New on our side: keep.
+LOW,Ours only,function,CatchUp.share,,,wareApp/catch_up_spread.py,84,New on our side: keep.
+LOW,Ours only,function,CatchUpSpread.__str__,,,wareApp/models.py,1533,New on our side: keep.
+LOW,Ours only,function,CatchUpSpreadApi.post,,,wareApp/views/catch_up.py,40,New on our side: keep.
+LOW,Ours only,function,CleanReadingMixin.clean_reading_values,,,wareApp/models.py,74,New on our side: keep.
+LOW,Ours only,function,CleanReadingMixin.save,,,wareApp/models.py,82,New on our side: keep.
+LOW,Ours only,function,Command.add_arguments,,,wareApp/management/commands/alarm_recipients.py; wareApp/management/commands/close_resolved_alarms.py; wareApp/management/commands/gateway_health.py; wareApp/management/commands/rebuild_hourly_baseline.py; wareApp/management/commands/replay_consumption_alarms.py; wareApp/management/commands/replay_dead_letters.py; wareApp/management/commands/report_reading_duplicates.py; wareApp/management/commands/resync_daily_totals.py; wareApp/management/commands/simulate_mqtt_gateway_traffic.py; wareApp/management/commands/simulate_mqtt_queue_routing.py,21,New on our side: keep.
+LOW,Ours only,function,Command.handle,,,wareApp/management/commands/alarm_recipients.py; wareApp/management/commands/close_resolved_alarms.py; wareApp/management/commands/gateway_health.py; wareApp/management/commands/rebuild_hourly_baseline.py; wareApp/management/commands/recovery_status_sweep.py; wareApp/management/commands/replay_consumption_alarms.py; wareApp/management/commands/replay_dead_letters.py; wareApp/management/commands/report_reading_duplicates.py; wareApp/management/commands/resync_daily_totals.py; wareApp/management/commands/simulate_mqtt_gateway_traffic.py; wareApp/management/commands/simulate_mqtt_queue_routing.py,25,New on our side: keep.
+LOW,Ours only,function,ConsumptionHandler.handle,,,wareApp/mqtt/handlers.py,50,New on our side: keep.
+LOW,Ours only,function,CustomerSnapshotApiOld.post,,,wareApp/views/customer.py,160,New on our side: keep.
+LOW,Ours only,function,DailyConsumptionRecoveryHandler.handle,,,wareApp/mqtt/handlers.py,89,New on our side: keep.
+LOW,Ours only,function,EmailFailure.__bool__,,,wareApp/sendmail.py,50,New on our side: keep.
+LOW,Ours only,function,EmailFailure.__eq__,,,wareApp/sendmail.py,53,New on our side: keep.
+LOW,Ours only,function,EmailFailure.__init__,,,wareApp/sendmail.py,46,New on our side: keep.
+LOW,Ours only,function,EmailFailure.__repr__,,,wareApp/sendmail.py,58,New on our side: keep.
+LOW,Ours only,function,FireAlarmHandler.handle,,,wareApp/mqtt/handlers.py,75,New on our side: keep.
+LOW,Ours only,function,GatewayOverheatAlertApi.post,,,wareApp/views/gateway_overheat.py,31,New on our side: keep.
+LOW,Ours only,function,HourlyConsumptionRecoveryHandler.handle,,,wareApp/mqtt/handlers.py,82,New on our side: keep.
+LOW,Ours only,function,KeyValuePayload.__contains__,,,wareApp/mqtt/payloads.py,59,New on our side: keep.
+LOW,Ours only,function,KeyValuePayload.__init__,,,wareApp/mqtt/payloads.py,44,New on our side: keep.
+LOW,Ours only,function,KeyValuePayload.get,,,wareApp/mqtt/payloads.py,62,New on our side: keep.
+LOW,Ours only,function,KeyValuePayload.parse,,,wareApp/mqtt/payloads.py,49,New on our side: keep.
+LOW,Ours only,function,LoadHandler.handle,,,wareApp/mqtt/handlers.py,68,New on our side: keep.
+LOW,Ours only,function,LoadRuntimeRecoveryHandler.handle,,,wareApp/mqtt/handlers.py,96,New on our side: keep.
+LOW,Ours only,function,MessageHandler.__repr__,,,wareApp/mqtt/handlers.py,42,New on our side: keep.
+LOW,Ours only,function,MessageHandler.handle,,,wareApp/mqtt/handlers.py,39,New on our side: keep.
+LOW,Ours only,function,MonitoringMarker.__str__,,,wareApp/models.py,1548,New on our side: keep.
+LOW,Ours only,function,MqttDeadLetter.__str__,,,wareApp/models.py,1572,New on our side: keep.
+LOW,Ours only,function,MqttEnvelope.from_mqtt,,,wareApp/mqtt/envelope.py,27,New on our side: keep.
+LOW,Ours only,function,MqttEnvelope.message_id,,,wareApp/mqtt/envelope.py,40,New on our side: keep.
+LOW,Ours only,function,MqttEnvelope.task_args,,,wareApp/mqtt/envelope.py,45,New on our side: keep.
+LOW,Ours only,function,MqttPublisher.__init__,,,wareApp/mqtt/services/publisher.py,27,New on our side: keep.
+LOW,Ours only,function,MqttPublisher.get,,,wareApp/mqtt/services/publisher.py,36,New on our side: keep.
+LOW,Ours only,function,MqttPublisher.publish,,,wareApp/mqtt/services/publisher.py,45,New on our side: keep.
+LOW,Ours only,function,PendingEmail.__str__,,,wareApp/models.py,1513,New on our side: keep.
+LOW,Ours only,function,Plan.as_dict,,,wareApp/baseline_setup.py,97,New on our side: keep.
+LOW,Ours only,function,RecoveryMonitorAdmin.retry_recovery,,,wareApp/admin.py,377,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.aisle,,,wareApp/mqtt/services/recovery_status.py,55,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.label,,,wareApp/mqtt/services/recovery_status.py,63,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.leg_id,,,wareApp/mqtt/services/recovery_status.py,73,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.monitor_filter,,,wareApp/mqtt/services/recovery_status.py,78,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.source,,,wareApp/mqtt/services/recovery_status.py,59,New on our side: keep.
+LOW,Ours only,function,RecoveryScope.status_kwargs,,,wareApp/mqtt/services/recovery_status.py,83,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.__init__,,,wareApp/mqtt/services/recovery_status.py,102,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService._catch_up_slot,,,wareApp/mqtt/services/recovery_status.py,323,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService._latest_monitor,,,wareApp/mqtt/services/recovery_status.py,125,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService._stored_slots,,,wareApp/mqtt/services/recovery_status.py,337,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService._write_status,,,wareApp/mqtt/services/recovery_status.py,134,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.failed_retry_after,,,wareApp/mqtt/services/recovery_status.py,113,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.max_attempts,,,wareApp/mqtt/services/recovery_status.py,109,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.record_applied,,,wareApp/mqtt/services/recovery_status.py,272,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.record_response,,,wareApp/mqtt/services/recovery_status.py,225,New on our side: keep.
+LOW,Ours only,function,RecoveryStatusService.request_recovery,,,wareApp/mqtt/services/recovery_status.py,138,New on our side: keep.
+LOW,Ours only,function,Report.__str__,,,wareApp/mqtt/services/gateway_health.py,206,New on our side: keep.
+LOW,Ours only,function,Site.__str__,,,wareApp/models.py,229,New on our side: keep.
+LOW,Ours only,function,SlotWriteResult.changed,,,wareApp/mqtt/slot_writes.py,32,New on our side: keep.
+LOW,Ours only,function,Spike.__init__,,,wareApp/mqtt/services/consumption_alarms.py,192,New on our side: keep.
+LOW,Ours only,function,SupplyTimeHandler.handle,,,wareApp/mqtt/handlers.py,59,New on our side: keep.
+LOW,Ours only,function,WareappConfig.ready,,,wareApp/apps.py,8,New on our side: keep.
+LOW,Ours only,function,_BaselineMemo.__init__,,,wareApp/mqtt/consumption.py,251,New on our side: keep.
+LOW,Ours only,function,_BaselineMemo._values,,,wareApp/mqtt/consumption.py,256,New on our side: keep.
+LOW,Ours only,function,_BaselineMemo._warn_missing,,,wareApp/mqtt/consumption.py,262,New on our side: keep.
+LOW,Ours only,function,_BaselineMemo.daily,,,wareApp/mqtt/consumption.py,282,New on our side: keep.
+LOW,Ours only,function,_BaselineMemo.hourly,,,wareApp/mqtt/consumption.py,278,New on our side: keep.
+LOW,Ours only,function,_MailGate.__call__,,,wareApp/management/commands/replay_consumption_alarms.py,44,New on our side: keep.
+LOW,Ours only,function,_MailGate.__init__,,,wareApp/management/commands/replay_consumption_alarms.py,35,New on our side: keep.
+LOW,Ours only,function,_activity_threshold,,,wareApp/mqtt/services/consumption_alarms.py,231,New on our side: keep.
+LOW,Ours only,function,_alarm_override_recipients,,,wareApp/sendmail.py,36,New on our side: keep.
+LOW,Ours only,function,_applied_spreads,,,wareApp/views/catch_up.py,14,New on our side: keep.
+LOW,Ours only,function,_apply,,,wareApp/mqtt/consumption_batch.py,325,New on our side: keep.
+LOW,Ours only,function,_as_saved,,,wareApp/mqtt/consumption_batch.py,296,New on our side: keep.
+LOW,Ours only,function,_baseline_for_day,,,wareApp/mqtt/daily_consumption_recovery.py,41,New on our side: keep.
+LOW,Ours only,function,_baseline_key,,,wareApp/mqtt/services/site_cache.py,30,New on our side: keep.
+LOW,Ours only,function,_baselines_key,,,wareApp/mqtt/services/site_cache.py,34,New on our side: keep.
+LOW,Ours only,function,_bounds_key,,,wareApp/load_data/monthly.py,18,New on our side: keep.
+LOW,Ours only,function,_bulk,,,wareApp/mqtt/consumption_batch.py,504,New on our side: keep.
+LOW,Ours only,function,_bypass_auto,,,wareApp/mqtt/services/consumption_alarms.py,112,New on our side: keep.
+LOW,Ours only,function,_bypass_threshold,,,wareApp/mqtt/services/consumption_alarms.py,79,New on our side: keep.
+LOW,Ours only,function,_cache_key,,,wareApp/mqtt/sync_status.py,41,New on our side: keep.
+LOW,Ours only,function,_cap_warehouse_saving_values,,,wareApp/mqtt/consumption.py,85,New on our side: keep.
+LOW,Ours only,function,_clear,,,wareApp/mqtt/services/gateway_health.py,265,New on our side: keep.
+LOW,Ours only,function,_consumed_queues,,,wareApp/tasks.py,78,New on our side: keep.
+LOW,Ours only,function,_consumption_alarms,,,wareApp/mqtt/consumption.py,190,New on our side: keep.
+LOW,Ours only,function,_consumption_recovery_request,,,wareApp/mqtt/consumption.py,221,New on our side: keep.
+LOW,Ours only,function,_counted_hours,,,wareApp/mqtt/consumption.py,286,New on our side: keep.
+LOW,Ours only,function,_cutoff,,,wareApp/alarm_feed.py,69,New on our side: keep.
+LOW,Ours only,function,_daily_total_from_hourly,,,wareApp/mqtt/consumption.py,302,New on our side: keep.
+LOW,Ours only,function,_daily_updates,,,wareApp/mqtt/consumption.py,320,New on our side: keep.
+LOW,Ours only,function,_date,,,wareApp/management/commands/replay_consumption_alarms.py,58,New on our side: keep.
+LOW,Ours only,function,_day_total,,,wareApp/mqtt/consumption_batch.py,306,New on our side: keep.
+LOW,Ours only,function,_dispatch,,,wareApp/tasks.py,200,New on our side: keep.
+LOW,Ours only,function,_down_after,,,wareApp/mqtt/services/gateway_health.py,81,New on our side: keep.
+LOW,Ours only,function,_drop_baseline,,,wareApp/mqtt/services/site_cache.py,109,New on our side: keep.
+LOW,Ours only,function,_drop_site,,,wareApp/mqtt/services/site_cache.py,104,New on our side: keep.
+LOW,Ours only,function,_evaluate_meter,,,wareApp/mqtt/services/gateway_health.py,451,New on our side: keep.
+LOW,Ours only,function,_first,,,wareApp/mqtt/consumption_batch.py,175,New on our side: keep.
+LOW,Ours only,function,_fmt,,,wareApp/alarm_feed.py,32,New on our side: keep.
+LOW,Ours only,function,_gap_reason,,,wareApp/mqtt/services/spike_alarms.py,37,New on our side: keep.
+LOW,Ours only,function,_gateway_details,,,wareApp/mqtt/services/gateway_health.py,327,New on our side: keep.
+LOW,Ours only,function,_gateway_number,,,wareApp/gateway_overheat.py,176,New on our side: keep.
+LOW,Ours only,function,_gateway_plan,,,wareApp/mqtt/services/gateway_health.py,281,New on our side: keep.
+LOW,Ours only,function,_handler,,,wareApp/mqtt/registry.py,47,New on our side: keep.
+LOW,Ours only,function,_handler_name,,,wareApp/mqtt/registry.py,35,New on our side: keep.
+LOW,Ours only,function,_high_percent,,,wareApp/mqtt/services/consumption_alarms.py,72,New on our side: keep.
+LOW,Ours only,function,_host_list,,,warehouse/settings.py,22,New on our side: keep.
+LOW,Ours only,function,_hour,,,wareApp/catch_up_spread.py; wareApp/mqtt/consumption_batch.py; wareApp/mqtt/log_format.py,54,New on our side: keep.
+LOW,Ours only,function,_hour_rows,,,wareApp/mqtt/services/consumption_alarms.py,157,New on our side: keep.
+LOW,Ours only,function,_hour_sums,,,wareApp/catch_up_spread.py,152,New on our side: keep.
+LOW,Ours only,function,_hourly_row,,,wareApp/catch_up_spread.py,205,New on our side: keep.
+LOW,Ours only,function,_hours,,,wareApp/mqtt/services/gateway_health.py,94,New on our side: keep.
+LOW,Ours only,function,_in_window,,,wareApp/mqtt/services/consumption_alarms.py,235,New on our side: keep.
+LOW,Ours only,function,_last_hourly_entry,,,wareApp/mqtt/consumption_batch.py,281,New on our side: keep.
+LOW,Ours only,function,_load_states,,,wareApp/mqtt/consumption_batch.py,234,New on our side: keep.
+LOW,Ours only,function,_mark_healthy,,,wareApp/mqtt/sync_status.py,64,New on our side: keep.
+LOW,Ours only,function,_normalized_key,,,wareApp/mqtt/payloads.py,31,New on our side: keep.
+LOW,Ours only,function,_nothing.__enter__,,,wareApp/management/commands/gateway_health.py,63,New on our side: keep.
+LOW,Ours only,function,_nothing.__exit__,,,wareApp/management/commands/gateway_health.py,66,New on our side: keep.
+LOW,Ours only,function,_notify_meter_reading_issue,,,wareApp/mqtt/consumption.py,107,New on our side: keep.
+LOW,Ours only,function,_parse,,,wareApp/mqtt/consumption_batch.py,183,New on our side: keep.
+LOW,Ours only,function,_parse_consumption_message,,,wareApp/mqtt/consumption.py,53,New on our side: keep.
+LOW,Ours only,function,_parse_daily_recovery_message,,,wareApp/mqtt/daily_consumption_recovery.py,25,New on our side: keep.
+LOW,Ours only,function,_parse_fire_alarm_message,,,wareApp/mqtt/fire_alarm.py,14,New on our side: keep.
+LOW,Ours only,function,_parse_hourly_recovery_message,,,wareApp/mqtt/hourly_consumption_recovery.py,25,New on our side: keep.
+LOW,Ours only,function,_parse_load_message,,,wareApp/mqtt/load.py,88,New on our side: keep.
+LOW,Ours only,function,_parse_load_runtime_recovery_message,,,wareApp/mqtt/load_runtime_recovery.py,23,New on our side: keep.
+LOW,Ours only,function,_parse_supply_time_message,,,wareApp/mqtt/supply_time.py,22,New on our side: keep.
+LOW,Ours only,function,_parse_time,,,wareApp/management/commands/replay_dead_letters.py,37,New on our side: keep.
+LOW,Ours only,function,_payload_text,,,wareApp/mqtt/envelope.py; wareApp/mqtt/payloads.py,10,New on our side: keep.
+LOW,Ours only,function,_pf_thresholds,,,wareApp/mqtt/load.py,61,New on our side: keep.
+LOW,Ours only,function,_pk,,,wareApp/mqtt/sync_status.py,27,New on our side: keep.
+LOW,Ours only,function,_power_issue,,,wareApp/alarm_feed.py,36,New on our side: keep.
+LOW,Ours only,function,_previous_hour_exists,,,wareApp/mqtt/supply_time.py,72,New on our side: keep.
+LOW,Ours only,function,_publish_options,,,wareApp/mqtt/consumers.py,21,New on our side: keep.
+LOW,Ours only,function,_queue_one_message_for_processing,,,wareApp/mqtt/consumers.py,36,New on our side: keep.
+LOW,Ours only,function,_raise,,,wareApp/mqtt/services/gateway_health.py,211,New on our side: keep.
+LOW,Ours only,function,_recheck_minutes,,,wareApp/load_data/rollups.py,24,New on our side: keep.
+LOW,Ours only,function,_reconnecting,,,wareApp/mqtt/services/gateway_health.py,312,New on our side: keep.
+LOW,Ours only,function,_record,,,wareApp/mqtt/services/consumption_alarms.py,270,New on our side: keep.
+LOW,Ours only,function,_record_power_factor_alarm,,,wareApp/mqtt/load.py,185,New on our side: keep.
+LOW,Ours only,function,_record_voltage_alarm,,,wareApp/mqtt/load.py,130,New on our side: keep.
+LOW,Ours only,function,_retry_recovery,,,wareApp/admin.py,291,New on our side: keep.
+LOW,Ours only,function,_row,,,wareApp/alarm_feed.py,209,New on our side: keep.
+LOW,Ours only,function,_run_handler,,,wareApp/tasks.py,233,New on our side: keep.
+LOW,Ours only,function,_run_isolated_mqtt_client,,,wareApp/mqtt/consumers.py,70,New on our side: keep.
+LOW,Ours only,function,_runs,,,wareApp/mqtt/log_format.py,33,New on our side: keep.
+LOW,Ours only,function,_save_batched_extrema,,,wareApp/load_data/rollups.py,104,New on our side: keep.
+LOW,Ours only,function,_schedule_refresh,,,wareApp/baseline_setup.py,329,New on our side: keep.
+LOW,Ours only,function,_send_fems_email,,,wareApp/sendmail.py,263,New on our side: keep.
+LOW,Ours only,function,_send_fire_alarm_email,,,wareApp/mqtt/fire_alarm.py,26,New on our side: keep.
+LOW,Ours only,function,_set_baseline,,,wareApp/baseline_setup.py,205,New on our side: keep.
+LOW,Ours only,function,_setting,,,wareApp/mqtt/services/alarm_closer.py,46,New on our side: keep.
+LOW,Ours only,function,_settings_changed,,,wareApp/mqtt/services/alarm_policy.py,177,New on our side: keep.
+LOW,Ours only,function,_site_for_queued_message,,,wareApp/tasks.py,168,New on our side: keep.
+LOW,Ours only,function,_site_key,,,wareApp/mqtt/services/site_cache.py,26,New on our side: keep.
+LOW,Ours only,function,_site_phase_thresholds,,,wareApp/mqtt/load.py,32,New on our side: keep.
+LOW,Ours only,function,_smtp_config,,,wareApp/sendmail.py,22,New on our side: keep.
+LOW,Ours only,function,_spike_note,,,wareApp/mqtt/services/consumption_alarms.py,227,New on our side: keep.
+LOW,Ours only,function,_start_mqtt_client_for_worker,,,wareApp/tasks.py,87,New on our side: keep.
+LOW,Ours only,function,_stored,,,wareApp/mqtt/consumption_batch.py,320,New on our side: keep.
+LOW,Ours only,function,_summary,,,wareApp/mqtt/services/notifications.py,80,New on our side: keep.
+LOW,Ours only,function,_text,,,wareApp/gateway_overheat.py,50,New on our side: keep.
+LOW,Ours only,function,_threshold,,,wareApp/mqtt/services/consumption_alarms.py,94,New on our side: keep.
+LOW,Ours only,function,_ttl,,,wareApp/mqtt/services/idempotency.py,33,New on our side: keep.
+LOW,Ours only,function,_version,,,wareApp/mqtt/services/alarm_policy.py,38,New on our side: keep.
+LOW,Ours only,function,_voltage_alarm_data,,,wareApp/mqtt/load.py,118,New on our side: keep.
+LOW,Ours only,function,_voltage_thresholds,,,wareApp/mqtt/load.py,37,New on our side: keep.
+LOW,Ours only,function,_with_database_connection_cleanup,,,wareApp/tasks.py,181,New on our side: keep.
+LOW,Ours only,function,active_alarms,,,wareApp/alarm_feed.py,75,New on our side: keep.
+LOW,Ours only,function,alive_from_lines,,,wareApp/mqtt/services/gateway_health.py,126,New on our side: keep.
+LOW,Ours only,function,apply,,,wareApp/baseline_setup.py; wareApp/catch_up_spread.py,289,New on our side: keep.
+LOW,Ours only,function,backfill,,,wareApp/baseline_setup.py,225,New on our side: keep.
+LOW,Ours only,function,baseline_info,,,wareApp/mqtt/services/baseline.py,31,New on our side: keep.
+LOW,Ours only,function,baseline_row,,,wareApp/mqtt/services/baseline.py,42,New on our side: keep.
+LOW,Ours only,function,baselines,,,wareApp/mqtt/services/site_cache.py,81,New on our side: keep.
+LOW,Ours only,function,batching_enabled,,,wareApp/mqtt/consumption_batch.py,75,New on our side: keep.
+LOW,Ours only,function,bypass_threshold_for,,,wareApp/mqtt/services/consumption_alarms.py,117,New on our side: keep.
+LOW,Ours only,function,candidate_sites,,,wareApp/mqtt/services/alarm_sites.py,81,New on our side: keep.
+LOW,Ours only,function,cap_reading,,,wareApp/models.py,37,New on our side: keep.
+LOW,Ours only,function,cap_reading_row,,,wareApp/models.py,54,New on our side: keep.
+LOW,Ours only,function,cause,,,wareApp/mqtt/services/spike_alarms.py,58,New on our side: keep.
+LOW,Ours only,function,check_consumption_spikes,,,wareApp/tasks.py,303,New on our side: keep.
+LOW,Ours only,function,check_gateway_health,,,wareApp/tasks.py,258,New on our side: keep.
+LOW,Ours only,function,check_intraday_bypass,,,wareApp/mqtt/services/consumption_alarms.py,458,New on our side: keep.
+LOW,Ours only,function,claim,,,wareApp/mqtt/services/idempotency.py,44,New on our side: keep.
+LOW,Ours only,function,clean_reading_float,,,wareApp/models.py,13,New on our side: keep.
+LOW,Ours only,function,clear_cache,,,wareApp/mqtt/services/alarm_policy.py,46,New on our side: keep.
+LOW,Ours only,function,close_resolved,,,wareApp/mqtt/services/alarm_closer.py,110,New on our side: keep.
+LOW,Ours only,function,close_resolved_alarms,,,wareApp/tasks.py,270,New on our side: keep.
+LOW,Ours only,function,day_ranges,,,wareApp/mqtt/log_format.py,55,New on our side: keep.
+LOW,Ours only,function,decide_email,,,wareApp/mqtt/services/alarm_policy.py,166,New on our side: keep.
+LOW,Ours only,function,display_site,,,wareApp/mqtt/services/alarm_sites.py,36,New on our side: keep.
+LOW,Ours only,function,display_site_id,,,wareApp/mqtt/services/alarm_sites.py,29,New on our side: keep.
+LOW,Ours only,function,effective_hours,,,wareApp/mqtt/services/baseline.py,48,New on our side: keep.
+LOW,Ours only,function,enqueue,,,wareApp/mqtt/consumption_batch.py,79,New on our side: keep.
+LOW,Ours only,function,evaluate,,,wareApp/mqtt/services/gateway_health.py,471,New on our side: keep.
+LOW,Ours only,function,evaluate_daily_alarms,,,wareApp/mqtt/services/consumption_alarms.py,347,New on our side: keep.
+LOW,Ours only,function,evaluate_days,,,wareApp/mqtt/services/consumption_alarms.py,509,New on our side: keep.
+LOW,Ours only,function,evaluate_gateways,,,wareApp/mqtt/services/gateway_health.py,335,New on our side: keep.
+LOW,Ours only,function,evaluate_meters,,,wareApp/mqtt/services/gateway_health.py,425,New on our side: keep.
+LOW,Ours only,function,fetch_remote_pings,,,wareApp/mqtt/services/gateway_health.py,139,New on our side: keep.
+LOW,Ours only,function,find_catch_ups,,,wareApp/catch_up_spread.py,106,New on our side: keep.
+LOW,Ours only,function,find_spikes,,,wareApp/mqtt/services/consumption_alarms.py,196,New on our side: keep.
+LOW,Ours only,function,flush,,,wareApp/mqtt/consumption_batch.py; wareApp/mqtt/services/gateway_activity.py,95,New on our side: keep.
+LOW,Ours only,function,flush_consumption_batch,,,wareApp/tasks.py,248,New on our side: keep.
+LOW,Ours only,function,gateway_aisles,,,wareApp/mqtt/services/alarm_sites.py,67,New on our side: keep.
+LOW,Ours only,function,gateway_number,,,wareApp/mqtt/services/gateway_health.py,88,New on our side: keep.
+LOW,Ours only,function,handle_consumption_message,,,wareApp/mqtt/consumption.py,338,New on our side: keep.
+LOW,Ours only,function,handle_daily_consumption_recovery_message,,,wareApp/mqtt/daily_consumption_recovery.py,47,New on our side: keep.
+LOW,Ours only,function,handle_fire_alarm_message,,,wareApp/mqtt/fire_alarm.py,62,New on our side: keep.
+LOW,Ours only,function,handle_hourly_consumption_recovery_message,,,wareApp/mqtt/hourly_consumption_recovery.py,41,New on our side: keep.
+LOW,Ours only,function,handle_load_message,,,wareApp/mqtt/load.py,228,New on our side: keep.
+LOW,Ours only,function,handle_load_runtime_recovery_message,,,wareApp/mqtt/load_runtime_recovery.py,36,New on our side: keep.
+LOW,Ours only,function,handle_supply_time_message,,,wareApp/mqtt/supply_time.py,92,New on our side: keep.
+LOW,Ours only,function,handler_for,,,wareApp/mqtt/registry.py,53,New on our side: keep.
+LOW,Ours only,function,home_gateway_id_for,,,wareApp/mqtt/log_context.py,1,New on our side: keep.
+LOW,Ours only,function,hour_counts_in_day,,,wareApp/models.py,42,New on our side: keep.
+LOW,Ours only,function,hour_ranges,,,wareApp/mqtt/log_format.py,44,New on our side: keep.
+LOW,Ours only,function,hour_span,,,wareApp/mqtt/log_format.py,14,New on our side: keep.
+LOW,Ours only,function,hourly_baseline,,,wareApp/mqtt/services/baseline.py,58,New on our side: keep.
+LOW,Ours only,function,is_emergency_supply,,,wareApp/mqtt/services/baseline.py,26,New on our side: keep.
+LOW,Ours only,function,is_handled,,,wareApp/mqtt/registry.py,41,New on our side: keep.
+LOW,Ours only,function,is_off,,,wareApp/mqtt/services/alarm_policy.py,68,New on our side: keep.
+LOW,Ours only,function,last_emailed_value,,,wareApp/mqtt/services/alarm_policy.py,143,New on our side: keep.
+LOW,Ours only,function,latest_baseline,,,wareApp/mqtt/services/site_cache.py,57,New on our side: keep.
+LOW,Ours only,function,live_site_ids,,,wareApp/mqtt/services/alarm_sites.py,44,New on our side: keep.
+LOW,Ours only,function,loconav_auth_headers,,,wareApp/fuel_providers.py,65,New on our side: keep.
+LOW,Ours only,function,log_bulk_write,,,wareApp/mqtt/log_format.py,71,New on our side: keep.
+LOW,Ours only,function,manual_threshold,,,wareApp/mqtt/services/alarm_policy.py,72,New on our side: keep.
+LOW,Ours only,function,mark,,,wareApp/mqtt/services/gateway_health.py,73,New on our side: keep.
+LOW,Ours only,function,mark_source_healthy,,,wareApp/mqtt/sync_status.py,95,New on our side: keep.
+LOW,Ours only,function,mark_sync_healthy,,,wareApp/mqtt/sync_status.py,90,New on our side: keep.
+LOW,Ours only,function,marker,,,wareApp/mqtt/services/gateway_health.py,77,New on our side: keep.
+LOW,Ours only,function,message_key,,,wareApp/mqtt/services/idempotency.py,37,New on our side: keep.
+LOW,Ours only,function,meter_issue_on,,,wareApp/mqtt/services/consumption_alarms.py,218,New on our side: keep.
+LOW,Ours only,function,missing_hours,,,wareApp/mqtt/log_format.py,26,New on our side: keep.
+LOW,Ours only,function,mode,,,wareApp/mqtt/services/alarm_policy.py,62,New on our side: keep.
+LOW,Ours only,function,monitored_site_ids,,,wareApp/mqtt/services/alarm_sites.py,48,New on our side: keep.
+LOW,Ours only,function,notify,,,wareApp/mqtt/services/notifications.py,33,New on our side: keep.
+LOW,Ours only,function,open_for,,,wareApp/alarm_feed.py,51,New on our side: keep.
+LOW,Ours only,function,open_info,,,wareApp/alarm_feed.py,60,New on our side: keep.
+LOW,Ours only,function,operation_hours_check,,,wareApp/mqtt/services/consumption_alarms.py,244,New on our side: keep.
+LOW,Ours only,function,parse_alert,,,wareApp/gateway_overheat.py,58,New on our side: keep.
+LOW,Ours only,function,parse_day,,,wareApp/baseline_setup.py; wareApp/catch_up_spread.py,51,New on our side: keep.
+LOW,Ours only,function,ping_information_fresh,,,wareApp/mqtt/services/gateway_health.py,192,New on our side: keep.
+LOW,Ours only,function,plan,,,wareApp/baseline_setup.py; wareApp/catch_up_spread.py,110,New on our side: keep.
+LOW,Ours only,function,priority_of,,,wareApp/mqtt/services/consumption_alarms.py,134,New on our side: keep.
+LOW,Ours only,function,process_consumption_batch,,,wareApp/mqtt/consumption_batch.py,528,New on our side: keep.
+LOW,Ours only,function,process_mqtt_message,,,wareApp/tasks.py,241,New on our side: keep.
+LOW,Ours only,function,processing_queue_for_site,,,wareApp/mqtt/routing.py,49,New on our side: keep.
+LOW,Ours only,function,publish_after_commit,,,wareApp/mqtt/services/publisher.py,58,New on our side: keep.
+LOW,Ours only,function,publish_recovery_request,,,wareApp/mqtt/handlers.py,23,New on our side: keep.
+LOW,Ours only,function,raise_power_alarm,,,wareApp/mqtt/services/alarms.py,29,New on our side: keep.
+LOW,Ours only,function,read_broker_log,,,wareApp/mqtt/services/gateway_health.py,99,New on our side: keep.
+LOW,Ours only,function,reading_capped,,,wareApp/models.py,32,New on our side: keep.
+LOW,Ours only,function,recipients,,,wareApp/mqtt/services/alarm_policy.py,99,New on our side: keep.
+LOW,Ours only,function,recompute_days,,,wareApp/catch_up_spread.py,187,New on our side: keep.
+LOW,Ours only,function,record_dead_letter,,,wareApp/mqtt/services/failures.py,29,New on our side: keep.
+LOW,Ours only,function,record_overheat,,,wareApp/gateway_overheat.py,83,New on our side: keep.
+LOW,Ours only,function,recovery_request_allowed,,,wareApp/mqtt/services/cooldown.py,7,New on our side: keep.
+LOW,Ours only,function,refresh_baseline_backfill,,,wareApp/tasks.py,280,New on our side: keep.
+LOW,Ours only,function,release,,,wareApp/mqtt/services/idempotency.py,53,New on our side: keep.
+LOW,Ours only,function,release_recovery_request,,,wareApp/mqtt/services/cooldown.py,18,New on our side: keep.
+LOW,Ours only,function,remember_failed,,,wareApp/mqtt/services/notifications.py,86,New on our side: keep.
+LOW,Ours only,function,replay,,,wareApp/management/commands/replay_dead_letters.py,46,New on our side: keep.
+LOW,Ours only,function,retry_pending,,,wareApp/mqtt/services/notifications.py,112,New on our side: keep.
+LOW,Ours only,function,retry_pending_emails,,,wareApp/tasks.py,294,New on our side: keep.
+LOW,Ours only,function,roadcast_auth_headers,,,wareApp/fuel_providers.py,50,New on our side: keep.
+LOW,Ours only,function,roadcast_credentials,,,wareApp/fuel_providers.py,43,New on our side: keep.
+LOW,Ours only,function,roadcast_pull_params,,,wareApp/fuel_providers.py,60,New on our side: keep.
+LOW,Ours only,function,rules,,,wareApp/mqtt/services/alarm_closer.py,50,New on our side: keep.
+LOW,Ours only,function,run_mqtt_client1,,,wareApp/mqtt/consumers.py,101,New on our side: keep.
+LOW,Ours only,function,run_mqtt_client2,,,wareApp/mqtt/consumers.py,128,New on our side: keep.
+LOW,Ours only,function,run_with_db_retry,,,wareApp/mqtt/services/failures.py,68,New on our side: keep.
+LOW,Ours only,function,scan,,,wareApp/mqtt/services/spike_alarms.py,85,New on our side: keep.
+LOW,Ours only,function,seen,,,wareApp/mqtt/services/gateway_activity.py,29,New on our side: keep.
+LOW,Ours only,function,send_alarm_email,,,wareApp/sendmail.py,463,New on our side: keep.
+LOW,Ours only,function,send_notification,,,wareApp/tasks.py,149,New on our side: keep.
+LOW,Ours only,function,setting,,,wareApp/mqtt/services/alarm_policy.py,53,New on our side: keep.
+LOW,Ours only,function,short_cause,,,wareApp/mqtt/services/spike_alarms.py,75,New on our side: keep.
+LOW,Ours only,function,should_email,,,wareApp/mqtt/services/alarm_policy.py,133,New on our side: keep.
+LOW,Ours only,function,site,,,wareApp/mqtt/services/site_cache.py,38,New on our side: keep.
+LOW,Ours only,function,site_location,,,wareApp/mqtt/services/alarm_policy.py,80,New on our side: keep.
+LOW,Ours only,function,site_targets,,,wareApp/mqtt/services/alarm_sites.py,59,New on our side: keep.
+LOW,Ours only,function,skipped_sites,,,wareApp/mqtt/services/gateway_health.py,275,New on our side: keep.
+LOW,Ours only,function,spike_hours,,,wareApp/mqtt/services/consumption_alarms.py,143,New on our side: keep.
+LOW,Ours only,function,split_paired_lists,,,wareApp/mqtt/payloads.py,4,New on our side: keep.
+LOW,Ours only,function,stale_history,,,wareApp/mqtt/consumption.py,195,New on our side: keep.
+LOW,Ours only,function,status_lookup,,,wareApp/mqtt/sync_status.py,31,New on our side: keep.
+LOW,Ours only,function,store_pings,,,wareApp/mqtt/services/gateway_health.py,173,New on our side: keep.
+LOW,Ours only,function,sweep,,,wareApp/management/commands/recovery_status_sweep.py,22,New on our side: keep.
+LOW,Ours only,function,tolerance_percent,,,wareApp/mqtt/services/alarm_policy.py,126,New on our side: keep.
+LOW,Ours only,function,undo,,,wareApp/catch_up_spread.py,264,New on our side: keep.
+LOW,Ours only,function,upsert_slots,,,wareApp/mqtt/slot_writes.py,37,New on our side: keep.
+LOW,Ours only,function,upsert_status,,,wareApp/mqtt/sync_status.py,46,New on our side: keep.
+LOW,Ours only,function,verified_day_total,,,wareApp/mqtt/services/consumption_alarms.py,167,New on our side: keep.
+LOW,Ours only,setting,wareApp.alarm_feed:ALARM_TYPES,,,wareApp/alarm_feed.py,28,New on our side: keep.
+LOW,Ours only,setting,wareApp.alarm_feed:GATEWAY_OVERHEAT,,,wareApp/alarm_feed.py,29,New on our side: keep.
+LOW,Ours only,setting,wareApp.alarm_feed:PRIORITY_LABELS,,,wareApp/alarm_feed.py,26,New on our side: keep.
+LOW,Ours only,setting,wareApp.baseline_setup:BATCH,,,wareApp/baseline_setup.py,44,New on our side: keep.
+LOW,Ours only,setting,wareApp.baseline_setup:MAX_SAMPLE_DAYS,,,wareApp/baseline_setup.py,43,New on our side: keep.
+LOW,Ours only,setting,wareApp.baseline_setup:logger,,,wareApp/baseline_setup.py,41,New on our side: keep.
+LOW,Ours only,setting,wareApp.catch_up_spread:CATCH_UP_FACTOR,,,wareApp/catch_up_spread.py,45,New on our side: keep.
+LOW,Ours only,setting,wareApp.catch_up_spread:LOOKBACK_DAYS,,,wareApp/catch_up_spread.py,46,New on our side: keep.
+LOW,Ours only,setting,wareApp.catch_up_spread:SHARE_WARN_FACTOR,,,wareApp/catch_up_spread.py,47,New on our side: keep.
+LOW,Ours only,setting,wareApp.catch_up_spread:logger,,,wareApp/catch_up_spread.py,43,New on our side: keep.
+LOW,Ours only,setting,wareApp.fuel_providers:ROADCAST_PULL_API_URL,,,wareApp/fuel_providers.py,40,New on our side: keep.
+LOW,Ours only,setting,wareApp.gateway_overheat:DEFAULT_THRESHOLD_C,,,wareApp/gateway_overheat.py,34,New on our side: keep.
+LOW,Ours only,setting,wareApp.gateway_overheat:GATEWAY_OBJECT_TYPE,,,wareApp/gateway_overheat.py,33,New on our side: keep.
+LOW,Ours only,setting,wareApp.gateway_overheat:GATEWAY_OVERHEAT_ALARM_TYPE,,,wareApp/gateway_overheat.py,32,New on our side: keep.
+LOW,Ours only,setting,wareApp.gateway_overheat:logger,,,wareApp/gateway_overheat.py,30,New on our side: keep.
+LOW,Ours only,setting,wareApp.load_data.handler:CONFIGURATION_ERRORS,,,wareApp/load_data/handler.py,18,New on our side: keep.
+LOW,Ours only,setting,wareApp.load_data.monthly:BOUNDS_CACHE_SECONDS,,,wareApp/load_data/monthly.py,15,New on our side: keep.
+LOW,Ours only,setting,wareApp.load_data.rollups:logger,,,wareApp/load_data/rollups.py,14,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.rebuild_hourly_baseline:BATCH,,,wareApp/management/commands/rebuild_hourly_baseline.py,21,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.replay_dead_letters:ORDERED_TYPES,,,wareApp/management/commands/replay_dead_letters.py,34,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.replay_dead_letters:SAFE_TYPES,,,wareApp/management/commands/replay_dead_letters.py,28,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.report_reading_duplicates:CHECKS,,,wareApp/management/commands/report_reading_duplicates.py,18,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.resync_daily_totals:BATCH,,,wareApp/management/commands/resync_daily_totals.py,37,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.resync_daily_totals:GLITCH_FACTOR,,,wareApp/management/commands/resync_daily_totals.py,41,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.resync_daily_totals:MAX_HOURLY_KWH,,,wareApp/management/commands/resync_daily_totals.py,40,New on our side: keep.
+LOW,Ours only,setting,wareApp.management.commands.resync_daily_totals:TOLERANCE,,,wareApp/management/commands/resync_daily_totals.py,39,New on our side: keep.
+LOW,Ours only,setting,wareApp.models:CAPPED_SITE_TYPES,,,wareApp/models.py,29,New on our side: keep.
+LOW,Ours only,setting,wareApp.models:MAX_READING_KWH,,,wareApp/models.py,28,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption:METER_READING_ISSUE_COOLDOWN_SECONDS,,,wareApp/mqtt/consumption.py,45,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption:METER_READING_ISSUE_PATTERN,,,wareApp/mqtt/consumption.py,46,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption:WAREHOUSE_SAVING_MAX_UNITS,,,wareApp/mqtt/consumption.py,82,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption_batch:BATCH_QUEUE,,,wareApp/mqtt/consumption_batch.py,67,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption_batch:BATCH_QUEUE_NAME,,,wareApp/mqtt/consumption_batch.py,66,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption_batch:BULK_BATCH_SIZE,,,wareApp/mqtt/consumption_batch.py,62,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption_batch:MAX_PACKETS_PER_FLUSH,,,wareApp/mqtt/consumption_batch.py,64,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.consumption_batch:logger,,,wareApp/mqtt/consumption_batch.py,60,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.load:ALARM_REPEAT,,,wareApp/mqtt/load.py,29,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.log_format:DAY,,,wareApp/mqtt/log_format.py,6,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.log_format:HOUR,,,wareApp/mqtt/log_format.py,5,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.log_format:MAX_RANGES,,,wareApp/mqtt/log_format.py,7,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.registry:LEGACY_TASK_NAMES,,,wareApp/mqtt/registry.py,24,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.registry:QUEUE_ONE_HANDLER_NAMES,,,wareApp/mqtt/registry.py,10,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.registry:RECOVERY_HANDLER_NAMES,,,wareApp/mqtt/registry.py,16,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_closer:A,,,wareApp/mqtt/services/alarm_closer.py,38,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_closer:DAILY,,,wareApp/mqtt/services/alarm_closer.py,41,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_closer:POWER,,,wareApp/mqtt/services/alarm_closer.py,39,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_closer:SAME_DAY,,,wareApp/mqtt/services/alarm_closer.py,40,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_closer:logger,,,wareApp/mqtt/services/alarm_closer.py,36,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_policy:CACHE_SECONDS,,,wareApp/mqtt/services/alarm_policy.py,33,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_policy:_NO_ROW,,,wareApp/mqtt/services/alarm_policy.py,35,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_policy:_VERSION_KEY,,,wareApp/mqtt/services/alarm_policy.py,34,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_recipients:GROUND_TEAM,,,wareApp/mqtt/services/alarm_recipients.py,49,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_recipients:GROUND_TEAM_ALL_SITES,,,wareApp/mqtt/services/alarm_recipients.py,21,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_recipients:LOCATION_TEAMS,,,wareApp/mqtt/services/alarm_recipients.py,26,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarm_recipients:SOFTWARE_TEAM,,,wareApp/mqtt/services/alarm_recipients.py,17,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarms:MEASURED_FIELDS,,,wareApp/mqtt/services/alarms.py,26,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.alarms:logger,,,wareApp/mqtt/services/alarms.py,24,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.baseline:EL_TOKEN,,,wareApp/mqtt/services/baseline.py,23,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.baseline:logger,,,wareApp/mqtt/services/baseline.py,21,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:BYPASSED,,,wareApp/mqtt/services/consumption_alarms.py,68,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:CATCH_UP_FACTOR,,,wareApp/mqtt/services/consumption_alarms.py,140,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:EVERY_DAY_TYPES,,,wareApp/mqtt/services/consumption_alarms.py,131,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:HIGH_CONSUMPTION,,,wareApp/mqtt/services/consumption_alarms.py,66,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:HIGH_PRIORITY_TYPES,,,wareApp/mqtt/services/consumption_alarms.py,128,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:LOW_CONSUMPTION,,,wareApp/mqtt/services/consumption_alarms.py,67,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:METER_READING_ISSUE,,,wareApp/mqtt/services/consumption_alarms.py,124,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:OPERATION_HOURS_INCREASED,,,wareApp/mqtt/services/consumption_alarms.py,69,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.consumption_alarms:logger,,,wareApp/mqtt/services/consumption_alarms.py,64,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.failures:DB_RETRY_DELAYS,,,wareApp/mqtt/services/failures.py,22,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.failures:DEAD_LETTER_DEDUPE_SECONDS,,,wareApp/mqtt/services/failures.py,26,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.failures:MAX_DEAD_LETTER_PAYLOAD,,,wareApp/mqtt/services/failures.py,23,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.failures:TRANSIENT_DB_ERRORS,,,wareApp/mqtt/services/failures.py,21,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.failures:logger,,,wareApp/mqtt/services/failures.py,19,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:DATA_TYPES,,,wareApp/mqtt/services/gateway_activity.py,21,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:FLUSH_SECONDS,,,wareApp/mqtt/services/gateway_activity.py,22,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:_last_flush,,,wareApp/mqtt/services/gateway_activity.py,26,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:_lock,,,wareApp/mqtt/services/gateway_activity.py,24,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:_pending,,,wareApp/mqtt/services/gateway_activity.py,25,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_activity:logger,,,wareApp/mqtt/services/gateway_activity.py,19,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:FIRST_READ_BYTES,,,wareApp/mqtt/services/gateway_health.py,61,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:GATEWAY_OBJECT,,,wareApp/mqtt/services/gateway_health.py,54,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:GATEWAY_PK_OFFSET,,,wareApp/mqtt/services/gateway_health.py,57,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:LISTENER_STARTED_MARKER,,,wareApp/mqtt/services/gateway_health.py,59,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:LOG_OFFSET_KEY,,,wareApp/mqtt/services/gateway_health.py,60,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:METER_OBJECT,,,wareApp/mqtt/services/gateway_health.py,53,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:PING_READ_MARKER,,,wareApp/mqtt/services/gateway_health.py,58,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:_ALIVE,,,wareApp/mqtt/services/gateway_health.py,68,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.gateway_health:logger,,,wareApp/mqtt/services/gateway_health.py,51,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.idempotency:GUARDED_FAMILIES,,,wareApp/mqtt/services/idempotency.py,30,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.notifications:ALLOWED_NOTIFICATIONS,,,wareApp/mqtt/services/notifications.py,22,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.notifications:QUEUE_ERRORS,,,wareApp/mqtt/services/notifications.py,17,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.notifications:RETRY_BATCH,,,wareApp/mqtt/services/notifications.py,77,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.notifications:RETRY_MINUTES,,,wareApp/mqtt/services/notifications.py,76,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.notifications:logger,,,wareApp/mqtt/services/notifications.py,19,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.publisher:logger,,,wareApp/mqtt/services/publisher.py,17,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:DAILY_CONSUMPTION,,,wareApp/mqtt/services/recovery_status.py,39,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:HOUR,,,wareApp/mqtt/services/recovery_status.py,37,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:HOURLY_CONSUMPTION,,,wareApp/mqtt/services/recovery_status.py,38,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:LOAD_RUNTIME,,,wareApp/mqtt/services/recovery_status.py,40,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:MAX_PAYLOAD_CHARS,,,wareApp/mqtt/services/recovery_status.py,44,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:OPEN_STATUSES,,,wareApp/mqtt/services/recovery_status.py,43,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.recovery_status:logger,,,wareApp/mqtt/services/recovery_status.py,35,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.site_cache:CONFIG_CACHE_TTL,,,wareApp/mqtt/services/site_cache.py,22,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.site_cache:_MISSING,,,wareApp/mqtt/services/site_cache.py,23,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.site_cache:logger,,,wareApp/mqtt/services/site_cache.py,20,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.spike_alarms:CONSUMPTION_SPIKE,,,wareApp/mqtt/services/spike_alarms.py,33,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.spike_alarms:GATEWAY_ALARMS,,,wareApp/mqtt/services/spike_alarms.py,34,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.services.spike_alarms:logger,,,wareApp/mqtt/services/spike_alarms.py,31,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.slot_writes:BULK_BATCH_SIZE,,,wareApp/mqtt/slot_writes.py,18,New on our side: keep.
+LOW,Ours only,setting,wareApp.mqtt.sync_status:STATUS_CACHE_TTL,,,wareApp/mqtt/sync_status.py,24,New on our side: keep.
+LOW,Ours only,setting,wareApp.sendmail:_FEMS_RECIPIENTS,,,wareApp/sendmail.py,256,New on our side: keep.
+LOW,Ours only,setting,wareApp.sendmail:logger,,,wareApp/sendmail.py,15,New on our side: keep.
+LOW,Ours only,setting,wareApp.views.catch_up:__all__,,,wareApp/views/catch_up.py,11,New on our side: keep.
+LOW,Ours only,setting,wareApp.views.common:DG_FUEL_DB_ALIAS,,,wareApp/views/common.py,59,New on our side: keep.
+LOW,Ours only,setting,wareApp.views.gateway_overheat:__all__,,,wareApp/views/gateway_overheat.py,16,New on our side: keep.
+LOW,Ours only,setting,wareApp.views.gateway_overheat:logger,,,wareApp/views/gateway_overheat.py,14,New on our side: keep.
+LOW,Ours only,setting,warehouse.__init__:__all__,,,warehouse/__init__.py,4,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_ACTIVITY_THRESHOLD_KWH,,,warehouse/settings.py,226,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_BYPASS_DEFAULT_PERCENT,,,warehouse/settings.py,225,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_CLOSE_CHECK_SECONDS,,,warehouse/settings.py,390,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_CLOSE_EVENT_HOURS,,,warehouse/settings.py,393,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_CLOSE_METER_ISSUE_MINUTES,,,warehouse/settings.py,395,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_CLOSE_OVERHEAT_HOURS,,,warehouse/settings.py,392,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_CLOSE_POWER_MINUTES,,,warehouse/settings.py,391,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_EMAIL_DEFAULT_TO,,,warehouse/settings.py,211,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_EMAIL_OVERRIDE_TO,,,warehouse/settings.py,208,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_FEED_MAX_AGE_DAYS,,,warehouse/settings.py,218,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT,,,warehouse/settings.py,220,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT,,,warehouse/settings.py,240,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_PF_AUTO_THRESHOLD,,,warehouse/settings.py,239,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_REEVALUATE_DAYS,,,warehouse/settings.py,228,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_REPEAT_CLEAR_HOURS,,,warehouse/settings.py,234,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_REPEAT_TOLERANCE_PERCENT,,,warehouse/settings.py,233,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_VOLTAGE_AUTO_HIGH,,,warehouse/settings.py,237,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ALARM_VOLTAGE_AUTO_LOW,,,warehouse/settings.py,238,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_BEAT_SCHEDULE,,,warehouse/settings.py,343,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_BROKER_TRANSPORT_OPTIONS,,,warehouse/settings.py,291,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_BROKER_URL,,,warehouse/settings.py,283,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_RESULT_BACKEND,,,warehouse/settings.py,284,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_TASK_IGNORE_RESULT,,,warehouse/settings.py,289,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CELERY_TASK_QUEUES,,,warehouse/settings.py,414,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:CONSUMPTION_SPIKE_CHECK_SECONDS,,,warehouse/settings.py,381,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:DEBUG,,,warehouse/settings.py,34,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:EMAIL_TIMEOUT,,,warehouse/settings.py,201,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_ALL_SILENT_MINUTES,,,warehouse/settings.py,372,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_CHECK_SECONDS,,,warehouse/settings.py,357,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_DOWN_MINUTES,,,warehouse/settings.py,358,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_PING_FRESH_MINUTES,,,warehouse/settings.py,359,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_REMINDER_HOURS,,,warehouse/settings.py,370,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_HEALTH_SKIP_SITES,,,warehouse/settings.py,362,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_OVERHEAT_EMAIL_SECONDS,,,warehouse/settings.py,215,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_OVERHEAT_STORE_SECONDS,,,warehouse/settings.py,214,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_PINGS_SSH,,,warehouse/settings.py,368,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:GATEWAY_PINGS_SSH_KEY,,,warehouse/settings.py,369,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:IS_PROD,,,warehouse/settings.py,19,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:LOCONAV_API_TOKEN,,,warehouse/settings.py,251,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_ASYNC_NOTIFICATIONS,,,warehouse/settings.py,335,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_BROKER_HOST,,,warehouse/settings.py,300,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_BROKER_PORT,,,warehouse/settings.py,301,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_CONSUMPTION_BATCH_SECONDS,,,warehouse/settings.py,339,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_IDEMPOTENCY_TTL_SECONDS,,,warehouse/settings.py,306,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_QUEUE1_CLIENT_ID,,,warehouse/settings.py,303,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_QUEUE2_CLIENT_ID,,,warehouse/settings.py,304,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_RECOVERY_FAILED_RETRY_SECONDS,,,warehouse/settings.py,318,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_RECOVERY_MAX_ATTEMPTS,,,warehouse/settings.py,317,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS,,,warehouse/settings.py,310,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_RECOVERY_STALE_DAYS,,,warehouse/settings.py,324,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_SITE_PARTITIONS,,,warehouse/settings.py,299,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_SYNC_LATE_SECONDS,,,warehouse/settings.py,326,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_SYNC_MISSING_SECONDS,,,warehouse/settings.py,327,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:MQTT_TRANSIENT_MESSAGES,,,warehouse/settings.py,332,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:NOTIFICATION_RETRY_CHECK_SECONDS,,,warehouse/settings.py,399,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:NOTIFICATION_RETRY_HOURS,,,warehouse/settings.py,398,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:PASSWORD_RESET_OTP_MINUTES,,,warehouse/settings.py,116,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:PASSWORD_RESET_RETURN_OTP,,,warehouse/settings.py,117,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:REDIS_URL,,,warehouse/settings.py,255,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ROADCAST_PULL_PASSWORD,,,warehouse/settings.py,249,New on our side: keep.
+LOW,Ours only,setting,warehouse.settings:ROADCAST_PULL_USERNAME,,,warehouse/settings.py,248,New on our side: keep.
+LOW,Ours only,url route,baselineSetup/,,,wareApp/urls.py,32,New on our side: keep.
+LOW,Ours only,url route,catchUpSpread/,,,wareApp/urls.py,33,New on our side: keep.
+LOW,Ours only,url route,temp/dispatch/mail/,,,wareApp/urls.py,136,New on our side: keep.
+LOW,We replaced it,class body,AisleGroupFields.Meta,wareApp/admin.py,53,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,CustomerWarehouseDetailSerializer,wareApp/serializers.py,66,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,CustomerWarehouseDetailSerializer.Meta,wareApp/serializers.py,68,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,DGFuelAlertDataAdmin.Meta,wareApp/admin.py,110,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,DailyLoadDataAdmin.Meta,wareApp/admin.py,82,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,DailyReadingFields.Meta,wareApp/admin.py,39,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,DgFuelConsumptionDataAdmin.Meta,wareApp/admin.py,94,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,DgUnitConsumptionAdmin.Meta,wareApp/admin.py,100,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,EmailHistoryAdmin.Meta,wareApp/admin.py,72,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,FloorFields.Meta,wareApp/admin.py,67,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,HourlyLoadDataAdmin.Meta,wareApp/admin.py,77,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,HourlyReadingFields.Meta,wareApp/admin.py,10,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,LoginException,wareApp/exception.py,2,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,MainsDgLoadDataAdmin.Meta,wareApp/admin.py,88,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,NewAlarmsNotifications,wareApp/models.py,859,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,PowerSupplyInfo,wareApp/views.py,1451,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SensorAisleUnitConsumptionAdmin.Meta,wareApp/admin.py,105,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteBaselineFields.Meta,wareApp/admin.py,46,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteCeleryPingAdmin.Meta,wareApp/admin.py,161,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteConsumptionPingAdmin.Meta,wareApp/admin.py,154,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SiteFields.Meta,wareApp/admin.py,60,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SitePhaseCurrentsInfo,wareApp/views.py,1417,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SitePhaseVoltagesInfo,wareApp/views.py,1381,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,SupplyTimeShareFields.Meta,wareApp/admin.py,18,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,TokenSerializer,wareApp/serializers.py,9,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,TokenSerializer.Meta,wareApp/serializers.py,10,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,monthlyLoadSharePercentage,wareApp/admin.py,29,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,monthlyLoadSharePercentage.Meta,wareApp/admin.py,32,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,siteLoadPower,wareApp/admin.py,22,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,class body,siteLoadPower.Meta,wareApp/admin.py,26,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,AisleGroup.__unicode__,wareApp/models.py,273,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,AisleInfo.__unicode__,wareApp/models.py,307,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,AlarmNotifications.__unicode__,wareApp/models.py,484,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,BlockInfo.__unicode__,wareApp/models.py,203,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,CustomerInfo.__unicode__,wareApp/models.py,58,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,DailySiteReading.save,wareApp/models.py,372,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Floor.__unicode__,wareApp/models.py,227,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,HomeGatewayId.__unicode__,wareApp/models.py,162,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,HourlySiteReading.save,wareApp/models.py,323,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Image.__unicode__,wareApp/models.py,191,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,LoginException.__call__,wareApp/exception.py,3,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,MeterReadings.__unicode__,wareApp/models.py,601,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,MeterSource.__unicode__,wareApp/models.py,576,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,NewAlarmsNotifications.__str__,wareApp/models.py,884,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,NewAlarmsNotifications.__unicode__,wareApp/models.py,875,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,NewAlarmsNotifications.save,wareApp/models.py,878,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,OTP.__unicode__,wareApp/models.py,514,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,Panel.__unicode__,wareApp/models.py,214,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,PowerSupplyInfo.post,wareApp/views.py,1453,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SiteInfo.get,wareApp/views.py,1622,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SiteLoadParameters.__unicode__,wareApp/models.py,898,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SiteLoadPower.__unicode__,wareApp/models.py,555,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SitePhaseCurrentsInfo.post,wareApp/views.py,1419,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,SitePhaseVoltagesInfo.post,wareApp/views.py,1383,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,_publish_consumption_recovery,wareApp/tasks.py,3824,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,_publish_supply_time_recovery,wareApp/tasks.py,3820,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,debug_task,warehouse/celery.py,23,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,roadcasteAPI,wareApp/tasks.py,31,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:DEFAULT_FROM,wareApp/sendmail.py,21,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:SMTP_HOST,wareApp/sendmail.py,15,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:SMTP_PASS,wareApp/sendmail.py,18,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:SMTP_PORT,wareApp/sendmail.py,16,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:SMTP_USER,wareApp/sendmail.py,17,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:USE_SSL,wareApp/sendmail.py,20,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,wareApp.sendmail:USE_TLS,wareApp/sendmail.py,19,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,warehouse.settings:SECRET_KEY,warehouse/settings.py,22,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,warehouse.settings:SECURE_BROWSER_XSS_FILTER,warehouse/settings.py,171,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,setting,warehouse.settings:USE_L10N,warehouse/settings.py,135,,,Nothing: we moved / removed / replaced it and they did not change it.

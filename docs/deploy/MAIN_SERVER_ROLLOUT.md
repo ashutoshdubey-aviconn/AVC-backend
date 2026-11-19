@@ -9,7 +9,7 @@ The test-server rollout this follows is in `TEST_SERVER_ROLLOUT.md`.
 | Item | Main now | After rollout (as on test) |
 | --- | --- | --- |
 | Code | old tree, not a git checkout | `full-optimization-v2` |
-| `wareApp` migrations | last `0074_alter_monthlyloadsharepercentage_created_on_and_more` (main's own lineage) | repo `0098` |
+| `wareApp` migrations | last `0076_alter_monthlyloadsharepercentage_created_on_and_more` (main's own lineage; 0075 / 0076 applied 31 Oct, checked 19 Nov) | repo `0114` |
 | MQTT services | `root-mqtt-queue1`, `root-mqtt-queue2`, `celerybeat`, `fetch-fuel-data`, `gunicorn` | `mqtt-listener-queue1/2`, `mqtt-processing-queue1/2`, `mqtt-notifications`, `recovery-status-sweep.timer`, `celerybeat` (now runs the 60 s consumption flush), `fetch-fuel-data`, `gunicorn` |
 | RabbitMQ | `queue1`/`queue2` hold 10 messages each, 0 consumers | + `queue1_processing`, `queue2_processing`, `notifications`, `mqtt.consumption.batch` |
 | Logrotate | `celery`, `celery-logs2`, `celery_logs`, `celery_monitor` | + `celerylogs1`, `django-debuglog` |
@@ -42,8 +42,10 @@ tree and of `/etc/systemd/system/*.service`, `/etc/mosquitto/mosquitto.conf`, `.
 
 A plain `manage.py migrate` will **fail**: main applied its own
 `0073_alter_meterdisconnectionevent_options_and_more` and
-`0074_alter_monthlyloadsharepercentage_created_on_and_more`, while the repo's `0073`/`0074`
-have other names (`InconsistentMigrationHistory`). Main also lists 56 historical migration
+`0074_alter_monthlyloadsharepercentage_created_on_and_more`, and since 31 Oct also
+`0075_aislegroup_dg_fuel_enabled_and_more` (AisleGroup `dg_fuel_enabled`, `dg_fuel_provider`,
+`dg_fuel_vehicle_number` and more) and `0076_alter_monthlyloadsharepercentage_created_on_and_more`,
+while the repo's `0073`–`0076` have other names (`InconsistentMigrationHistory`). Main also lists 56 historical migration
 names that are not in the repo (harmless, they are only rows).
 
 To do (like `test_server_migrate.sh` did for test), **checked against main's schema**:
