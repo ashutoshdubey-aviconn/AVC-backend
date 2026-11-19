@@ -1,0 +1,135 @@
+View,Route,Frontend calls it,Verdict,Contract differs,Our lines,Their lines,Response keys only ours,Response keys only theirs,Request fields only ours,Request fields only theirs,Our file,Their file
+AisleLevelBaseline,,,Only ours,,46,,,,,,wareApp/views/baseline.py,
+AlarmsList,alarmList/,yes,Response keys differ,yes,21,8,"active_alarms, data, high_priority, medium_priority, status, total_alarm",alarms,siteId,site_id,wareApp/views/alarms.py,wareApp/views/alert_views.py
+AlarmsListDetail,alarmListDetail/,yes,Calls AlarmsList instead,,11,5,"data, msg, status",,"alarm_type, siteId",,wareApp/views/alarms.py,wareApp/views/alert_views.py
+BaselineData,fetchBaseline/,yes,Same keys plus extras,,26,31,,error,,,wareApp/views/baseline.py,wareApp/views/metering_views.py
+BaselineHistory,baselineHistory/,yes,Same keys plus extras,,29,30,,error,,,wareApp/views/baseline.py,wareApp/views/metering_views.py
+BaselineSetup,baselineSetup/,yes,Only ours,yes,31,,,,,,wareApp/views/baseline.py,
+CatchUpSpreadApi,catchUpSpread/,yes,Only ours,yes,37,,,,,,wareApp/views/catch_up.py,
+ChangePassword,change-pwd/,yes,Response keys differ,yes,15,12,"msg, result","error, message",,,wareApp/views/auth.py,wareApp/views/auth_views.py
+ConsumptionAlarmsAPI,consumptionAlarms/,yes,Response keys differ,yes,24,8,"data, msg, status",consumption_alarms,"end_date, start_date",,wareApp/views/alarms.py,wareApp/views/alert_views.py
+CreateAisleGroupUsingProvisioning,createAisleGroups/,,Response keys differ,yes,19,10,"aisle_id, msg, status","id, message","aisle_name, power_source, site_type",aisleGroupName,wareApp/views/provisioning.py,wareApp/views/site_views.py
+CreateCustomerUsingProvisioning,createCustomer/,,Response keys differ,yes,21,14,"msg, status, user_id","id, message","customer_contact, customer_email, customer_name","address, password, username",wareApp/views/provisioning.py,wareApp/views/site_views.py
+CreateHomeGatewayIdUsingProvisioning,createHomeGatewayId/,,Response keys differ,yes,20,10,"msg, status","id, message","home_gateway_name, monitoring_port, rssh_port",hgw_id,wareApp/views/provisioning.py,wareApp/views/site_views.py
+CreateSiteUsingProvisioning,createSite/,,Response keys differ,yes,15,11,"msg, status","error, message",site_location,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+CustomerAllSiteInfo,getCustomerSites/,yes,Same response keys,,24,23,,,,,wareApp/views/customer.py,wareApp/views/site_views.py
+CustomerMonthlyGraphicalData,,,Only ours,,35,,,,,,wareApp/views/customer.py,
+CustomerSnapshotApi,customerSnapShotEnergySavingApi/,yes,Same response keys,,69,68,,,,,wareApp/views/customer.py,wareApp/views/site_views.py
+CustomerSnapshotApiOld,,,Only ours,,45,,,,,,wareApp/views/customer.py,
+CustomerTotalConsumption,,,Only ours,,31,,,,,,wareApp/views/customer.py,
+CustomerView,customer/,yes,Response keys differ,yes,10,7,data,,,,wareApp/views/customer.py,wareApp/views/site_views.py
+DGFuelDataExcelExport,dgFuelDataExcelExport/,yes,Placeholder,yes,33,5,"msg, status",message,"end_date, site_id, start_date",,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DashboardAcknowledgeAlarmView,dashboard/alarms/acknowledge/,,Only theirs,,,22,,,,,,wareApp/views/alert_views.py
+DashboardAlarmSummaryView,dashboard/alarms/summary/,,Only theirs,,,21,,,,,,wareApp/views/alert_views.py
+DashboardLiveAlarmsView,dashboard/alarms/live/,,Only theirs,,,27,,,,,,wareApp/views/alert_views.py
+DashboardTriggerDigestView,dashboard/alarms/daily-digest/,,Only theirs,,,19,,,,,,wareApp/views/alert_views.py
+DemoApi,demoapi/,,Response keys differ,yes,10,5,"data, result",status,,,wareApp/views/site.py,wareApp/views/alert_views.py
+DgAlertsPushInterface,dgFuelPushInterface/,,Same response keys,,16,11,,,,,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DgFuelConsumptionDataApi,,,Only ours,,50,,,,,,wareApp/views/dg_fuel.py,
+DgFuelConsumptionDataApiUsingLoconavAPI_new,dgFuelConsumptionData/,yes,Same response keys,,63,124,,,,,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DgFuelConsumptionDataApi_new,dgFuelConsumptionData_test/,,Response keys differ,yes,241,8,"data, dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data, error, fuel_level, name, provider_status, refuel_alert, sample, status, theft_alert, type",fuel_data,date,,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DgFuelConsumptionDataCustomRangeApi,,,Only ours,,51,,,,,,wareApp/views/dg_fuel.py,
+DgFuelConsumptionDataCustomRangeApiUsingPushAPIs,fetchDGFuelDataCustomeRange/,yes,Response keys differ,yes,59,12,"data, dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data, error, fuel_level, name, provider_status, refuel_alert, status, theft_alert, type",custom_range_fuel_data,from_date,start_date,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DgFuelMonthlyTrend,,,Only ours,,68,,,,,,wareApp/views/dg_fuel.py,
+DgFuelMonthlyTrend_test,dgFuelMonthlyTrend/; fuel-data-trend-test,yes,Same response keys,,36,47,,,,,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+DownloadExcel,,,Only ours,,50,,,,,,wareApp/views/energy_saving.py,
+DownloadExcelVB,download/excel/test,,Placeholder,yes,51,5,,,"end_date, from_date, site_id, user_type",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+DownloadExcel_new,DownloadExcel/; dataConsExcelTest/,yes,Placeholder,yes,44,5,,,"end_date, from_date, site_id, user_type",,wareApp/views/energy_saving.py,wareApp/views/load_views.py
+DownloadFluctuatedPowerFactor,downloadExcelPFData/,yes,Placeholder,yes,33,5,"data, msg, status",message,site_id,,wareApp/views/load.py,wareApp/views/load_views.py
+DownloadMinMaxMonthlyLoadData,downloadExcelMonthlyMinMaxData/,yes,Placeholder,yes,34,5,"data, msg, status",message,site_id,,wareApp/views/load.py,wareApp/views/load_views.py
+EmailHistory,emailhistory/,yes,Response keys differ,yes,12,8,"data, message, status",email_history,,,wareApp/views/fire.py,wareApp/views/fire_views.py
+EnergySavingMonthlyBarChart,,,Only ours,,147,,,,,,wareApp/views/energy_saving.py,
+EnergySavingMonthlyBarChartOld,,,Only ours,,180,,,,,,wareApp/views/energy_saving.py,
+EnergySavingMonthlyBarChartTestVB,monthly/data/test,,Calls EnergySavingMonthlyBarChart_new instead,,47,5,"Data, Dates, SavingData, msg, result, status",,"from_date, site_id, till_date, user_type",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingMonthlyBarChart_new,savingMonthly/; dailyData_test/; monthly/data/test,yes,Same response keys,,60,59,,,,,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingMonthlyBarChartbackup,,,Only ours,,147,,,,,,wareApp/views/energy_saving.py,
+EnergySavingMonthlyTrendApi,savingMonthlyTrend/,yes,Same response keys,,101,100,,,,,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingMonthlyTrendExcelDownload,savingMonthlyTrendExcel/,,Placeholder,yes,110,5,"data, msg, status",message,"from_month, site_id, to_month, user_type",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingsHourlyBarChart,,,Only ours,,49,,,,,,wareApp/views/energy_saving.py,
+EnergySavingsHourlyBarChartOld,,,Only ours,,97,,,,,,wareApp/views/energy_saving.py,
+EnergySavingsHourlyBarChartV2,hourlySavingData/,yes,Same keys plus extras,,56,88,,"hourly_bar, status",,,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingsHourlyBarChartVB,hourly/data/test,,Calls EnergySavingsHourlyBarChartV2 instead,,60,5,"Data, Hours, SavingData, msg, result",,"date, site_id",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+EnergySavingsHourlyExcelDownloadVB,hourly/data/excel/V1,,Placeholder,yes,200,5,"msg, result",message,"date, end_date, from, from_date, site_id, till_date, to, to_date",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+ExpiredDevicesListApi,expireddevicesList/,yes,Response keys differ,yes,12,8,"data, status",expired_devices,site_id,,wareApp/views/fire.py,wareApp/views/fire_views.py
+FansDataApi,FansDataApi/,yes,Same response keys,,10,8,,,,,wareApp/views/devices.py,wareApp/views/fire_views.py
+FetchAisleGroupsForParticularSiteUsingProvisioning,fetchAisleGroups/,,Response keys differ,yes,12,8,"data, error, status",,,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FetchAllCustomers,fetchAllCustomers/,,Response keys differ,yes,12,7,"data, msg, status",,,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FetchAllCustomersForSuperAdmin,customerDetails/,yes,Same response keys,,70,70,,,,,wareApp/views/superadmin.py,wareApp/views/site_views.py
+FetchAllSitesForProvisoning,allSitesList/,,Response keys differ,yes,10,7,"data, status",,,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FetchDGAlertData,dgFuelAlerts/,,Response keys differ,yes,12,8,"msg, status",dg_fuel_alerts,,site_id,wareApp/views/dg_fuel.py,wareApp/views/dg_fuel_views.py
+FetchFluctuatedPowerFactor,fluctuatedPowerFactorData/,yes,Response keys differ,yes,18,8,"data, msg, status",power_factor_data,,,wareApp/views/load.py,wareApp/views/load_views.py
+FetchHGID,fetchHomeGatewayId/,,Response keys differ,yes,14,7,"msg, status",,site_id,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FetchLastRsshPort,fetchLastRsshPort/,,Response keys differ,yes,7,7,"rssh_port, status",last_rssh_port,,,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FetchMinMaxMonthlyLoadData,monthlyMinMaxLoadData/,yes,Response keys differ,yes,28,8,"data, max_date, max_value, min_date, min_value, msg, status",monthly_min_max,id,site_id,wareApp/views/load.py,wareApp/views/load_views.py
+FetchParticularCustomerUsingProvisioningScript,fetchParticularCustomer/,,Response keys differ,yes,9,9,"contact, status","error, id",id,customer_id,wareApp/views/provisioning.py,wareApp/views/site_views.py
+FireAlarm,fireAlarm/,yes,Response keys differ,yes,21,8,"data, status",fire_alarms,,,wareApp/views/fire.py,wareApp/views/fire_views.py
+FireEquiSystemTypeAdd,fireDeviceTypeAdd/,yes,Same keys plus extras,yes,12,10,,"error, id, message","category, deviceName","categories, devicename",wareApp/views/fire.py,wareApp/views/fire_views.py
+FireEquiSystemTypefetch,fireDeviceTypefetch/,yes,Response keys differ,yes,15,7,"data, result",,site_id,,wareApp/views/fire.py,wareApp/views/fire_views.py
+FireEquipmentSystemAdd,saveInventoryData/,yes,Response keys differ,yes,27,10,"msg, status","id, message","deviceName, id, last_service, location, next_service, row_id, updated_by, warrenty","deviceType_id, loaction",wareApp/views/fire.py,wareApp/views/fire_views.py
+FireEquipmentSystemFetch,fireDevicefetchdata/,yes,Response keys differ,yes,15,7,"data, result",,row_id,,wareApp/views/fire.py,wareApp/views/fire_views.py
+ForgetPassword,forgot/,yes,Response keys differ,yes,32,11,"msg, result",message,"Username, email, mobile",username,wareApp/views/auth.py,wareApp/views/auth_views.py
+GatewayOverheatAlertApi,temp/dispatch/mail/,yes,Only ours,yes,14,,,,,,wareApp/views/gateway_overheat.py,
+GatewayOverheatThrottle,,,Only ours,,3,,,,,,wareApp/views/gateway_overheat.py,
+GroupViewSet,,,Calls viewsets.ModelViewSet instead,,5,2,,,,,wareApp/views/auth.py,wareApp/views/auth_views.py
+HomeGatewayStatusApi,gateway-status/,yes,Only ours,yes,89,,,,,,wareApp/views/monitoring.py,
+HourlySiteReadingForOneSite,hourlyConsumption,,Response keys differ,yes,28,8,"data, result",readings,date,,wareApp/views/site.py,wareApp/views/metering_views.py
+LightsDataApi,lightsDataApi/,yes,Same response keys,,11,8,,,,,wareApp/views/devices.py,wareApp/views/fire_views.py
+LiveDataApi,liveLoadData/test,yes,Calls LoadGrapghAPI instead,,16,5,message,,"epoch_time, site_id",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadDataApi,loadData/test/,,Calls LoadGrapghAPI instead,,16,5,"data, error, message, status",,"aisle_id, date",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadDataApiMultipleSource,,,Only ours,,25,,,,,,wareApp/views/load.py,
+LoadDataApiMultipleSourceV2,loadDataPowerSource/test,yes,Calls LoadGrapghAPI instead,,37,5,"data, error, message, status",,"date, site_id",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadDataExcelDownload,downloadExcelLoadData/,yes,Placeholder,yes,50,5,"data, msg, status",message,"date, graph_type, site_id",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadDataExcelDownloadMonthlyRange,loadDataExcel/test,,Placeholder,yes,63,5,"data, msg, status",message,"end_date, from_date, graph_type, site_id",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadGrapghAPI,liveDataLoadGraph/; liveLoadTesting/,yes,Response keys differ,yes,15,8,"msg, status",,,,wareApp/views/load.py,wareApp/views/load_views.py
+LoadGrapghAPITestingPurpose,,,Only ours,,15,,,,,,wareApp/views/load.py,
+LoadGraphApiForDailyData,dailyLoadGraph/,yes,Response keys differ,yes,20,8,"msg, status",,date,,wareApp/views/load.py,wareApp/views/load_views.py
+LoadGraphApiForEverySecond,liveDataEverySecond/,yes,Calls LoadGrapghAPI instead,,16,5,"data, msg, status",,"epoch_time, site_id",,wareApp/views/load.py,wareApp/views/load_views.py
+LoadGraphApiForHourlyData,hourlyLoadGraph/,,Same response keys,,18,32,,,,,wareApp/views/load.py,wareApp/views/load_views.py
+LoadGraphApiForMainsDgDailyData,loadDataMainsDgDaily/,yes,Response keys differ,yes,36,8,"msg, status",,date,,wareApp/views/load.py,wareApp/views/load_views.py
+LoginApi,login/,yes,Same keys plus extras,yes,14,40,,error,,"password, username",wareApp/views/auth.py,wareApp/views/auth_views.py
+MeterDisconnectionIngestView,meter-disconnections/ingest/,yes,Response keys differ,yes,37,12,"msg, received, saved, status","error, id, message",,"detection_window_end, detection_window_start, meter_id, meter_name",wareApp/views/monitoring.py,wareApp/views/metering_views.py
+MeterDisconnectionListView,meter-disconnections/,yes,Response keys differ,yes,36,7,"count, limit, msg, offset, results, status",events,"from, limit, logged_site_id, meter_id, meter_number, offset, site_id, status, to",,wareApp/views/monitoring.py,wareApp/views/metering_views.py
+NewEnergySavingMonthlyTrendApi,NewMonthlyTrendAPi/,,Calls EnergySavingMonthlyTrendApi instead,,87,5,"carbon_saved, energyConsumed, energySaved, months, msg, percentageSaved, result, status",,"site_id, user_type",,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+NewSubMeteringMonthlyTrendApi,newSubMeteringMonthlyTrend/,,Calls SubMeteringMonthlyTrendApi instead,,94,2,"months, result, unit_consumed_avg_data, unit_consumed_data",,"site_id, user_type",,wareApp/views/submetering.py,wareApp/views/metering_views.py
+ParticularCustomerInfo,customer-details,yes,Response keys differ,yes,11,10,"data, result",error,,customer_id,wareApp/views/customer.py,wareApp/views/site_views.py
+ParticularSiteSnapshotEnergySavingApi,,,Only ours,,72,,,,,,wareApp/views/energy_saving.py,
+ParticularSiteSnapshotEnergySavingApiVB,siteSnapShotEnergySavingApi/,yes,Response keys differ,yes,70,9,"alarms, carbon_emission_saved, energy_consumed, live_date, percentage_saved, previous_date, result, saved_energy, site_live_date","consumed_energy, current_baseline, error, site_name, total_energy_saved",user_type,,wareApp/views/energy_saving.py,wareApp/views/metering_views.py
+PowerDistributionHourlyBarChart,getHourlyPowerSrcDistData/,yes,Calls PowerDistributionPieChartV2 instead,,65,5,"Data, Hours, error",,"date, site_id",,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerDistributionHourlyBarChartTime,getHourlyPowerSrcDistDataTime/,yes,Calls PowerDistributionPieChartV2 instead,,47,5,"Data, Hours",,"date, site_id",,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerDistributionPieChartV2,getPowerSrcDistData/; power-distribution/test/,yes,Same response keys,,53,53,,,,,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerSource,listPowerSource/test/,,Calls PowerSupplyInfo instead,,12,5,"data, error, message, result",,site_id,,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerSourceDistributionMonthlyBarChart,getDailyPowerSrcDistData/,yes,Calls PowerDistributionPieChartV2 instead,,69,5,"Data, Dates, error",,"from_date, site_id, till_date",,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerSourceDistributionMonthlyBarChartTime,getDailyPowerSrcDistDataTime/,yes,Calls PowerDistributionPieChartV2 instead,,90,5,"Data, Dates",,"from_date, site_id, till_date",,wareApp/views/power_distribution.py,wareApp/views/load_views.py
+PowerSupplyInfo,,,Only theirs,,,8,,,,,,wareApp/views/load_views.py
+RecoveryUploadAPIView,upload/,,Only ours,,30,,,,,,wareApp/recovery/views.py,
+ResetPasswordApi,reset/,yes,Response keys differ,yes,36,16,"msg, result","error, message","Username, newpassword",password,wareApp/views/auth.py,wareApp/views/auth_views.py
+SavingBaselineData,saveBaseline/,yes,Response keys differ,yes,56,12,"msg, result","error, message","baselineValue, date, legId, siteId","baseline_value, site_id",wareApp/views/baseline.py,wareApp/views/metering_views.py
+SiteAisleGroupsWithLastEntries,sitesWithAisleGroupsLastEntries/,,Response keys differ,yes,72,8,"data, result",groups,,,wareApp/views/monitoring.py,wareApp/views/site_views.py
+SiteApiBasedOnSiteType,switchSiteDashboard/,yes,Response keys differ,yes,25,9,"data, result","error, site_id, site_type, site_type_id",customer_id,,wareApp/views/site.py,wareApp/views/site_views.py
+SiteCeleryPingApi,siteCeleryPings/,,Response keys differ,yes,51,8,"data, msg, page, page_size, pagination, result, total","id, status","id, page, page_size, siteId","home_gateway_id, site_id",wareApp/views/monitoring.py,wareApp/views/site_views.py
+SiteConsumptionPingApi,siteConsumptionPingsMosquitto/,,Response keys differ,yes,29,8,"data, msg, result","id, status","id, siteId","home_gateway_id, site_id",wareApp/views/monitoring.py,wareApp/views/site_views.py
+SiteCurrentLoadInfo,getSiteCurrLoadInfo/,yes,Response keys differ,yes,33,9,"B_Current, B_Power_Factor, B_Voltage, Power_supply, R_Current, R_Power_Factor, R_Voltage, Status, Total_Load, Y_Current, Y_Power_Factor, Y_Voltage, max_load, min_load, msg, status","b_current, b_volt, r_current, r_volt, site_total_load, supply_source, updated_on, y_current, y_volt",,,wareApp/views/site.py,wareApp/views/load_views.py
+SiteInfo,site-details/,yes,Same keys plus extras,yes,11,16,,error,,site_id,wareApp/views/site.py,wareApp/views/site_views.py
+SitePhaseCurrentsInfo,,,Only theirs,,,5,,,,,,wareApp/views/load_views.py
+SitePhaseVoltagesInfo,,,Only theirs,,,5,,,,,,wareApp/views/load_views.py
+SiteTotalGraphDataDaily,getSiteDailyConsumptionData/,yes,Same response keys,,85,45,,,,,wareApp/views/site.py,wareApp/views/metering_views.py
+SiteTotalGraphDataHourly,,,Same keys plus extras,,47,13,,hourly_data,,,wareApp/views/site.py,wareApp/views/metering_views.py
+SiteTotalGraphDataHourlyWHTM,getSiteHourlyConsumptionData/,yes,Same response keys,,16,43,,,,,wareApp/views/site.py,wareApp/views/metering_views.py
+SnapshotApi,snapShotApi/,yes,Response keys differ,yes,19,9,"data, expiredDevice, status, totalDevices, warrenty","consumed_energy, error, site_name, total_energy_saved",,,wareApp/views/fire.py,wareApp/views/site_views.py
+SubMeteringMonthlyTrendApi,subMeteringMonthlyTrend/,yes,Same keys plus extras,,73,75,,error,,,wareApp/views/submetering.py,wareApp/views/metering_views.py
+SubmeteringHourlyBarChart,,,Only ours,,58,,,,,,wareApp/views/submetering.py,
+SubmeteringHourlyBarChartNew,submeteringHourlyData/,yes,Same keys plus extras,,33,41,,"msg, status",,,wareApp/views/submetering.py,wareApp/views/metering_views.py
+SubmeteringMonthlyBarChart,,,Only ours,,107,,,,,,wareApp/views/submetering.py,
+SubmeteringMonthlyBarChart_new,submeterMonthlyTrend_test; submeteringMonthlyBarChart/,yes,Same response keys,yes,29,52,,,user_type,,wareApp/views/submetering.py,wareApp/views/metering_views.py
+SubmeteringSnapshotAPI,submeteringSnapshot/,yes,Same keys plus extras,,33,35,,"error, msg",,,wareApp/views/submetering.py,wareApp/views/site_views.py
+SuperAdminSnapShot,snapshot/,yes,Response keys differ,yes,35,11,"alarms, current_date, total_energy_saved, total_saved_percentage, total_unit_consumed","live_sites, total_customers, total_sites","end_date, start_date, user_id",,wareApp/views/superadmin.py,wareApp/views/site_views.py
+SuperUserAllAlarmsPriorityBasedOnCustomersList,alarmapi/,yes,Same response keys,,11,16,,,,,wareApp/views/superadmin.py,wareApp/views/alert_views.py
+SuperUserAllAlarmsTypeBasedOnCustomersList,alarmTypeApi/,yes,Same response keys,,14,19,,,,,wareApp/views/superadmin.py,wareApp/views/alert_views.py
+TokenViewSet,,,Calls viewsets.ModelViewSet instead,,2,4,,,,,wareApp/views/auth.py,wareApp/views/auth_views.py
+TotalAlarmsOnCustomerPageTabularForm,alarmListOnCustomerPage/,yes,Response keys differ,yes,19,9,result,alarms,,user_id,wareApp/views/customer.py,wareApp/views/alert_views.py
+TotalAlarmsOnSitePageTabularForm,alarmListOnSitePage/,,Response keys differ,yes,15,8,"msg, result",site_alarms,,,wareApp/views/site.py,wareApp/views/alert_views.py
+TotalAlarmsTypeCountOnCustomerPage,getCustAlarmGraph/,yes,Same response keys,yes,16,17,,,,user_id,wareApp/views/customer.py,wareApp/views/alert_views.py
+UserViewSet,,,Calls viewsets.ModelViewSet instead,,6,3,,,,,wareApp/views/auth.py,wareApp/views/auth_views.py
+ValidatedToken,validateToken/,yes,Same keys plus extras,,15,12,,user_id,,,wareApp/views/auth.py,wareApp/views/auth_views.py
+avgDataApi,avgData/,yes,Response keys differ,yes,47,7,"energyConsumed, error, status, totalDays, value",avg_load,"from_date, siteId, till_date",,wareApp/views/devices.py,wareApp/views/load_views.py
+fireEquiSystemDelete,deleteInventoryData/,yes,Response keys differ,yes,8,7,"msg, status",message,,,wareApp/views/fire.py,wareApp/views/fire_views.py

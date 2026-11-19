@@ -100,6 +100,11 @@ add("F09", "Credential clean-up", "Security", "Planned",
     "moved out of the setup scripts (26 Oct).",
     "2026-08-18", "2026-10-26", "-", "-", "Agree which credentials to rotate.", "User",
     "docs/roadmaps/TODO.md", "4643371d (DB password)")
+add("F11", "Provisioning API: require login, no fixed password", "Security", "Not started",
+    "Found 19 Nov in the three-way comparison: CreateCustomerUsingProvisioning (and the other provisioning APIs) need no login "
+    "and create customers with one fixed default password. Inherited from main; same on main and ours.",
+    "2026-11-19", "2026-11-19", "-", "-", "Check who calls the provisioning script before closing it.", "User",
+    "docs/merge/THREE_WAY_COMPARISON.md", "-")
 add("F10", "Merge with the colleague's code", "Merge", "Waiting for input",
     "Team lead: merge this branch with the colleague's optimized version of main's code. Prepared 19 Nov: tag "
     "fov2-pre-merge-20261119, code inventory (every feature, alarm, API, model, migration and function with a fingerprint), "
@@ -154,6 +159,12 @@ add("D28", "Colleague's code vs main's code", "Docs / merge", "Done",
     "login has no rate limit and re-activates disabled users.",
     "2026-11-19", "2026-11-19", "-", "-", "Not run: confirm by running his code on a copy of main's DB with the frontend.", "-",
     "docs/merge/COLLEAGUE_VS_MAIN.md", "-")
+add("D29", "Three-way comparison: main / ours / colleague", "Docs / merge", "Done",
+    "Side by side of main's code, ours and the colleague's: API contract for every pair (ours replacing main: 4 frontend "
+    "APIs differ, all deliberate fixes; colleague replacing main 42 / ours 40), DB, DG fuel, LoadData, MQTT, alarms, "
+    "security, tests. Found in his code: fixed OTP 1234 lets anyone reset any password.",
+    "2026-11-19", "2026-11-19", "-", "-", "Static only: not run.", "-",
+    "docs/merge/THREE_WAY_COMPARISON.md", "-")
 add("D26", "Alarm counts consistent on every page", "Alarms / frontend", "Done",
     "Super-admin, customer and site ALARMS tiles, the customer alarm table / chart and the site panel all read the "
     "alarm server and count open alarms; customer table grouped Gateway / Consumption / Power; sign-in guard.",

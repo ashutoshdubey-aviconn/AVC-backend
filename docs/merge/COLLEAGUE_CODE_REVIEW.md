@@ -54,6 +54,7 @@ His structure:
 | 8 | **Settings** | `DEBUG = True` also for PROD. `ALLOWED_HOSTS = ['*']` and allow-all CORS are hardcoded (ours reads them from `.env`, though our defaults are open too). |
 | 9 | **Repo hygiene** | 72 `.pyc` / `__pycache__` files committed. One large commit with no history of what changed and why. |
 | 10 | **Not verified** | We don't know whether it runs or passes its 44 tests: it was not run here. |
+| 11 | **Anyone can take over any account** | Found 19 Nov (see [THREE_WAY_COMPARISON.md](THREE_WAY_COMPARISON.md)). `forgot/` needs only a username (no login, e-mail or mobile check, no rate limit), stores the fixed OTP `1234` and sends nothing; `reset/` accepts `1234` and sets the new password. The OTP never expires and is never used up. Login also has no rate limit and re-activates deactivated users. |
 
 ## Function-level overlap (his code vs ours)
 
@@ -81,3 +82,4 @@ As files: 21 files exist on both sides with the same path, and 18 of them differ
 3. **Leave out:** his placeholder or simplified views, his `0002`–`0032` migrations, his `models/` and `tasks/` layout, and the credentials.
 4. **MQTT pipeline:** both designs solve the same problem. Keep ours for now, since it is in production. His Redis bridge can be evaluated later as a separate change, with a load test.
 5. **Rotate the exposed credentials** whatever is decided (feature F09).
+6. **Never deploy his `forgot/` / `reset/` / `login/`** as they are (problem 11).
