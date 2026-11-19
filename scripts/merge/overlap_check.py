@@ -5,7 +5,8 @@
 
 --theirs   the other code base: a folder (e.g. a copy of main's code or the colleague's checkout) or a git ref.
 --base     what both sides started from; give every version the other side may be built on (git refs or
-           folders). Default: origin/main (legacy), mains-migrated-with-zepto, main-load-dg-fuel-repair-20261014.
+           folders). The first one is the legacy code. Default: origin/main and our branches / tags that main
+           got files from (DEFAULT_BASES).
 --ours     this branch (default: the current folder).
 
 A git ref is extracted with `git archive` into .work/merge_trees/<ref>. Nothing is changed in the code.
@@ -21,7 +22,8 @@ source (ast.unparse: comments and formatting ignored) on the three sides:
     Theirs only              exists only on their side, not in a base     -> port it (new on their side)
     Ours only                exists only on our side                      -> keep (new on our side)
     We replaced it           theirs = base, missing in ours               -> nothing (we moved / removed it)
-    They removed it          ours = base, missing in theirs               -> check why
+    They removed it          in the legacy code and ours, not in theirs   -> check why
+    Not on their side yet    from one of our branches, they have an older copy without it -> keep
 
 A name is matched across files, so a view class that moved from wareApp/views.py to wareApp/views/site.py
 is still compared with the same class on their side.
@@ -39,7 +41,13 @@ from collections import Counter, defaultdict
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORK = ROOT / ".work" / "merge_trees"
-DEFAULT_BASES = ["origin/main", "mains-migrated-with-zepto", "main-load-dg-fuel-repair-20261014"]
+# The legacy code first, then every branch / tag of ours that main's server got files from (checked 19 Nov:
+# main's DG fuel and LoadData files equal these exactly).
+DEFAULT_BASES = [
+    "origin/main", "mains-migrated-with-zepto", "main-load-dg-fuel-repair-20261014", "origin/task_optimization",
+    "origin/loaddatav1", "origin/fully_optimization", "origin/dg_fuel_v2", "origin/DgFuel", "origin/feature/celery",
+    "origin/development", "mqtt-dgfuel-complete-v1", "DgFuel-v1.0",
+]
 
 # Live code only: migrations, tests and the many backup copies on the servers are left out.
 SKIP_DIRS = {"migrations", "tests", "backups", "__pycache__", "venv", "virtualwarehouse", "node_modules", ".work",
@@ -49,7 +57,7 @@ CODE_DIRS = ("wareApp", "warehouse")
 
 RISK = {
     "Both changed": "HIGH", "Theirs only": "HIGH", "Only theirs changed": "MEDIUM", "They removed it": "MEDIUM",
-    "Different base versions": "MEDIUM", "Only ours changed": "LOW", "Ours only": "LOW", "We replaced it": "LOW",
+    "Different base versions": "MEDIUM", "Not on their side yet": "LOW", "Only ours changed": "LOW", "Ours only": "LOW", "We replaced it": "LOW",
     "Same": "-",
 }
 ACTION = {
@@ -61,6 +69,7 @@ ACTION = {
     "Ours only": "New on our side: keep.",
     "We replaced it": "Nothing: we moved / removed / replaced it and they did not change it.",
     "They removed it": "They deleted it: check whether our code still needs it.",
+    "Not on their side yet": "Ours: they have an older copy of our work without it; keep.",
     "Different base versions": "Both sides are unchanged copies of different base versions: keep the newer (usually ours).",
 }
 
@@ -172,7 +181,11 @@ def compare(ours, theirs, bases):
             status = "We replaced it" if all(e[2] in base_hashes for e in t) else "Theirs only"
             rows.append(row(status, kind, name, t, []))
         else:
-            status = "They removed it" if (base_hashes and all(e[2] in base_hashes for e in o)) else "Ours only"
+            in_legacy = bool(bases[0].get(key))
+            if base_hashes and all(e[2] in base_hashes for e in o):
+                status = "They removed it" if in_legacy else "Not on their side yet"
+            else:
+                status = "Ours only"
             rows.append(row(status, kind, name, [], o))
     return rows
 

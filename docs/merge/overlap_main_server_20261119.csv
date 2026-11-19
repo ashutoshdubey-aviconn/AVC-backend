@@ -8,7 +8,6 @@ HIGH,Both changed,function,LoadDataExcelDownload.post,wareApp/views.py,5224,ware
 HIGH,Both changed,function,LoadGraphApiForDailyData.post,wareApp/views.py,5183,wareApp/views/load.py,143,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,LoadGraphApiForMainsDgDailyData.post,wareApp/views.py,5538,wareApp/views/load.py,484,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,SiteCeleryPingApi.post,wareApp/views.py,10564,wareApp/views/monitoring.py,88,Merge by hand: compare both versions with the base.
-HIGH,Both changed,function,handle_load_data_message,wareApp/load_data/handler.py,818,wareApp/load_data/handler.py,21,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,process_consumption_message,wareApp/tasks.py,3896,wareApp/tasks.py,355,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,process_daily_consumption_recovery_message,wareApp/tasks.py,3866,wareApp/tasks.py,340,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,process_fire_alarm_message,wareApp/tasks.py,3886,wareApp/tasks.py,350,Merge by hand: compare both versions with the base.
@@ -17,9 +16,6 @@ HIGH,Both changed,function,process_load_data_message,wareApp/tasks.py,3829,wareA
 HIGH,Both changed,function,process_load_message,wareApp/tasks.py,3912,wareApp/tasks.py,360,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,process_load_runtime_recovery_message,wareApp/tasks.py,3856,wareApp/tasks.py,335,Merge by hand: compare both versions with the base.
 HIGH,Both changed,function,process_supply_time_message,wareApp/tasks.py,3839,wareApp/tasks.py,330,Merge by hand: compare both versions with the base.
-HIGH,Both changed,function,roll_up_completed_load_data,wareApp/load_data/rollups.py,86,wareApp/load_data/rollups.py,161,Merge by hand: compare both versions with the base.
-HIGH,Both changed,function,roll_up_load_data_if_due,wareApp/load_data/rollups.py,151,wareApp/load_data/rollups.py,247,Merge by hand: compare both versions with the base.
-HIGH,Both changed,function,update_monthly_min_max_load,wareApp/load_data/monthly.py,11,wareApp/load_data/monthly.py,22,Merge by hand: compare both versions with the base.
 HIGH,Both changed,setting,wareApp.urls:urlpatterns,wareApp/urls.py,6,wareApp/urls.py,4,Merge by hand: compare both versions with the base.
 HIGH,Theirs only,class body,HomeGatewayStatusAdmin,wareApp/admin.py,167,,,New on their side: port it into our code base.
 HIGH,Theirs only,class body,HomeGatewayStatusAdmin.Meta,wareApp/admin.py,178,,,New on their side: port it into our code base.
@@ -34,8 +30,6 @@ HIGH,Theirs only,function,MonitoringCustomerSitesInfo.post,wareApp/views.py,1810
 HIGH,Theirs only,function,_deferred_mqtt_client1,wareApp/tasks.py,3803,,,New on their side: port it into our code base.
 HIGH,Theirs only,function,_deferred_mqtt_client2,wareApp/tasks.py,3816,,,New on their side: port it into our code base.
 HIGH,Theirs only,function,_deferred_task,wareApp/tasks.py,3780,,,New on their side: port it into our code base.
-HIGH,Theirs only,function,_group_by_bucket,wareApp/load_data/rollups.py,76,,,New on their side: port it into our code base.
-HIGH,Theirs only,function,_handle_load_data_message,wareApp/load_data/handler.py,15,,,New on their side: port it into our code base.
 HIGH,Theirs only,function,_retired_mqtt_client2_inline_load_data,wareApp/tasks.py,2352,,,New on their side: port it into our code base.
 HIGH,Theirs only,function,get_loconav_fuel_data,wareApp/tasks.py,59,,,New on their side: port it into our code base.
 HIGH,Theirs only,function,roadcasteAPIUpdated,wareApp/tasks.py,54,,,New on their side: port it into our code base.
@@ -46,7 +40,9 @@ HIGH,Theirs only,url route,monitoringCustomerSites/,wareApp/urls.py,127,,,New on
 HIGH,Theirs only,url route,monitoringSitesList/,wareApp/urls.py,128,,,New on their side: port it into our code base.
 MEDIUM,Different base versions,class body,Email_History,wareApp/models.py,627,wareApp/models.py,914,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,FirePumpAlarm,wareApp/models.py,608,wareApp/models.py,888,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,GatewayTopic,wareApp/mqtt/topics.py,9,wareApp/mqtt/topics.py,9,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,HourlyLoadData.Meta,wareApp/models.py,719,wareApp/models.py,1044,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,class body,LoadReading,wareApp/load_data/parser.py,6,wareApp/load_data/parser.py,6,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,MonthlyLoadSharePercentage,wareApp/models.py,580,wareApp/models.py,853,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,MonthlyMinMaxLoadData,wareApp/models.py,770,wareApp/models.py,1116,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,SiteBaseline,wareApp/models.py,421,wareApp/models.py,526,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
@@ -54,65 +50,63 @@ MEDIUM,Different base versions,class body,SiteLoadParameters,wareApp/models.py,8
 MEDIUM,Different base versions,class body,SiteLoadPower,wareApp/models.py,521,wareApp/models.py,772,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,SiteLoadPower.Meta,wareApp/models.py,540,wareApp/models.py,793,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,class body,SupplyLoadTimeShare,wareApp/models.py,169,wareApp/models.py,280,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,RecoveryUploadAPIView.post,wareApp/recovery/views.py,14,wareApp/recovery/views.py,18,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,_extrema,wareApp/load_data/rollups.py,34,wareApp/load_data/rollups.py,47,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,_materialized_buckets,wareApp/load_data/rollups.py,44,wareApp/load_data/rollups.py,64,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,_save_extrema,wareApp/load_data/rollups.py,57,wareApp/load_data/rollups.py,98,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
+MEDIUM,Different base versions,function,parse_gateway_topic,wareApp/mqtt/topics.py,16,wareApp/mqtt/topics.py,16,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Different base versions,setting,warehouse.settings:MIDDLEWARE,warehouse/settings.py,51,warehouse/settings.py,62,Both sides are unchanged copies of different base versions: keep the newer (usually ours).
 MEDIUM,Only theirs changed,class body,AisleGroup,wareApp/models.py,231,wareApp/models.py,351,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,class body,GatewayTopic,wareApp/mqtt/topics.py,9,wareApp/mqtt/topics.py,9,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,class body,LoadReading,wareApp/load_data/parser.py,6,wareApp/load_data/parser.py,6,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,class body,MeterDisconnectionEvent,wareApp/models.py,982,wareApp/models.py,1445,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,class body,MeterDisconnectionEvent.Meta,wareApp/models.py,1007,wareApp/models.py,1470,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,class body,SiteCeleryPingApi,wareApp/views.py,10558,wareApp/views/monitoring.py,83,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,function,MeterDisconnectionIngestView.post,wareApp/views.py,10950,wareApp/views/monitoring.py,364,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,function,RecoveryUploadAPIView.post,wareApp/recovery/views.py,14,wareApp/recovery/views.py,18,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,function,_dg_fuel_db_alias,wareApp/views.py,92,wareApp/views/common.py,62,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,function,_extrema,wareApp/load_data/rollups.py,34,wareApp/load_data/rollups.py,47,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,function,_materialized_buckets,wareApp/load_data/rollups.py,44,wareApp/load_data/rollups.py,64,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,function,_save_extrema,wareApp/load_data/rollups.py,57,wareApp/load_data/rollups.py,98,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,function,mqtt_client1,wareApp/tasks.py,80,wareApp/tasks.py,41,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,function,mqtt_client2,wareApp/tasks.py,3928,wareApp/tasks.py,53,Port their change into our version (file shown under 'Our file').
-MEDIUM,Only theirs changed,function,parse_gateway_topic,wareApp/mqtt/topics.py,16,wareApp/mqtt/topics.py,16,Port their change into our version (file shown under 'Our file').
 MEDIUM,Only theirs changed,setting,warehouse.settings:DATABASE_ROUTERS,warehouse/settings.py,85,warehouse/settings.py,122,Port their change into our version (file shown under 'Our file').
-MEDIUM,They removed it,class body,AisleGroup.DgFuelProvider,,,wareApp/models.py,352,They deleted it: check whether our code still needs it.
 MEDIUM,They removed it,class body,CustomerSnapshotApiOld,,,wareApp/views/customer.py,158,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,DailyLoadData.Meta,,,wareApp/models.py,1073,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,DgUnitConsumption.DailyDataStatus,,,wareApp/models.py,1177,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,Email_History.Meta,,,wareApp/models.py,933,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,FirePumpAlarm.Meta,,,wareApp/models.py,908,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,MonthlyMinMaxLoadData.Meta,,,wareApp/models.py,1125,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,RawLoadData.Meta,,,wareApp/models.py,1020,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,SiteBaseline.Meta,,,wareApp/models.py,542,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,SiteLoadParameters.Meta,,,wareApp/models.py,1259,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,class body,SupplyLoadTimeShare.Meta,,,wareApp/models.py,298,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,Command._find_leg,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,82,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,Command._messages,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,92,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,Command._simulate,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,29,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_extrema_by_bucket,,,wareApp/load_data/rollups.py,136,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_is_listener_worker,,,wareApp/tasks.py,73,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_records_for_extrema,,,wareApp/load_data/rollups.py,81,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_send_throttled_motor_on_email,,,wareApp/mqtt/fire_alarm.py,44,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_task_is_active_or_reserved,,,wareApp/tasks.py,57,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,_update_monthly_share_if_due,,,wareApp/mqtt/supply_time.py,37,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,request_remote_access,,,wareApp/mqtt/remote_access.py,10,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,start_queue_one_mqtt_client,,,wareApp/tasks.py,123,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,function,start_queue_two_mqtt_client,,,wareApp/tasks.py,133,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.load_data.rollups:_last_daily_rollup_hour_by_site,,,wareApp/load_data/rollups.py,10,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.load_data.rollups:_rollup_locks_by_site,,,wareApp/load_data/rollups.py,11,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.management.commands.simulate_mqtt_queue_routing:TOPIC_PATTERN,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,10,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.consumers:logger,,,wareApp/mqtt/consumers.py,18,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.consumption:logger,,,wareApp/mqtt/consumption.py,43,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.daily_consumption_recovery:logger,,,wareApp/mqtt/daily_consumption_recovery.py,22,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.fire_alarm:logger,,,wareApp/mqtt/fire_alarm.py,11,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.hourly_consumption_recovery:logger,,,wareApp/mqtt/hourly_consumption_recovery.py,22,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.load:logger,,,wareApp/mqtt/load.py,25,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.load_runtime_recovery:logger,,,wareApp/mqtt/load_runtime_recovery.py,20,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.remote_access:REMOTE_ACCESS_ACTIONS,,,wareApp/mqtt/remote_access.py,7,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.remote_access:logger,,,wareApp/mqtt/remote_access.py,5,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.mqtt.supply_time:logger,,,wareApp/mqtt/supply_time.py,19,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.recovery.views:logger,,,wareApp/recovery/views.py,9,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.tasks:_mqtt_start_dispatched,,,wareApp/tasks.py,23,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.tasks:_mqtt_start_lock,,,wareApp/tasks.py,22,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,wareApp.tasks:logger,,,wareApp/tasks.py,20,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,warehouse.settings:CELERY_WORKER_PREFETCH_MULTIPLIER,,,warehouse/settings.py,286,They deleted it: check whether our code still needs it.
-MEDIUM,They removed it,setting,warehouse.settings:USE_SECONDARY_DATABASE,,,warehouse/settings.py,121,They deleted it: check whether our code still needs it.
+LOW,Not on their side yet,class body,AisleGroup.DgFuelProvider,,,wareApp/models.py,352,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,DailyLoadData.Meta,,,wareApp/models.py,1073,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,DgUnitConsumption.DailyDataStatus,,,wareApp/models.py,1177,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,Email_History.Meta,,,wareApp/models.py,933,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,FirePumpAlarm.Meta,,,wareApp/models.py,908,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,MonthlyMinMaxLoadData.Meta,,,wareApp/models.py,1125,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,RawLoadData.Meta,,,wareApp/models.py,1020,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,SiteBaseline.Meta,,,wareApp/models.py,542,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,SiteLoadParameters.Meta,,,wareApp/models.py,1259,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,class body,SupplyLoadTimeShare.Meta,,,wareApp/models.py,298,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,Command._find_leg,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,82,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,Command._messages,,,wareApp/management/commands/simulate_mqtt_gateway_traffic.py,92,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,Command._simulate,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,29,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_extrema_by_bucket,,,wareApp/load_data/rollups.py,136,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_is_listener_worker,,,wareApp/tasks.py,73,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_records_for_extrema,,,wareApp/load_data/rollups.py,81,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_send_throttled_motor_on_email,,,wareApp/mqtt/fire_alarm.py,44,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_task_is_active_or_reserved,,,wareApp/tasks.py,57,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,_update_monthly_share_if_due,,,wareApp/mqtt/supply_time.py,37,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,request_remote_access,,,wareApp/mqtt/remote_access.py,10,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,start_queue_one_mqtt_client,,,wareApp/tasks.py,123,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,function,start_queue_two_mqtt_client,,,wareApp/tasks.py,133,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.rollups:_last_daily_rollup_hour_by_site,,,wareApp/load_data/rollups.py,10,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.load_data.rollups:_rollup_locks_by_site,,,wareApp/load_data/rollups.py,11,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.management.commands.simulate_mqtt_queue_routing:TOPIC_PATTERN,,,wareApp/management/commands/simulate_mqtt_queue_routing.py,10,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.consumers:logger,,,wareApp/mqtt/consumers.py,18,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.consumption:logger,,,wareApp/mqtt/consumption.py,43,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.daily_consumption_recovery:logger,,,wareApp/mqtt/daily_consumption_recovery.py,22,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.fire_alarm:logger,,,wareApp/mqtt/fire_alarm.py,11,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.hourly_consumption_recovery:logger,,,wareApp/mqtt/hourly_consumption_recovery.py,22,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.load:logger,,,wareApp/mqtt/load.py,25,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.load_runtime_recovery:logger,,,wareApp/mqtt/load_runtime_recovery.py,20,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.remote_access:REMOTE_ACCESS_ACTIONS,,,wareApp/mqtt/remote_access.py,7,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.remote_access:logger,,,wareApp/mqtt/remote_access.py,5,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.mqtt.supply_time:logger,,,wareApp/mqtt/supply_time.py,19,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.recovery.views:logger,,,wareApp/recovery/views.py,9,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.tasks:_mqtt_start_dispatched,,,wareApp/tasks.py,23,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.tasks:_mqtt_start_lock,,,wareApp/tasks.py,22,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,wareApp.tasks:logger,,,wareApp/tasks.py,20,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,warehouse.settings:CELERY_WORKER_PREFETCH_MULTIPLIER,,,warehouse/settings.py,286,Ours: they have an older copy of our work without it; keep.
+LOW,Not on their side yet,setting,warehouse.settings:USE_SECONDARY_DATABASE,,,warehouse/settings.py,121,Ours: they have an older copy of our work without it; keep.
 LOW,Only ours changed,class body,AisleGroupFields,wareApp/admin.py,50,wareApp/admin.py,123,Keep ours (they did not change it).
 LOW,Only ours changed,class body,AlarmListSerializer,wareApp/serializers.py,100,wareApp/serializers.py,81,Keep ours (they did not change it).
 LOW,Only ours changed,class body,AlarmListSerializer.Meta,wareApp/serializers.py,101,wareApp/serializers.py,107,Keep ours (they did not change it).
@@ -242,8 +236,11 @@ LOW,Only ours changed,function,fetch_loconav_report,wareApp/fuel_providers.py,34
 LOW,Only ours changed,function,fetch_roadcast_fuel,wareApp/fuel_providers.py,47,wareApp/fuel_providers.py,86,Keep ours (they did not change it).
 LOW,Only ours changed,function,fetch_roadcast_pull_api,wareApp/fuel_providers.py,113,wareApp/fuel_providers.py,152,Keep ours (they did not change it).
 LOW,Only ours changed,function,fetch_roadcast_report,wareApp/fuel_providers.py,284,wareApp/fuel_providers.py,327,Keep ours (they did not change it).
+LOW,Only ours changed,function,handle_load_data_message,wareApp/load_data/handler.py,818,wareApp/load_data/handler.py,21,Keep ours (they did not change it).
 LOW,Only ours changed,function,line,wareApp/sendmail.py,86,wareApp/sendmail.py,149,Keep ours (they did not change it).
 LOW,Only ours changed,function,process_hourly,wareApp/recovery/processor.py,379,wareApp/recovery/processor.py,382,Keep ours (they did not change it).
+LOW,Only ours changed,function,roll_up_completed_load_data,wareApp/load_data/rollups.py,86,wareApp/load_data/rollups.py,161,Keep ours (they did not change it).
+LOW,Only ours changed,function,roll_up_load_data_if_due,wareApp/load_data/rollups.py,151,wareApp/load_data/rollups.py,247,Keep ours (they did not change it).
 LOW,Only ours changed,function,send_alarm_for_dg_overtime,wareApp/sendmail.py,498,wareApp/sendmail.py,602,Keep ours (they did not change it).
 LOW,Only ours changed,function,send_alarm_for_high_voltage,wareApp/sendmail.py,399,wareApp/sendmail.py,500,Keep ours (they did not change it).
 LOW,Only ours changed,function,send_alarm_for_low_voltage,wareApp/sendmail.py,435,wareApp/sendmail.py,537,Keep ours (they did not change it).
@@ -260,6 +257,7 @@ LOW,Only ours changed,function,send_mail_for_pf_fluctuation,wareApp/sendmail.py,
 LOW,Only ours changed,function,send_mail_for_sensor_by_pass,wareApp/sendmail.py,122,wareApp/sendmail.py,186,Keep ours (they did not change it).
 LOW,Only ours changed,function,subscribe,wareApp/mqtt/routing.py,49,wareApp/mqtt/routing.py,65,Keep ours (they did not change it).
 LOW,Only ours changed,function,update_daily_from_hourly,wareApp/recovery/processor.py,118,wareApp/recovery/processor.py,125,Keep ours (they did not change it).
+LOW,Only ours changed,function,update_monthly_min_max_load,wareApp/load_data/monthly.py,11,wareApp/load_data/monthly.py,22,Keep ours (they did not change it).
 LOW,Only ours changed,setting,warehouse.settings:ALLOWED_HOSTS,warehouse/settings.py,31,warehouse/settings.py,35,Keep ours (they did not change it).
 LOW,Only ours changed,setting,warehouse.settings:CORS_ORIGIN_ALLOW_ALL,warehouse/settings.py,32,warehouse/settings.py,36,Keep ours (they did not change it).
 LOW,Only ours changed,setting,warehouse.settings:CSRF_COOKIE_SECURE,warehouse/settings.py,172,warehouse/settings.py,42,Keep ours (they did not change it).
@@ -877,6 +875,8 @@ LOW,We replaced it,function,SiteLoadParameters.__unicode__,wareApp/models.py,898
 LOW,We replaced it,function,SiteLoadPower.__unicode__,wareApp/models.py,555,,,Nothing: we moved / removed / replaced it and they did not change it.
 LOW,We replaced it,function,SitePhaseCurrentsInfo.post,wareApp/views.py,1419,,,Nothing: we moved / removed / replaced it and they did not change it.
 LOW,We replaced it,function,SitePhaseVoltagesInfo.post,wareApp/views.py,1383,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,_group_by_bucket,wareApp/load_data/rollups.py,76,,,Nothing: we moved / removed / replaced it and they did not change it.
+LOW,We replaced it,function,_handle_load_data_message,wareApp/load_data/handler.py,15,,,Nothing: we moved / removed / replaced it and they did not change it.
 LOW,We replaced it,function,_publish_consumption_recovery,wareApp/tasks.py,3824,,,Nothing: we moved / removed / replaced it and they did not change it.
 LOW,We replaced it,function,_publish_supply_time_recovery,wareApp/tasks.py,3820,,,Nothing: we moved / removed / replaced it and they did not change it.
 LOW,We replaced it,function,debug_task,warehouse/celery.py,23,,,Nothing: we moved / removed / replaced it and they did not change it.

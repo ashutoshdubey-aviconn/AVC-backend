@@ -103,10 +103,11 @@ add("F09", "Credential clean-up", "Security", "Planned",
 add("F10", "Merge with the colleague's code", "Merge", "Waiting for input",
     "Team lead: merge this branch with the colleague's optimized version of main's code. Prepared 19 Nov: tag "
     "fov2-pre-merge-20261119, code inventory (every feature, alarm, API, model, migration and function with a fingerprint), "
-    "function-level overlap check. Against main's current code: 22 items changed on both sides, 23 only on main (e.g. "
-    "monitoringCustomerSites/ API), migrations 0073-0076 diverged.",
+    "function-level overlap check. Main's server = legacy origin/main + our DG fuel / LoadData branches + a few hotfixes "
+    "(user type 6, monitoringCustomerSites/ API, Redis CACHES, admin pages, AisleGroup DG fuel fields); migrations "
+    "0073-0076 diverged. The colleague's code is not on origin/main yet.",
     "2026-11-19", "2026-11-19", "-", "-",
-    "Get the colleague's code into git (branch from origin/main), run overlap_check.py on it, merge on an integration branch.",
+    "Colleague pushes his code (to main or a branch); run overlap_check.py on it; merge on an integration branch.",
     "Colleague: his code (repo / branch); team lead: who merges",
     "docs/merge/MERGE_GUIDE.md", "-")
 

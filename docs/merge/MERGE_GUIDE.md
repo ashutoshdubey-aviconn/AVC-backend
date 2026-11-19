@@ -3,7 +3,7 @@
 Written 2026-11-19, before the merge. Two code bases started from the same legacy code:
 
 - **ours**: `full-optimization-v2`, tagged `fov2-pre-merge-20261119`.
-- **theirs**: the colleague's optimized version of the code that runs on main.
+- **theirs**: the colleague's optimized version of the legacy code (`origin/main`). Main's server runs that legacy code plus our earlier DG fuel and LoadData rollouts.
 
 Files here:
 
@@ -19,34 +19,51 @@ Files here:
 2. **Fingerprints.** Every function and class in the Functions sheet has a fingerprint, a hash of its source with comments and formatting ignored. After the merge, the check below shows which of our functions changed.
 3. **Ownership comes from the inventory.** Each function's "Origin" (New / Changed / Moved, unchanged) says what this branch wrote. The overlap sheet says what the other side touched.
 
+## Where each code base lives
+
+| Code | Where | State (19 Nov) |
+|---|---|---|
+| Legacy code (the common base) | `origin/main` | Unchanged since 23 Dec 2025 (`7d2dacde`); no commits from the colleague there yet |
+| Ours | `full-optimization-v2` / `-next`, tag `fov2-pre-merge-20261119` | This inventory |
+| Main's server | `~/django_project` on main (not a git checkout) | Legacy code + our two earlier rollouts + a few hotfixes made on the server |
+
+Main's DG fuel and LoadData files are **exact copies** of our own branches (`dg_fuel_v2`, `fully_optimization`, `task_optimization`, `loaddatav1`). They are not new code, so they are compared against those branches (the default bases of `overlap_check.py`).
+
+Main's **own edits**, the only code there that is in none of our branches:
+
+| Edit on main | File | In ours? | Action |
+|---|---|---|---|
+| Customer 74 (YusenLogistics) in the super-admin customer lists | views.py (`CustomerSnapshotApi.post`, `LoadGraphApi*.post` ...) | Yes (17 Nov) | Keep ours |
+| User type 6 `AVC_Super_admin` | models.py `User.user_type` | No | Port (choices only, no migration needed for data) |
+| `MonitoringCustomerSitesInfo` API: `monitoringCustomerSites/`, `monitoringSitesList/` (sites that send consumption pings) | views.py, urls.py | No | Port into `wareApp/views/monitoring.py` + urls |
+| Redis cache `CACHES` | settings.py | No (ours uses the default cache setting) | Port; our cooldown / site cache / idempotency then use Redis |
+| Admin pages for HomeGatewayStatus and MeterDisconnectionEvent | admin.py | No | Port |
+| AisleGroup `dg_fuel_enabled` / `dg_fuel_provider` / `dg_fuel_vehicle_number` and more | models.py, migrations 0075 / 0076 (applied 31 Oct) | Partly (ours has DG fuel per aisle differently) | Compare fields, map in the migration reconciliation |
+| `_deferred_task`: a no-op decorator that turns the later duplicate task definitions in tasks.py into plain functions | tasks.py | Not needed (ours has one definition per task) | Keep ours |
+| A commented-out MQTT login in tasks.py | tasks.py | No | Do not port; part of the credential clean-up (F09) |
+
 ## Why conflicts are expected
 
-Git can only merge well when both sides share history. The colleague's code comes from main's server, which is not a git checkout, so git has no common base for it.
+- `wareApp/views.py`: ours is split into `wareApp/views/` (18 modules), while main keeps one file of about 11,000 lines. A change in `views.py` must be applied to our matching file, and the overlap sheet names that file ("Our file").
+- `wareApp/tasks.py`: ours moved MQTT handling to `wareApp/mqtt/`.
+- **Migrations:** ours are `0059`–`0114`, but main's DB applied its **own** `0073`–`0076`. Same numbers, different migrations, so a plain `migrate` fails. A reconciliation step is needed (see [MAIN_SERVER_ROLLOUT.md section 3](../deploy/MAIN_SERVER_ROLLOUT.md)).
 
-What the comparison with main's current code (19 Nov) shows:
-
-| Area | Ours | Main's code now | Effect |
-|---|---|---|---|
-| `wareApp/views.py` | split into `wareApp/views/` (18 modules) | one file, about 11,000 lines, changed on 16 Nov | Every change of theirs in `views.py` must be applied to the matching file of ours. The overlap sheet names that file ("Our file"). |
-| `wareApp/tasks.py` | MQTT handling moved to `wareApp/mqtt/` | the 14 Oct release plus changes | 8 processing tasks changed on both sides (HIGH) |
-| Migrations | our `0059`–`0114` | main's DB applied its **own** `0073`–`0076` (`0075` adds AisleGroup `dg_fuel_enabled` / `dg_fuel_provider` / `dg_fuel_vehicle_number`, applied 31 Oct) | Same numbers, different migrations. A plain `migrate` fails, so a reconciliation step is needed (see [MAIN_SERVER_ROLLOUT.md section 3](../deploy/MAIN_SERVER_ROLLOUT.md)). |
-| `models.py`, `urls.py`, `serializers.py`, `admin.py` | changed | changed on main 31 Oct – 18 Nov | merge by hand, item by item |
-
-Overlap counts (main's code vs ours):
+Overlap counts (main's code vs ours, all our branches as bases):
 
 | Risk | Count | What it means |
 |---|---|---|
-| HIGH | 22 | **Both changed**, so merge by hand. Examples: `process_*_message` tasks, `handle_load_data_message`, the load-data rollups, `CustomerSnapshotApi.post`, `LoadGraphApiForDailyData.post`, `SiteCeleryPingApi.post`, models `User` and `DgUnitConsumption`, `urlpatterns`. |
-| HIGH | 23 | **Theirs only**: exists on main, not in ours, so port it. Examples: APIs `monitoringCustomerSites/` and `monitoringSitesList/` (`MonitoringCustomerSitesInfo`), `CACHES` setting, Roadcaste / Loconav fuel tasks, admin pages for HomeGatewayStatus and MeterDisconnectionEvent. |
-| MEDIUM | 16 | **Only theirs changed**, so port their change into our file. Examples: AisleGroup model fields, `mqtt_client1/2`, `parse_gateway_topic`, `MeterDisconnectionIngestView.post`, `DATABASE_ROUTERS`. |
-| MEDIUM | 53 | They removed it (42), or both sides are unchanged copies of different base versions (11). |
-| LOW | 230 | Only we changed it, or we replaced it: keep ours. |
+| HIGH | 18 | **Both changed**. Mostly our rewrite against a small hotfix on main (e.g. customer 74, user type 6), or main's `_deferred_task` copies of the `process_*_message` tasks. Check each one; usually keep ours and add the hotfix. |
+| HIGH | 21 | **Theirs only**: on main, not in ours. These are the main-only edits in the table above, plus legacy fuel helpers in tasks.py (`DG_fuel_for_Roadcaste`, `get_loconav_fuel_data`, `roadcasteAPIUpdated`) that ours replaced with `wareApp/dg_fuel/`. |
+| MEDIUM | 9 | **Only theirs changed**, so port it (AisleGroup / MeterDisconnectionEvent fields, `_dg_fuel_db_alias`, `DATABASE_ROUTERS`, `SiteCeleryPingApi`, `MeterDisconnectionIngestView.post`). |
+| MEDIUM | 18 | **Different base versions**: main has an older copy of one of our branches (load-data rollups, topics, models). Keep ours, which is newer. |
+| MEDIUM | 1 | They removed it: `CustomerSnapshotApiOld`. |
+| LOW | 277 | Only ours changed, we replaced it, or main has an older copy without it. Keep ours. |
 
-Main's code is not necessarily the colleague's code. **Run the check again on the colleague's actual code** before merging.
+**The colleague's code is not on `origin/main` yet.** When it is pushed (to `main` or another branch), run the check on it (step 2). Its new work will show up as "Theirs only", "Only theirs changed" or "Both changed".
 
 ## Steps
 
-1. **Get the colleague's code into git** as a branch made from the legacy commit, so git has a common base:
+1. **Get the colleague's code into git.** If he pushes it to `main` (on top of `7d2dacde`), it already shares history with ours. Otherwise make a branch from the legacy commit, so git has a common base:
 
    ```bash
    git switch -c colleague-code origin/main
