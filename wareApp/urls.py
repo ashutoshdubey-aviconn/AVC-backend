@@ -32,6 +32,8 @@ urlpatterns = [
     path("baselineSetup/", views.BaselineSetup.as_view()),
     path("catchUpSpread/", views.CatchUpSpreadApi.as_view()),
     path("alarmSettings/", views.AlarmSettingsApi.as_view()),
+    path("syncStatus/", views.SyncStatusApi.as_view()),
+    path("recoveryHistory/", views.RecoveryHistoryApi.as_view()),
     path("customerSnapShotEnergySavingApi/", views.CustomerSnapshotApi.as_view()),
     path(
         "siteSnapShotEnergySavingApi/",

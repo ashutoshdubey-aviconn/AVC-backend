@@ -1,5 +1,6 @@
 """Build the feature tracker: FEATURE_TRACKER.xlsx and .csv (every feature: done, in progress, waiting, planned),
-plus the "Frontend APIs" sheet / FRONTEND_APIS.csv (every API a feature uses and how the frontend handles it).
+plus the "Frontend APIs" sheet / FRONTEND_APIS.csv (every API a feature uses, how it works, a real response and how
+the frontend handles it) and FRONTEND_API_GUIDE.md for the frontend developer.
 
     python3 docs/features/build_feature_tracker.py
 
@@ -8,6 +9,7 @@ re-run this script. Keep the IDs stable (never reuse one); add new rows at the e
 """
 
 import csv
+import json
 import pathlib
 from collections import Counter
 
@@ -172,6 +174,13 @@ add("D32", "'Open for' on the alarm lists", "Alarms / frontend", "Done",
     "orange from 1 day); the super-admin column sorts by days.",
     "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome", T,
     "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
+add("D33", "Data sync / recovery status screen", "Recovery / frontend", "Done",
+    "Site page -> Data sync (Super Admin): whether each aisle and power source is sending its data (healthy / late "
+    "/ missing / recovery requested / received / recovered / failed, with counts and a filter), the last gap and "
+    "its recovery, and the recovery requests asked from the gateways (status filter, paging). New read-only APIs "
+    "GET syncStatus/ and recoveryHistory/; the data was stored but nothing served it.",
+    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114: 38 healthy, 576 requests)", T,
+    "-", "-", "docs/features/FRONTEND_API_GUIDE.md", "-")
 add("D30", "Gateway Status panel: Gateway Service issue", "Alarms / frontend", "Done",
     "gateway-status/ adds health (online / offline / modbus_issue) with health_since / health_detail, from the open "
     "Gateway Disconnected (15) and Gateway Service / Modbus Issue (16) alarms; status (bool) unchanged. Dashboard panel: "
@@ -385,6 +394,18 @@ api("D18, D31, H04", "/api/alarmSettings/", "GET / POST", "Token, Super_Admin",
     "threshold, email_software, email_ground, repeat_tolerance_percent",
     FE + "alarm/alarm-settings.component.ts (site page -> Alarms -> settings button)", "Done",
     "H04: Low Consumption can now be switched on per site here (Auto or Manual).")
+# Data sync / recovery status (read-only)
+api("D33", "/api/syncStatus/", "GET", "Token, Super_Admin", "?site_id=114",
+    "site_id, site_name, total, counts {state: n}, data[]: home_gateway_id, object_type (aisle / power_source), "
+    "object_name, leg_id, power_source, sync_status, last_sync_at, expected_from / expected_to (gap), missing_slots, "
+    "recovered_slots, has_data_loss, last_error, last_recovery_*_at, current_recovery {id, recovery_type, status, attempt}",
+    FE + "alarm/sync-status.component.ts (site page -> Data sync button)", "Done", "-")
+api("D33", "/api/recoveryHistory/", "GET", "Token, Super_Admin",
+    "?site_id=114&status=failed&recovery_type=hourly_consumption&limit=20&offset=0",
+    "count, limit, offset, results[]: recovery_type, status, gateway_id, object_name, missing_from / missing_to, "
+    "expected_slots, recovered_slots, error_slots, attempt, requested_at, response_received_at, applied_at, "
+    "verified_at, failed_reason, catch_up_at, is_active",
+    FE + "alarm/sync-status.component.ts (Recovery requests table, status filter, paging)", "Done", "-")
 # Not called by the frontend
 api("F11", "/api/createCustomer/, createSite/, createAisleGroups/, createHomeGatewayId/", "POST", "None (open)",
     "provisioning payload", "created ids", "- (provisioning script)", "Not frontend",
@@ -393,6 +414,210 @@ api("F08", "/api/dgFuelAlerts/, /api/dgFuelPushInterface/", "POST", "None (provi
     "status", "- (fuel providers)", "Not frontend", "-")
 api("D16", "/api/meter-disconnections/ingest/", "POST", "None (gateway)", "meter events", "saved count",
     "- (gateway)", "Not frontend", "-")
+api("D21, D33", "/api/v1/recovery/upload/", "POST", "None (gateway)",
+    '{"Recovery Payload": [topic, site id, gateway id, recovery data, ...]}',
+    "status, message (400 \"Recovery Payload missing\")", "- (gateways upload recovery data over HTTP)", "Not frontend",
+    "Same processing as the MQTT recovery answers: rows applied and the sync status moved (shown by syncStatus/).")
+
+
+# ---- How each frontend API works, and a real response (FRONTEND_API_GUIDE.md) -------------------
+# Responses: frontend_api_samples_test_server.json, captured on the test server by
+# capture_frontend_api_samples.py (read-only calls only). APIs that write are not called: their
+# example comes from the code (WRITE_EXAMPLES).
+SAMPLES_FILE = HERE / "frontend_api_samples_test_server.json"
+SAMPLES = json.loads(SAMPLES_FILE.read_text()) if SAMPLES_FILE.exists() else {}
+
+# endpoint (as in A) -> (guide section, sample key, how it works)
+FEATURE_API, ALARM_API, OTHER_API = "Feature APIs", "Alarm APIs", "Not called by the frontend"
+HOW = {
+    "/api/catchUpSpread/": (FEATURE_API, "catchUpSpread",
+        "Preview (apply false, changes nothing): finds the site's catch-up hours on that day - the first hour after a "
+        "gap that holds the whole gap's energy - and per aisle returns the gap, the missing hours, the share each "
+        "missing hour would get and each day's total before / after. not_spreadable lists catch-ups that can't be "
+        "spread (and why). apply true (with the ticked legs) writes the spread: missing hours created with "
+        "is_estimated, the catch-up hour lowered, day totals recomputed, the Consumption Spike alarm closed, a "
+        "CatchUpSpread row logged; total energy unchanged. {\"undo\": id} reverses one spread. Super_Admin only "
+        "(403 otherwise)."),
+    "/api/baselineSetup/": (FEATURE_API, "baselineSetup",
+        "Preview (apply false, changes nothing): per aisle the stored consumption of each sample day, the average, an "
+        "override if sent, the proposed baseline and warnings (missing hours, alarms, spikes in the sample); errors "
+        "block applying. apply true closes the open baselines on effective_from, creates the new SiteBaseline rows "
+        "and rewrites daily / hourly baseline and energy_saved from that day. Super_Admin only."),
+    "/api/saveBaseline/": (FEATURE_API, None,
+        "Old one-aisle baseline save (baseline page table): sets the baseline of legId from date. Fixed: the first "
+        "baseline of a site no longer crashes. Writes, so not captured: example from the code."),
+    "/api/hourlySavingData/": (FEATURE_API, "hourlySavingData",
+        "Hourly chart of a saving site and day: per aisle 24 hourly kWh (Data) and 24 hourly kWh saved (SavingData), "
+        "plus a 'baseline' spline (day baseline / 24) on live sites. estimated[i] true = hour i was filled by a "
+        "catch-up spread: draw it lighter / dashed. No login needed (AllowAny)."),
+    "/api/submeteringHourlyData/": (FEATURE_API, "submeteringHourlyData",
+        "Hourly chart of a submetering site: per aisle 24 hourly kWh summed in one query, with estimated[24] as "
+        "above. No baseline series."),
+    "/api/getSiteHourlyConsumptionData/": (FEATURE_API, "getSiteHourlyConsumptionData",
+        "Hourly chart of a WH-metering site (and the baseline page): per meter (Main-Supply, DG, ...) the day's "
+        "hourly kWh with estimated[24]. Known issue: values are taken in stored order and padded at the end, so a "
+        "missing hour shifts the later hours one place left."),
+    "/api/snapshot/": (FEATURE_API, "snapshot",
+        "Super-admin tiles: kWh consumed and saved and % saved over all live sites of all customers, this month by "
+        "default (start_date / end_date to change it; current_date is the start used), and alarms = the number of "
+        "open issues (same count as the super-admin alarm list)."),
+    "/api/customerSnapShotEnergySavingApi/": (FEATURE_API, "customerSnapShotEnergySavingApi",
+        "Customer page tiles: energy consumed / saved and % saved of the customer's saving sites since each site's "
+        "live date up to yesterday, and alarms = open alarms of those sites."),
+    "/api/siteSnapShotEnergySavingApi/": (FEATURE_API, "siteSnapShotEnergySavingApi",
+        "Site page tiles: energy consumed / saved since the live date up to yesterday (previous_date), % saved, "
+        "carbon saved when the site shows it, and alarms = the site's open alarms. Energy values are strings here."),
+    "/api/alarmList/": (ALARM_API, "alarmList",
+        "Site alarm panel summary: only alarms still happening (is_active). active_alarms = number of open alarms; "
+        "total_alarm / high_priority / medium_priority = their occurrences; data = one line per alarm type "
+        "(name, count, priority, alarm_type) - use alarm_type to open alarmListDetail/."),
+    "/api/alarmListDetail/": (ALARM_API, "alarmListDetail",
+        "Open alarms of one site and type, newest first. issue is the readable cause; created = first seen "
+        "(outages: when the outage began), last_seen, occurrences; phase / fuel / run-hour values for power and DG "
+        "alarms; open_days / open_for = how long it has been open."),
+    "/api/alarmListDetail/ (open_days, open_for)": (ALARM_API, "alarmListDetail",
+        "Same response as above: open_days (whole days) and open_for (\"2 days 5 h\", \"20.2 h\") count from created."),
+    "/api/alarmTypeApi/": (ALARM_API, "alarmTypeApi",
+        "Super-admin alarm list: one row per open issue of every live site (last seen within ALARM_FEED_MAX_AGE_DAYS "
+        "= 30), grouped by customer. Each row: alarm name / type, priority, site, source (consumption / power / "
+        "gateway / meter), aisle or power source or gateway, issue, created_time (first seen), last_seen, "
+        "occurrences, open_for."),
+    "/api/alarmTypeApi/ (open_days, open_for)": (ALARM_API, "alarmTypeApi",
+        "Same response as above: open_days / open_for of each row, counted from the issue's first day."),
+    "/api/alarmapi/": (ALARM_API, "alarmapi",
+        "Open-issue counts per customer, priority and site (one list per customer, empty for customers without "
+        "alarms). No screen uses it."),
+    "/api/alarmListOnCustomerPage/": (ALARM_API, "alarmListOnCustomerPage",
+        "Customer page table: per site of the customer (id = customer user id) the open alarms by type name, the "
+        "total and the site type. Sites without open alarms are left out. result is the string \"1\" here."),
+    "/api/getCustAlarmGraph/": (ALARM_API, "getCustAlarmGraph",
+        "Customer page bar chart: open alarms per type over the customer's sites, as Highcharts series (one column "
+        "series per type) plus alarm_name_list for the x axis."),
+    "/api/alarmListOnSitePage/": (ALARM_API, "alarmListOnSitePage",
+        "Open alarms of one site, newest first, short form (type, object type / name, priority, date dd-mm-yyyy). "
+        "No screen uses it (the site page uses alarmList/ + alarmListDetail/)."),
+    "/api/consumptionAlarms/": (ALARM_API, "consumptionAlarms",
+        "Open High / Low Consumption alarms (types 7, 8) of a site, optionally created between start_date and "
+        "end_date. No screen uses it."),
+    "/api/gateway-status/": (ALARM_API, "gateway-status",
+        "Every gateway with its site and customer. status (bool) = data in the last hour. health = \"modbus_issue\" "
+        "while a Gateway Service / Modbus Issue alarm is open (pings, no meter data; shown as 'Gateway Service "
+        "issue'), \"offline\" while a Gateway Disconnected alarm is open, else online / offline from status; "
+        "health_since / health_detail = start and text of that alarm. Paged by limit / offset (the panel asks "
+        "limit=1000). No login needed."),
+    "/api/meter-disconnections/": (ALARM_API, "meter-disconnections",
+        "Meter disconnect / reconnect events reported by gateways (input of Meter Disconnected), newest first; "
+        "filter by site_id, meter_id, meter_number, status (connected / disconnected), from / to; paged (count, "
+        "limit, offset)."),
+    "/api/alarmSettings/": (ALARM_API, "alarmSettings",
+        "GET ?site_id: every alarm type of the site with its setting: mode default (no setting: works as before) / "
+        "auto (system thresholds) / manual (threshold in unit) / off (not raised), the e-mail groups and repeat "
+        "tolerance; unit null = no manual threshold; raised false = type exists but nothing raises it. POST saves "
+        "one type (validated: manual needs threshold > 0 and a type with a unit; 400 {msg} otherwise) and returns "
+        "the whole list; mode default deletes the setting. Applies at the next alarm check. Super_Admin only."),
+    "/api/syncStatus/": (FEATURE_API, "syncStatus",
+        "Current state of every aisle (consumption) and power source (supply time / load runtime) of the site's "
+        "gateways (AisleSyncRecoveryStatus). States: healthy (data on time) -> late (no packet for 70 min) -> missing "
+        "(130 min); a gap starts recovery: recovery_requested (the server asked the gateway for the missing hours, "
+        "retried up to 3 times) -> recovery_received -> recovered -> healthy, or failed (no answer). counts = rows per "
+        "state; expected_from / expected_to and missing_slots / recovered_slots describe the last gap (kept after "
+        "the row is healthy again: show it as history); has_data_loss = recovered but the gateway had no data for "
+        "some hours (stored as 0). Read-only; Super_Admin only."),
+    "/api/recoveryHistory/": (FEATURE_API, "recoveryHistory",
+        "The site's recovery requests (RecoveryMonitor), newest first: one row per gap asked from a gateway, with "
+        "type (hourly / daily consumption, load runtime), status (requested -> response_received -> applied -> "
+        "verified, or failed / timeout), the gap, hours asked / got / without data (error_slots), attempt and "
+        "failed_reason. Filter by status and recovery_type; paged by limit (max 500) / offset. Raw MQTT payloads are "
+        "not returned. Read-only; Super_Admin only."),
+}
+WRITE_EXAMPLES = {
+    "/api/saveBaseline/": {"request": {"siteId": 114, "legId": "671", "baselineValue": 9.21, "date": "2026/11/13"},
+                           "body": {"result": 1, "msg": "baseline value set"}},
+}
+# POST of alarmSettings/ writes: its example is added to the guide next to the captured GET.
+ALARM_SETTINGS_POST = {
+    "request": {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250,
+                "email_software": True, "email_ground": False},
+    "body": "200: the same response as GET, with this type's row changed. "
+            "400: {\"status\": 400, \"msg\": \"Manual needs a threshold above 0 (kWh / day).\"}",
+}
+# Things a frontend developer trips over, shown at the top of the guide.
+CONVENTIONS = [
+    "Base URL: /api/ on the server that serves the page (test: http://43.204.53.81/api/). Send "
+    "'Authorization: Token <token from login>' and 'Content-Type: application/json'. Without a token: 401; "
+    "a Super_Admin-only API with another user: 403.",
+    "Success flags differ per API: \"status\": 200, \"status\": 1, \"result\": 1 and \"result\": \"1\" (a string) "
+    "are all used. Check the HTTP status first; errors are 400 / 404 / 500 with msg, message or error.",
+    "Dates differ per API: ISO \"2026-11-20T15:20:59\" (alarms, gateways), \"2026/11/20\" (requests, snapshots), "
+    "\"20-11-2026\" (alarmListOnSitePage), \"19-Nov-2026\" (site snapshot). Request dates are YYYY/MM/DD.",
+    "Numbers: the site snapshot sends energy as strings (\"541432.6\") and % with a sign (\"78.2 %\"); parse "
+    "before maths.",
+    "Alarm lists show only alarms still happening (is_active). Daily alarms (High / Low Consumption, Bypassed) "
+    "are per day; outage alarms (Meter / Gateway Disconnected, Service / Modbus Issue) stay one row until solved.",
+    "Hourly charts: estimated[24] on each series marks spread hours; it is missing on servers without it (main) - "
+    "treat missing as all false.",
+]
+
+
+def api_samples(endpoint):
+    """(request, body) for an endpoint: captured on test, else the code example, else (None, None)."""
+    _, key, _ = HOW.get(endpoint, (None, None, None))
+    sample = SAMPLES.get(key) if key else None
+    if sample:
+        return sample.get("request"), sample.get("body", sample.get("error"))
+    example = WRITE_EXAMPLES.get(endpoint)
+    return (example["request"], example["body"]) if example else (None, None)
+
+
+def short_json(value, limit=1500):
+    if value is None:
+        return "-"
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return text if len(text) <= limit else text[:limit] + " ..."
+
+
+def _json_block(value):
+    return value if isinstance(value, str) else json.dumps(value, indent=1, ensure_ascii=False)
+
+
+def write_guide(path):
+    """FRONTEND_API_GUIDE.md: every frontend API with how it works and a real response."""
+    note = SAMPLES.get("_note", "No samples captured yet.")
+    lines = [
+        "# Frontend API guide", "",
+        "For the frontend developer: every API the frontend calls (features and alarms), how it works and a real "
+        "response. Generated by `docs/features/build_feature_tracker.py` (same data as the \"Frontend APIs\" sheet "
+        "of `FEATURE_TRACKER.xlsx`); do not edit by hand.", "",
+        f"Responses: {note} Re-capture with `docs/features/capture_frontend_api_samples.py` (read-only calls). "
+        "APIs that write are shown with an example from the code.", "",
+        "## Conventions", "",
+    ]
+    lines += [f"- {c}" for c in CONVENTIONS]
+    for section in (FEATURE_API, ALARM_API):
+        lines += ["", f"## {section}", ""]
+        for row in A:
+            endpoint = row[1]
+            if endpoint not in HOW or HOW[endpoint][0] != section or "(open_days" in endpoint:
+                continue
+            request, body = api_samples(endpoint)
+            shown = json.dumps(request, ensure_ascii=False) if request is not None else row[4]
+            lines += [
+                f"### `{row[2]} {endpoint}`", "",
+                f"- **Features:** {row[0]} | **Auth:** {row[3]} | **Frontend:** {row[7]} - {row[6]}",
+                f"- **Request:** `{shown}`",
+                f"- **How it works:** {HOW[endpoint][2]}",
+            ]
+            if row[8] not in ("-", ""):
+                lines.append(f"- **Note:** {row[8]}")
+            lines += ["", "<details><summary>Response</summary>", "", "```json", _json_block(body), "```", "",
+                      "</details>", ""]
+            if endpoint == "/api/alarmSettings/":
+                lines += [f"- **POST request:** `{json.dumps(ALARM_SETTINGS_POST['request'])}`",
+                          f"- **POST response:** {ALARM_SETTINGS_POST['body']}", ""]
+    others = [r for r in A if r[1] not in HOW]
+    lines += ["", f"## {OTHER_API}", ""]
+    lines += [f"- `{r[1]}` ({r[2]}, {r[3]}): {r[5]} - {r[8]}" for r in others]
+    path.write_text("\n".join(lines) + "\n")
 
 
 def write_sheet(book, title, columns, rows, status_col=None, first=False, colours=None):
@@ -435,7 +660,10 @@ def main():
         apis = [f"{a[1]} ({a[7]})" for a in A if row[0] in {i.strip() for i in a[0].split(",")}]
         rows.append(row[:9] + ["; ".join(apis) or "-"] + row[9:])
     write_sheet(book, "Features", columns, rows, status_col=3)
-    write_sheet(book, "Frontend APIs", API_COLUMNS, A, status_col=7, colours=FE_STATUSES)
+    api_columns = API_COLUMNS + [("How it works", 70), ("Example response (test server, trimmed)", 80)]
+    api_rows = [row + [HOW.get(row[1], ("", "", "-"))[2], short_json(api_samples(row[1])[1])] for row in A]
+    write_sheet(book, "Frontend APIs", api_columns, api_rows, status_col=7, colours=FE_STATUSES)
+    write_guide(HERE / "FRONTEND_API_GUIDE.md")
     fe_counts = Counter(row[7] for row in A)
     write_sheet(book, "Frontend API status", [("Frontend status", 16), ("APIs", 8), ("Meaning", 70)],
                 [[status, fe_counts.get(status, 0), meaning] for status, (meaning, _) in FE_STATUSES.items()],
@@ -447,7 +675,10 @@ def main():
         [4, "When it is done: status Done, link its doc and commit, and add a row to docs/CHANGELOG.md."],
         [5, "API added / changed / built in the frontend: edit A (one api(...) per endpoint, with the feature IDs) - the "
             "Features sheet's 'Frontend APIs' column is filled from it."],
-        [6, "Run: python3 docs/features/build_feature_tracker.py (writes FEATURE_TRACKER.xlsx, .csv and FRONTEND_APIS.csv)."],
+        [6, "API response changed: re-capture the samples on test with docs/features/capture_frontend_api_samples.py "
+            "(read-only calls; command in its docstring) and update HOW (how it works)."],
+        [7, "Run: python3 docs/features/build_feature_tracker.py (writes FEATURE_TRACKER.xlsx, .csv, FRONTEND_APIS.csv "
+            "and FRONTEND_API_GUIDE.md)."],
     ])
     book.save(HERE / "FEATURE_TRACKER.xlsx")
     with open(HERE / "FEATURE_TRACKER.csv", "w", newline="") as handle:
@@ -456,8 +687,8 @@ def main():
         writer.writerows(rows)
     with open(HERE / "FRONTEND_APIS.csv", "w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow([name for name, _ in API_COLUMNS])
-        writer.writerows(A)
+        writer.writerow([name for name, _ in api_columns])
+        writer.writerows(api_rows)
     print(f"{len(F)} features ({', '.join(f'{s} {n}' for s, n in counts.items())}); "
           f"{len(A)} APIs ({', '.join(f'{s} {n}' for s, n in fe_counts.items())}) -> {HERE / 'FEATURE_TRACKER.xlsx'}")
 

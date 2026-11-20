@@ -5,6 +5,7 @@
 
 from .alarm_settings import *  # noqa: F401,F403
 from .alarms import *  # noqa: F401,F403
+from .sync_status import *  # noqa: F401,F403
 from .auth import *  # noqa: F401,F403
 from .baseline import *  # noqa: F401,F403
 from .catch_up import *  # noqa: F401,F403
