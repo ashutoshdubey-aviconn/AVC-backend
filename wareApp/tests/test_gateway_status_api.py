@@ -5,7 +5,7 @@ from datetime import datetime
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from wareApp.models import AlarmNotifications, HomeGatewayId, HomeGatewayStatus, Site
+from wareApp.models import AlarmNotifications, HomeGatewayId, HomeGatewayStatus, Site, User
 
 
 class GatewayStatusHealthTests(TestCase):
@@ -25,7 +25,9 @@ class GatewayStatusHealthTests(TestCase):
         )
 
     def health(self):
-        body = APIClient().get("/api/gateway-status/?limit=500").json()
+        client = APIClient()
+        client.force_authenticate(User.objects.get_or_create(username="admin", UserType=1)[0])
+        body = client.get("/api/gateway-status/?limit=500").json()
         return {row["gateway_id"]: row for row in body["results"]}
 
     def test_health_from_status_and_open_alarms(self):
@@ -60,3 +62,10 @@ class GatewayStatusHealthTests(TestCase):
         self.alarm("avc_both_000001_6", AlarmNotifications.GATEWAY_SERVICE_ISSUE)
         self.alarm("avc_both_000001_6", AlarmNotifications.GATEWAY_DISCONNECTED)
         self.assertEqual(self.health()["avc_both_000001_6"]["health"], "offline")
+
+    def test_only_super_admin_can_list(self):
+        self.gateway("avc_on_000001_1", True)
+        self.assertEqual(APIClient().get("/api/gateway-status/").status_code, 401)
+        customer = APIClient()
+        customer.force_authenticate(User.objects.create(username="customer", UserType=4))
+        self.assertEqual(customer.get("/api/gateway-status/").status_code, 403)

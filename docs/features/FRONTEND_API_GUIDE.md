@@ -1194,9 +1194,9 @@ Responses: Captured on the test server (21 Nov 2026) as a Super Admin; lists cut
 
 ### `GET /api/gateway-status/`
 
-- **Features:** D16, D30 | **Auth:** None (AllowAny) | **Frontend:** Done - Aviconncorp-new-migrated-frontend/src/app/alarm/gateway-status.component.ts (dashboard Gateway Status panel)
+- **Features:** D16, D30 | **Auth:** Token, Super_Admin | **Frontend:** Done - Aviconncorp-new-migrated-frontend/src/app/alarm/gateway-status.component.ts (dashboard Gateway Status panel)
 - **Request:** `{"limit": 3}`
-- **How it works:** Every gateway with its site and customer. status (bool) = data in the last hour. health = "modbus_issue" while a Gateway Service / Modbus Issue alarm is open (pings, no meter data; shown as 'Gateway Service issue'), "offline" while a Gateway Disconnected alarm is open, else online / offline from status; health_since / health_detail = start and text of that alarm. Paged by limit / offset (the panel asks limit=1000). No login needed.
+- **How it works:** Every gateway with its site and customer. status (bool) = data in the last hour. health = "modbus_issue" while a Gateway Service / Modbus Issue alarm is open (pings, no meter data; shown as 'Gateway Service issue'), "offline" while a Gateway Disconnected alarm is open, else online / offline from status; health_since / health_detail = start and text of that alarm. Paged by limit / offset (the panel asks limit=1000). Super_Admin only since 21 Nov (401 / 403); POST (gateway location) stays open.
 - **Note:** Label 'Gateway Service issue' for health = modbus_issue.
 
 <details><summary>Response</summary>

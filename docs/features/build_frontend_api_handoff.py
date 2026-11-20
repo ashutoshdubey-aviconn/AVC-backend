@@ -43,8 +43,9 @@ CALLS = [
     ),
     dict(
         feature="Gateway status", call="Gateway list with health (online / offline / Gateway Service issue)",
-        method="GET", url="/api/gateway-status/", auth="None (AllowAny)", who="Everyone",
-        available="Test (health fields); main has the list without health", sample="gateway-status-health",
+        method="GET", url="/api/gateway-status/", auth=TOKEN, who="Super Admin (UserType 1)",
+        available="Test (health fields, Super Admin only since 21 Nov); main: open list without health",
+        sample="gateway-status-health",
         request_fields=[("limit", "number", "no", "Page size, 1-500 (default 100); the panel asks 1000"),
                         ("offset", "number", "no", "Rows to skip (default 0)")],
         response_fields=[
@@ -59,7 +60,7 @@ CALLS = [
             ("results[].site_id / site_name / customer_name", "", "Where the gateway is"),
             ("results[].latitude / longitude", "number | null", "Map position if set"),
         ],
-        errors="400 limit / offset not numbers; 500 {message, error}",
+        errors="401 no token; 403 not Super Admin; 400 limit / offset not numbers; 500 {message, error}",
         how="Every gateway with its site and customer. health comes from the open gateway alarms: an open Gateway "
             "Service / Modbus Issue alarm (pings arrive, no meter data) gives modbus_issue, an open Gateway Disconnected "
             "alarm (no data, no ping) gives offline; otherwise online / offline follows status. The gateway check runs "
@@ -308,6 +309,37 @@ CALLS = [
     ),
 ]
 
+# Per call: type (Alarm = comes from the alarm system, Feature = a tool / data feature, Common), where it
+# belongs (Monitoring dashboard = internal Super Admin tools; Main UI = the screens customers and admins
+# use), and which action of a shared endpoint it is (one endpoint, several request bodies).
+MONITORING = "Monitoring dashboard (Super Admin only)"
+# Older APIs used by the customer screens, where we only added fields: the new fields are for the
+# Super Admin views; the API itself keeps its access (changing it would break the customer screens).
+EXTENDED = "Monitoring dashboard (Super Admin only) - older customer API, new fields only"
+GROUPS = {
+    "Log in (get the token)": ("Common", "Both", "log in"),
+    "Gateway list with health (online / offline / Gateway Service issue)": ("Alarm", MONITORING, "list"),
+    "Alarm settings of a site": ("Alarm", MONITORING, "1 of 2: read"),
+    "Save one alarm type's setting": ("Alarm", MONITORING, "2 of 2: save"),
+    "Open alarms of one type ('Open for')": ("Alarm", EXTENDED, "list"),
+    "Preview the catch-ups of a day (changes nothing)": ("Feature", MONITORING, "1 of 4: preview"),
+    "Spread the ticked catch-ups (manual)": ("Feature", MONITORING, "2 of 4: spread"),
+    "Undo a spread (within 5 days)": ("Feature", MONITORING, "3 of 4: undo"),
+    "Spread history of a site": ("Feature", MONITORING, "4 of 4: history"),
+    "Sync status of every aisle / power source": ("Feature", MONITORING, "list"),
+    "Recovery requests (history)": ("Feature", MONITORING, "list"),
+    "Automatic baseline: preview": ("Feature", MONITORING, "1 of 2: preview"),
+    "Automatic baseline: set (apply)": ("Feature", MONITORING, "2 of 2: set"),
+    "Save one aisle's baseline (older screen)": ("Feature", EXTENDED, "save"),
+    "Hourly chart of a saving site (estimated flag)": ("Feature", EXTENDED, "chart data"),
+}
+TYPE_ORDER = ["Common", "Alarm", "Feature"]
+SECTIONS = {
+    "Common": "COMMON - needed by every screen",
+    "Alarm": "ALARM APIs - data from the alarm system (gateway alarms 15 / 16, alarm settings, alarm lists)",
+    "Feature": "FEATURE APIs - tools and data features (catch-up spread, sync & recovery, baseline, hourly charts)",
+}
+
 # Values to show (label / colour) per field.
 VALUES = [
     ("gateway-status health", "online", "Online", "green", "Data arriving"),
@@ -351,8 +383,19 @@ START = [
                     "ask an inline confirmation first. Previews (apply false) never change anything."),
     ("Examples", "Responses in 'Examples' are real, captured on the test server; lists are cut to 2 items "
                  "('... N items in total'). Write calls show an example from the code."),
-    ("Sheets", "APIs (one row per call) · Request fields · Response fields · Examples (full JSON) · Values (labels "
-               "and colours to show)."),
+    ("Type / Goes to", "Type: Alarm = data from the alarm system; Feature = tools and data features; Common = login. "
+                       "Goes to: every API built in this branch is for the Super Admin monitoring dashboard, not "
+                       "for customers (today: the super-admin dashboard and, for Super Admin, the site page). Rows "
+                       "marked 'older customer API, new fields only' (alarmListDetail, saveBaseline, hourlySavingData) "
+                       "are existing APIs the customer screens already call; only the new fields (open_for, estimated, "
+                       "the first-baseline fix) are ours - show them in Super Admin views only."),
+    ("Same endpoint", "Some endpoints take several request bodies (column Action): catchUpSpread has 4 (preview, "
+                      "spread, undo, history), baselineSetup 2 (preview, set), alarmSettings 2 (GET read, POST save)."),
+    ("Gateway Service issue", "Not a separate API: it is health = modbus_issue in /api/gateway-status/ (same call as "
+                              "online / offline)."),
+    ("Sheets", "All APIs (one table: type, goes to, endpoint, method, action, auth, used for, request, response fields, example response) · "
+               "APIs (one row per call, more columns) · Request fields · Response fields · Examples (full JSON) · Values "
+               "(labels and colours to show)."),
     ("Source", "Generated by docs/features/build_frontend_api_handoff.py; details in docs/features/"
                "FRONTEND_API_GUIDE.md, docs/consumption/CATCH_UP_SPREAD.md, BASELINE_SETUP_FRONTEND.md."),
 ]
@@ -411,27 +454,58 @@ def pretty(value, limit=30000):
 def main():
     book = Workbook()
     sheet(book, "Start here", [("Topic", 16), ("", 140)], START, first=True)
-    api_rows, req_rows, resp_rows, ex_rows = [], [], [], []
-    for n, call in enumerate(CALLS, start=1):
+    api_rows, req_rows, resp_rows, ex_rows, one_table = [], [], [], [], []
+    assert {c["call"] for c in CALLS} == set(GROUPS), set(GROUPS) ^ {c["call"] for c in CALLS}
+    ordered = sorted(CALLS, key=lambda c: TYPE_ORDER.index(GROUPS[c["call"]][0]))
+    section = None
+    for n, call in enumerate(ordered, start=1):
+        kind, goes_to, action = GROUPS[call["call"]]
+        if kind != section:
+            section = kind
+            one_table.append([f"▶ {SECTIONS[kind]}"] + [""] * 9)
+            api_rows.append([f"▶ {SECTIONS[kind]}"] + [""] * 14)
         request, response, captured = example(call)
         name = f"{n}. {call['call']}"
         query = call["method"] == "GET"
         api_rows.append([
-            n, call["feature"], call["call"], call["method"], call["url"], call["auth"], call["who"],
+            n, kind, goes_to, call["feature"], call["call"], call["method"], call["url"], call["auth"], call["who"],
             ("Query: " if query else "JSON body: ") + json.dumps(request, ensure_ascii=False),
             call["errors"], call["how"], call["screen"], call["available"],
             "captured on test" if captured else "example from the code",
+        ])
+        one_table.append([
+            kind, goes_to, call["url"], call["method"], action,
+            f"{call['auth']}{', ' + call['who'] + ' only' if call['who'].startswith('Super Admin') else ''}",
+            f"{call['feature']}: {call['call']}. {call['how']}",
+            ("?" + "&".join(f"{k}={v}" for k, v in request.items())) if query and request
+            else json.dumps(request, ensure_ascii=False),
+            "; ".join(f"{field}: {meaning}" if meaning else field for field, _, meaning in call["response_fields"]),
+            pretty(response, 8000),
         ])
         req_rows += [[name, field, kind, required, meaning] for field, kind, required, meaning in call["request_fields"]]
         resp_rows += [[name, field, kind, meaning] for field, kind, meaning in call["response_fields"]]
         ex_rows.append([name, f"{call['method']} {call['url']}" + (" (query)" if query else ""), pretty(request),
                         pretty(response)])
-    sheet(book, "APIs", [("#", 4), ("Feature", 14), ("Call", 30), ("Method", 8), ("URL", 24), ("Auth header", 22),
+    sheet(book, "All APIs (one table)", [
+        ("Type", 9), ("Goes to", 22), ("Endpoint", 24), ("Method", 8), ("Action", 14), ("Auth", 22), ("Used for", 40),
+        ("Request", 38), ("Response fields", 56), ("Example response (test server, trimmed)", 86)], one_table)
+    sheet(book, "APIs", [("#", 4), ("Type", 9), ("Goes to", 22), ("Feature", 14), ("Call", 30), ("Method", 8), ("URL", 24), ("Auth header", 22),
                          ("Who", 16), ("Request example", 46), ("Errors", 40), ("How it works", 70),
                          ("Frontend screen / file", 40), ("Available on", 24), ("Example", 16)], api_rows)
     sheet(book, "Request fields", [("Call", 36), ("Field", 26), ("Type", 12), ("Required", 10), ("Meaning", 80)],
           req_rows)
     sheet(book, "Response fields", [("Call", 36), ("Field", 34), ("Type", 14), ("Meaning", 90)], resp_rows)
+    for title in ("All APIs (one table)", "APIs"):
+        ws = book[title]
+        for row in range(2, ws.max_row + 1):
+            first = ws.cell(row=row, column=1)
+            if isinstance(first.value, str) and first.value.startswith("▶"):
+                ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ws.max_column)
+                first.font = Font(bold=True, color="FFFFFF", size=12)
+                first.fill = PatternFill("solid", fgColor="C55A11")
+                ws.row_dimensions[row].height = 22
+            elif title == "All APIs (one table)":
+                ws.row_dimensions[row].height = 240
     ws = sheet(book, "Examples", [("Call", 30), ("Method / URL", 26), ("Request", 50), ("Response", 110)], ex_rows)
     for row in range(2, len(ex_rows) + 2):
         ws.row_dimensions[row].height = 300

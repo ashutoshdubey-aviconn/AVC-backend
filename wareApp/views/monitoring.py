@@ -5,7 +5,8 @@ from collections import defaultdict
 
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -548,12 +549,23 @@ class HomeGatewayStatusApi(APIView):
     hour. ``health``: "modbus_issue" while a Gateway Service / Modbus Issue
     alarm (16) is open (pings but no meter data), "offline" while a Gateway
     Disconnected alarm (15) is open, else "online" / "offline" from ``status``.
-    ``health_since`` / ``health_detail``: start and text of that alarm."""
+    ``health_since`` / ``health_detail``: start and text of that alarm.
+
+    GET is for the Super Admin monitoring dashboard only (decided 2026-11-21: every API of this
+    branch is Super Admin only): token required (401) and UserType 1 (403). POST (a gateway's
+    location, sent by gateways / scripts) keeps its open access."""
 
     permission_classes = [AllowAny]
     throttle_classes = []
 
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     def get(self, request):
+        if getattr(request.user, "UserType", None) != 1:
+            raise PermissionDenied("Only Super_Admin users can see the gateway status.")
         try:
             queryset = (
                 HomeGatewayStatus.objects.select_related(

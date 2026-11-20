@@ -277,8 +277,18 @@ STATUS_COLUMNS = [
 ]
 
 
+# Newer samples (docs/features/frontend_api_samples_test_server.json, captured by
+# capture_frontend_api_samples.py) win over the older ones of this folder; for gateway-status the
+# example with every health state.
+NEW_SAMPLES_FILE = pathlib.Path(__file__).resolve().parents[1] / "features" / "frontend_api_samples_test_server.json"
+NEW_SAMPLES = json.loads(NEW_SAMPLES_FILE.read_text()) if NEW_SAMPLES_FILE.exists() else {}
+NEW_SAMPLE_KEYS = {"gateway-status": "gateway-status-health"}
+
+
 def sample(name):
-    return json.dumps(SAMPLES.get(name, {}).get("body", {}), indent=1, default=str)
+    newer = NEW_SAMPLES.get(NEW_SAMPLE_KEYS.get(name, name))
+    body = newer.get("body") if newer else SAMPLES.get(name, {}).get("body", {})
+    return json.dumps(body, indent=1, default=str, ensure_ascii=False)
 
 
 APIS = [
@@ -297,7 +307,7 @@ API_ROWS = [
      '{"user_id": 1, "start_date": "YYYY/MM/DD", "end_date": "YYYY/MM/DD"} (dates optional: current month)', "alarms (same count as the alarm list), total_unit_consumed, total_energy_saved, total_saved_percentage, current_date", sample("snapshot")],
     ["/api/consumptionAlarms/", "POST", "Token", "Active High / Low Consumption alarms of a site",
      '{"site_id": 134, "start_date": "YYYY/MM/DD", "end_date": "YYYY/MM/DD"} (dates optional)', "data[]: id, alarm_type, priority, aisle_group, created_time", sample("consumptionAlarms")],
-    ["/api/gateway-status/", "GET", "None (AllowAny)", "Gateway online map / list (status = data in the last hour; health = online / offline / modbus_issue from open alarms 15 / 16)",
+    ["/api/gateway-status/", "GET", "Token, Super_Admin only", "Gateway online map / list (status = data in the last hour; health = online / offline / modbus_issue from open alarms 15 / 16)",
      "?limit=100&offset=0", "count, limit, offset, results[]: id, gateway_id, latitude, longitude, status, health, health_since, health_detail, site_id, site_name, customer_name", sample("gateway-status")],
     ["/api/alarmSettings/", "GET / POST", "Token, Super_Admin only", "Site page -> Alarms -> Alarm settings: Default / Auto / Manual (threshold) / Off and e-mail groups per alarm type",
      'GET ?site_id=114; POST {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250, "email_software": true, "email_ground": false} (mode "default" removes the row)',

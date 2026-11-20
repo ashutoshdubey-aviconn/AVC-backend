@@ -375,7 +375,7 @@ api("H04", "/api/consumptionAlarms/", "POST", "Token", '{"site_id": 134, "start_
     FE + "alarm/alarm-api.service.ts (consumptionAlarms) - no screen calls it", "Not used",
     "Low Consumption (H04) is on hold; High / Low already show in alarmList/.")
 # Gateway / meter state
-api("D16, D30", "/api/gateway-status/", "GET", "None (AllowAny)", "?limit=1000&offset=0",
+api("D16, D30", "/api/gateway-status/", "GET", "Token, Super_Admin", "?limit=1000&offset=0",
     "results[]: gateway_id, status, health (online / offline / modbus_issue), health_since, health_detail, site_id, site_name, customer_name",
     FE + "alarm/gateway-status.component.ts (dashboard Gateway Status panel)", "Done",
     "Label 'Gateway Service issue' for health = modbus_issue.")
@@ -530,7 +530,7 @@ HOW = {
         "while a Gateway Service / Modbus Issue alarm is open (pings, no meter data; shown as 'Gateway Service "
         "issue'), \"offline\" while a Gateway Disconnected alarm is open, else online / offline from status; "
         "health_since / health_detail = start and text of that alarm. Paged by limit / offset (the panel asks "
-        "limit=1000). No login needed."),
+        "limit=1000). Super_Admin only since 21 Nov (401 / 403); POST (gateway location) stays open."),
     "/api/meter-disconnections/": (ALARM_API, "meter-disconnections",
         "Meter disconnect / reconnect events reported by gateways (input of Meter Disconnected), newest first; "
         "filter by site_id, meter_id, meter_number, status (connected / disconnected), from / to; paged (count, "
