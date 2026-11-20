@@ -3,7 +3,7 @@
 import time
 from datetime import datetime, timedelta
 
-from django.db.models import Sum
+from django.db.models import Case, IntegerField, Max, Sum, When
 from django.db.models.functions import TruncMonth
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -598,7 +598,11 @@ class SubmeteringHourlyBarChartNew(APIView):
             )
             .annotate(hour=ExtractHour("reading_from"))
             .values("leg_id", "aisle_group", "hour")
-            .annotate(total=Sum("unit_consumption"))
+            .annotate(
+                total=Sum("unit_consumption"),
+                # 1 when a catch-up spread filled the hour (is_estimated).
+                estimated=Max(Case(When(is_estimated=True, then=1), default=0, output_field=IntegerField())),
+            )
         )
         logger.debug("%s %s", "hourly data: ", datetime.now())
 
@@ -606,10 +610,13 @@ class SubmeteringHourlyBarChartNew(APIView):
         # Build lookup dict
         # -------------------------
         data_lookup = defaultdict(lambda: defaultdict(float))
+        estimated_lookup = defaultdict(set)
 
         for row in hourly_data:
             key = row["aisle_group"] or row["leg_id"]
             data_lookup[key][row["hour"]] += row["total"] or 0.0
+            if row["estimated"]:
+                estimated_lookup[key].add(row["hour"])
 
         # -------------------------
         # Build response data
@@ -625,7 +632,10 @@ class SubmeteringHourlyBarChartNew(APIView):
                 round(data_lookup[key].get(hour, 0.0), 2) for hour in range(24)
             ]
 
-            data_list.append({"name": name, "data": hourly_values, "type": "column"})
+            data_list.append({
+                "name": name, "data": hourly_values, "type": "column",
+                "estimated": [hour in estimated_lookup[key] for hour in range(24)],
+            })
 
         end_time = datetime.now()
         logger.debug("%s %s", "Time taken:", end_time - start_time)

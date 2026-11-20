@@ -269,14 +269,16 @@ class SiteTotalGraphDataHourlyWHTM(APIView):
                 )
             )
             for i in rooms:
-                cons = list(
+                rows = list(
                     HourlySiteReading.objects.filter(
                         associated_Site=site_id, leg_id=i, reading_from__date=date
                     )
                     .order_by("reading_from__hour")
-                    .values_list("unit_consumption", flat=True)
+                    .values_list("unit_consumption", "is_estimated")
                 )
-                cons.extend([0] * (24 - len(cons)))
+                cons = [kwh for kwh, _ in rows] + [0] * (24 - len(rows))
+                # estimated[i]: the i-th value was filled by a catch-up spread.
+                estimated = [bool(flag) for _, flag in rows] + [False] * (24 - len(rows))
                 hourlyData.append(
                     {
                         "name": (
@@ -285,6 +287,7 @@ class SiteTotalGraphDataHourlyWHTM(APIView):
                             else i
                         ),
                         "data": [round(j, 2) for j in cons],
+                        "estimated": estimated,
                     }
                 )
             return Response(

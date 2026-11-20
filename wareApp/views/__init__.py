@@ -3,6 +3,7 @@
 ``from wareApp.views import *`` (wareApp/urls.py) still exposes every view.
 """
 
+from .alarm_settings import *  # noqa: F401,F403
 from .alarms import *  # noqa: F401,F403
 from .auth import *  # noqa: F401,F403
 from .baseline import *  # noqa: F401,F403

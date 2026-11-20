@@ -1292,6 +1292,8 @@ class EnergySavingsHourlyBarChartV2(APIView):
             logger.debug("%s %s", "name is", name)
             unitConsumptionList = []
             savingConsumptionList = []
+            # estimated[i]: hour i was filled by a catch-up spread (is_estimated).
+            estimated = []
 
             for i in range(24):
                 unit_consumption = 0.0
@@ -1304,12 +1306,13 @@ class EnergySavingsHourlyBarChartV2(APIView):
 
                 unitConsumptionList.append(round(unit_consumption, 2))
                 savingConsumptionList.append(round(energy_saved, 2))
+                estimated.append(bool(hourly_data and hourly_data.is_estimated))
 
             dataList.append(
-                {"name": name, "data": unitConsumptionList, "type": "column"}
+                {"name": name, "data": unitConsumptionList, "type": "column", "estimated": estimated}
             )
             savingList.append(
-                {"name": name, "data": savingConsumptionList, "type": "column"}
+                {"name": name, "data": savingConsumptionList, "type": "column", "estimated": estimated}
             )
 
         if site.is_live:

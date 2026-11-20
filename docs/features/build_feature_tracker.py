@@ -68,11 +68,6 @@ add("F03", "Baseline setup screen", "Frontend", "Done",
     "2026-11-05", "2026-11-17", "API deployed 5 Nov; screen checked 17 Nov on site 114 (preview, cancelled; nothing set)", T,
     "Push the frontend commit; set a real baseline when a site needs one.", "-",
     "docs/consumption/BASELINE_SETUP_FRONTEND.md", "4bd8744e + frontend")
-add("F04", "Estimated hours on the hourly chart", "API / frontend", "Planned",
-    "Hourly API returns HourlySiteReading.is_estimated so charts can show spread hours differently (e.g. hatched).",
-    "2026-11-16", "2026-11-16", "-", T,
-    "Needs approval first: API views are out of scope for this branch.", "User",
-    "docs/consumption/CATCH_UP_SPREAD.md", "-")
 add("F05", "Alarm e-mails: Gmail login refused", "Alarms / e-mail", "Waiting for input",
     "Gmail has refused the alarm account's SMTP login since 6 Nov 14:55 (test and main share the account). Retries keep "
     "failed e-mails for 24 h; 8 e-mails sent before the retries existed were lost.",
@@ -160,6 +155,23 @@ add("D28", "Colleague's code vs main's code", "Docs / merge", "Done",
     "login has no rate limit and re-activates disabled users.",
     "2026-11-19", "2026-11-19", "-", "-", "Not run: confirm by running his code on a copy of main's DB with the frontend.", "-",
     "docs/merge/COLLEAGUE_VS_MAIN.md", "-")
+add("F04", "Estimated hours on the hourly chart", "API / frontend", "Done",
+    "hourlySavingData/, submeteringHourlyData/ and getSiteHourlyConsumptionData/ send estimated[24] per series "
+    "(HourlySiteReading.is_estimated: hours filled by a catch-up spread). Site, submetering, WH-metering and baseline "
+    "hourly charts draw them lighter with a dashed outline, tooltip '(estimated)', and a note under the title.",
+    "2026-11-16", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114, 15 Nov: 480 estimated bars)", T,
+    "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
+add("D31", "Alarm settings screen", "Alarms / frontend", "Done",
+    "Site page -> Alarms -> settings button (Super Admin): per alarm type Default / Auto / Manual (threshold with "
+    "unit) / Off and the e-mail groups, saved per row. New API GET / POST alarmSettings/ on the AlarmSetting rows "
+    "(Super_Admin only, validated; Default removes the row). Was Django admin only.",
+    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114: save Auto, back to Default)", T,
+    "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
+add("D32", "'Open for' on the alarm lists", "Alarms / frontend", "Done",
+    "Site alarm detail and super-admin alarm list show how long each issue has been open (open_for from the APIs, "
+    "orange from 1 day); the super-admin column sorts by days.",
+    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome", T,
+    "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
 add("D30", "Gateway Status panel: Gateway Service issue", "Alarms / frontend", "Done",
     "gateway-status/ adds health (online / offline / modbus_issue) with health_since / health_detail, from the open "
     "Gateway Disconnected (15) and Gateway Service / Modbus Issue (16) alarms; status (bool) unchanged. Dashboard panel: "
@@ -302,15 +314,15 @@ api("D12, D16, D17, D19, D24, N01", "/api/alarmList/", "POST", "Token", '{"siteI
 api("D12, D14, D16, D24", "/api/alarmListDetail/", "POST", "Token", '{"siteId": 114, "alarm_type": 10}',
     "data[]: type, priority, aisle_group, issue, created, last_seen, occurrences, is_active",
     FE + "alarm/alarm.component.ts (siteAlarmDetail)", "Done", "-")
-api("D13", "/api/alarmListDetail/ (open_days, open_for)", "POST", "Token", '{"siteId": 114, "alarm_type": 15}',
-    "open_days, open_for of each row (returned today, not shown)", FE + "alarm/alarm.component.ts (detail table)",
-    "To build", "Add an 'Open for' column ('3 days') for outage alarms 14 / 15 / 16.")
+api("D13, D32", "/api/alarmListDetail/ (open_days, open_for)", "POST", "Token", '{"siteId": 114, "alarm_type": 15}',
+    "open_days, open_for of each row", FE + "alarm/alarm.component.ts (detail table: 'Open for' column)",
+    "Done", "-")
 api("D12, D26", "/api/alarmTypeApi/", "POST", "Token, Super_Admin", "{}",
     "data[]: customer_id, customer_name, alarm_list[] (site, aisle, type, priority, issue)",
     FE + "super-admin/super-admin.component.ts (allAlarmsByCustomer)", "Done", "-")
-api("D13", "/api/alarmTypeApi/ (open_days, open_for)", "POST", "Token, Super_Admin", "{}",
-    "alarm_list[].open_days, open_for (returned today, not shown)", FE + "super-admin/super-admin.component.ts",
-    "To build", "Show 'Open for' in the super-admin alarm list.")
+api("D13, D32", "/api/alarmTypeApi/ (open_days, open_for)", "POST", "Token, Super_Admin", "{}",
+    "alarm_list[].open_days, open_for", FE + "super-admin/super-admin.component.ts ('Open for' column, sorts by days)",
+    "Done", "-")
 api("D26", "/api/alarmapi/", "POST", "Token", "{}", "data[][]: Alarm_priority, site_id__site_name, alarm_count",
     FE + "alarm/alarm-api.service.ts (alarmCounts) - no screen calls it", "Not used",
     "Superseded by alarmTypeApi/ on the super-admin page; drop from the service or keep for later.")
@@ -359,19 +371,20 @@ api("D08", "/api/saveBaseline/", "POST", "Token", "baseline values per aisle",
     "status (first baseline no longer crashes)", FE + "baseline/baseline.component.ts, services/data.service.ts", "Done", "-")
 # Hourly charts: estimated hours
 api("F04", "/api/hourlySavingData/", "POST", "Token", "site, date range",
-    "hourly bars; to add: is_estimated per hour", FE + "services/user.service.ts (warehouse hourly chart)", "To build",
-    "Backend: return is_estimated. Frontend: draw spread hours hatched / lighter, with a legend.")
+    "Data[] / SavingData[]: name, data[24], estimated[24]", FE + "warehouse/warehouse.component.ts (hourly consumption + saving charts)", "Done",
+    "-")
 api("F04", "/api/submeteringHourlyData/", "POST", "Token", "site, date range",
-    "hourly bars; to add: is_estimated per hour", FE + "submetering/submetering.component.ts", "To build",
-    "Same as hourlySavingData/.")
+    "Data[]: name, data[24], estimated[24]", FE + "submetering/submetering.component.ts", "Done", "-")
 api("F04", "/api/getSiteHourlyConsumptionData/", "POST", "Token", "site, date range",
-    "hourly bars; to add: is_estimated per hour", FE + "wh-metering/wh-metering.component.ts, baseline/baseline.component.ts",
-    "To build", "Same as hourlySavingData/.")
+    "Data[]: name, data[24], estimated[24]", FE + "wh-metering/wh-metering.component.ts, baseline/baseline.component.ts",
+    "Done", "-")
 # Alarm settings: no API yet
-api("D18, H03, H04", "(none) alarm settings per site: Auto / Manual / Off", "-", "-", "-",
-    "AlarmSetting (site, alarm type, mode, manual threshold); recipients by team",
-    "- (set in Django admin today)", "To decide",
-    "Decide whether admins should change alarm settings from the frontend; if yes, needs a new GET / POST API.")
+api("D18, D31, H04", "/api/alarmSettings/", "GET / POST", "Token, Super_Admin",
+    'GET ?site_id=114; POST {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250, "email_ground": false}',
+    "site_id, site_name, data[]: alarm_type, alarm_name, group, raised, unit, mode (default / auto / manual / off), "
+    "threshold, email_software, email_ground, repeat_tolerance_percent",
+    FE + "alarm/alarm-settings.component.ts (site page -> Alarms -> settings button)", "Done",
+    "H04: Low Consumption can now be switched on per site here (Auto or Manual).")
 # Not called by the frontend
 api("F11", "/api/createCustomer/, createSite/, createAisleGroups/, createHomeGatewayId/", "POST", "None (open)",
     "provisioning payload", "created ids", "- (provisioning script)", "Not frontend",

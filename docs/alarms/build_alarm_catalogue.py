@@ -24,7 +24,7 @@ REPEAT_DAILY = "One alarm per aisle per day, e-mailed when raised. If the same a
 REPEAT_SAME_DAY = "One alarm per aisle per day, e-mailed once when raised. A new day is a new alarm and is e-mailed again (no comparison with the day before)."
 CLEAR_SAME_DAY = "Yes: at the end of its own day"
 REPEAT_OUTAGE = "One active alarm per outage, shown on the frontend until solved; created_time = when the outage began, and the APIs give open_days / open_for (days not solved). E-mailed when raised, then once a day ('still not solved (N days)', GATEWAY_HEALTH_REMINDER_HOURS=24) until solved. Cleared automatically (no e-mail) when it recovers; the next e-mail of the same issue shows 'Previous outage ... restored ... (duration)'."
-CONFIG_STD = "AlarmSetting (Django admin, per site + type): Auto / Manual (threshold) / Off, e-mail software team on/off, e-mail ground team on/off, repeat tolerance %."
+CONFIG_STD = "AlarmSetting (site page -> Alarms -> Alarm settings, or Django admin; per site + type): Auto / Manual (threshold) / Off, e-mail software team on/off, e-mail ground team on/off, repeat tolerance %."
 RECIPIENTS = "wareApp/mqtt/services/alarm_recipients.py: SOFTWARE_TEAM (all sites) + GROUND_TEAM_ALL_SITES + LOCATION_TEAMS (by site location) + GROUND_TEAM (per site). Test server: ALARM_EMAIL_OVERRIDE_TO replaces them."
 
 COLUMNS = [
@@ -299,6 +299,9 @@ API_ROWS = [
      '{"site_id": 134, "start_date": "YYYY/MM/DD", "end_date": "YYYY/MM/DD"} (dates optional)', "data[]: id, alarm_type, priority, aisle_group, created_time", sample("consumptionAlarms")],
     ["/api/gateway-status/", "GET", "None (AllowAny)", "Gateway online map / list (status = data in the last hour; health = online / offline / modbus_issue from open alarms 15 / 16)",
      "?limit=100&offset=0", "count, limit, offset, results[]: id, gateway_id, latitude, longitude, status, health, health_since, health_detail, site_id, site_name, customer_name", sample("gateway-status")],
+    ["/api/alarmSettings/", "GET / POST", "Token, Super_Admin only", "Site page -> Alarms -> Alarm settings: Default / Auto / Manual (threshold) / Off and e-mail groups per alarm type",
+     'GET ?site_id=114; POST {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250, "email_software": true, "email_ground": false} (mode "default" removes the row)',
+     "site_id, site_name, data[]: alarm_type, alarm_name, group, raised, unit (manual threshold unit or null), mode, threshold, email_software, email_ground, repeat_tolerance_percent", "-"],
     ["/api/meter-disconnections/", "GET", "Token", "Meter disconnect / reconnect events (input of alarm 14)",
      "?site_id=102&meter_number=&meter_id=&status=disconnected&from=&to=", "count, limit, offset, results[]: id, logged_site_id, meter_id, meter_number, meter_name, status, port_id, detection_window_start/end, last_seen_at, ...", sample("meter-disconnections")],
     ["/api/meter-disconnections/ingest/", "POST", "None (gateway)", "Gateways report meter disconnects (device side, not frontend)",
@@ -313,10 +316,10 @@ CONFIG = [
     ("Where", 34), ("Setting", 34), ("Default", 16), ("What it does", 70),
 ]
 CONFIG_ROWS = [
-    ["Django admin -> Alarm settings", "mode", "Auto", "Per site + alarm type: Auto (system threshold) / Manual (typed threshold) / Off (not raised). No row = the alarm works from the site fields as before."],
-    ["Django admin -> Alarm settings", "threshold", "-", "Manual mode: V (voltage), PF, kWh/day (High, Low, Bypassed), °C (overheat), hours (14 / 15 / 16)."],
-    ["Django admin -> Alarm settings", "email_software / email_ground", "on / on", "Switch the software team or the ground team off for this site and type."],
-    ["Django admin -> Alarm settings", "repeat_tolerance_percent", "5", "A repeat is e-mailed again only when this much worse than the last e-mail."],
+    ["Alarm settings (site page or Django admin)", "mode", "Auto", "Per site + alarm type: Auto (system threshold) / Manual (typed threshold) / Off (not raised). No row = the alarm works from the site fields as before."],
+    ["Alarm settings (site page or Django admin)", "threshold", "-", "Manual mode: V (voltage), PF, kWh/day (High, Low, Bypassed), °C (overheat), hours (14 / 15 / 16)."],
+    ["Alarm settings (site page or Django admin)", "email_software / email_ground", "on / on", "Switch the software team or the ground team off for this site and type."],
+    ["Alarm settings (site page or Django admin)", "repeat_tolerance_percent", "5", "A repeat is e-mailed again only when this much worse than the last e-mail."],
     ["wareApp/mqtt/services/alarm_recipients.py", "SOFTWARE_TEAM", "ashutosh.dubey@aviconncorp.com", "Receives every site's alarms."],
     ["wareApp/mqtt/services/alarm_recipients.py", "GROUND_TEAM_ALL_SITES", "rakesh.kumar@aviconncorp.com", "Ground-team members for every site."],
     ["wareApp/mqtt/services/alarm_recipients.py", "LOCATION_TEAMS", "7 locations, e-mails empty", "Ground team per location (Gurgaon, Delhi, Mumbai / Bhiwandi, Pune, Bangalore, Kolkata, Lucknow); site matched by keywords in its location / name. Check: python manage.py alarm_recipients"],
@@ -460,10 +463,13 @@ API_LIST_ROWS = [
      "views/dg_fuel.py -> DgAlertsPushInterface"],
     ["-", RELATED, "/api/catchUpSpread/", "POST", "Spread a catch-up hour over its data gap (closes the Consumption Spike alarm 17); Super_Admin only",
      '{"site_id": 114, "day": "2026/11/16", "legs": ["692"], "apply": false} or {"undo": 12}', "catch_ups[] (gap, missing hours, share, days before / after, warnings), not_spreadable[], applied, spreads[]",
-     "Catch-ups of one site and day", "Working on test since 16 Nov (frontend not built yet)", "views/catch_up.py -> CatchUpSpreadApi; catch_up_spread.py"],
+     "Catch-ups of one site and day", "Working on test since 16 Nov (frontend: Spread catch-up panel since 17 Nov)", "views/catch_up.py -> CatchUpSpreadApi; catch_up_spread.py"],
     ["-", RELATED, "/api/gateway-status/", "GET", "Gateway online / offline / Modbus issue list (health from the open 15 / 16 alarms; dashboard Gateway Status panel)",
      "?limit=100&offset=0", "gateway id, site, customer, status, last data / ping time", "All gateways", "Working",
      "views/monitoring.py -> HomeGatewayStatusApi"],
+    ["-", RELATED, "/api/alarmSettings/", "GET / POST", "Alarm settings per site and type: Default / Auto / Manual (threshold) / Off, e-mail groups; Super_Admin only",
+     'GET ?site_id=114 / POST {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250}', "data[] one row per alarm type (mode, threshold, unit, e-mail groups)",
+     "All alarm types of one site", "Working on test since 20 Nov (site page -> Alarms -> settings button)", "views/alarm_settings.py -> AlarmSettingsApi"],
     ["-", RELATED, "/api/meter-disconnections/", "GET", "Raw meter connect / disconnect events (input of 14)",
      "?site_id=&meter_id=&status=&from=&to=&limit=&offset=", "count, limit, offset, results[]", "All events", "Working",
      "views/monitoring.py -> MeterDisconnectionListView"],
