@@ -309,6 +309,15 @@ def check_consumption_spikes():
 
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
+def auto_spread_catch_ups():
+    """Spread clear catch-up hours at night / on Sunday; e-mail the ones that need a manual spread."""
+    from wareApp import catch_up_spread
+
+    return catch_up_spread.auto_spread()
+
+
+@app.task(queue="queue2_processing")
+@_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):
     site = _site_for_queued_message(site_id, gateway_id, "LoadData")
     if site is None:

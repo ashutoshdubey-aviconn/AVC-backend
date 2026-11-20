@@ -82,6 +82,9 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                 "energy_saved": saving,
             }
 
+        from wareApp.catch_up_spread import spread_days
+
+        spread = spread_days(site.id, aisle_group_id, min(slots), max(slots)) if slots else set()
         scope = RecoveryScope.aisle(aisle_group)
         status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
@@ -113,9 +116,11 @@ def handle_daily_consumption_recovery_message(site, location_id, gateway_id, mes
                     is_visible=True,
                     **values,
                 ),
-                # Never lower a known daily value (unchanged rule).
+                # Never lower a known daily value (unchanged rule), and leave days
+                # recalculated by a catch-up spread alone (decided 2026-11-20).
                 should_update=lambda rows, values: (
-                    rows[0].unit_consumption < values["unit_consumption"]
+                    rows[0].reading_for not in spread
+                    and rows[0].unit_consumption < values["unit_consumption"]
                 ),
             )
             status.record_applied(monitor, scope, status_slots)

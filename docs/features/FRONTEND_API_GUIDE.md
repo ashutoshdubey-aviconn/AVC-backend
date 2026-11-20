@@ -26,10 +26,10 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 ```json
 {
  "current_date": "2026/11/01",
- "alarms": 26,
- "total_unit_consumed": 552403.51,
- "total_energy_saved": 107325.43,
- "total_saved_percentage": "15.62"
+ "alarms": 29,
+ "total_unit_consumed": 557096.93,
+ "total_energy_saved": 102632.0,
+ "total_saved_percentage": "14.94"
 }
 ```
 
@@ -46,7 +46,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 ```json
 {
  "result": 1,
- "alarms": 13,
+ "alarms": 9,
  "energy_consumed": 3048628.5,
  "saved_energy": 13373661.4,
  "percentage_saved": "81.4 %"
@@ -66,7 +66,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 ```json
 {
  "result": 1,
- "alarms": 7,
+ "alarms": 2,
  "energy_consumed": "541432.6",
  "saved_energy": "1940769.2",
  "carbon_emission_saved": "0.0",
@@ -81,9 +81,9 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 
 ### `POST /api/catchUpSpread/`
 
-- **Features:** D01, D14, F02 | **Auth:** Token, Super_Admin | **Frontend:** Done - Aviconncorp-new-migrated-frontend/src/app/alarm/catch-up-spread.component.ts (preview, apply, undo); Spread... on Consumption Spike rows
+- **Features:** D01, D14, F02, O02 | **Auth:** Token, Super_Admin | **Frontend:** Done - Aviconncorp-new-migrated-frontend/src/app/alarm/catch-up-spread.component.ts (preview, apply, undo, waiting, history); Spread... on Consumption Spike rows
 - **Request:** `{"site_id": 114, "day": "2026/11/20", "apply": false}`
-- **How it works:** Preview (apply false, changes nothing): finds the site's catch-up hours on that day - the first hour after a gap that holds the whole gap's energy - and per aisle returns the gap, the missing hours, the share each missing hour would get and each day's total before / after. not_spreadable lists catch-ups that can't be spread (and why). apply true (with the ticked legs) writes the spread: missing hours created with is_estimated, the catch-up hour lowered, day totals recomputed, the Consumption Spike alarm closed, a CatchUpSpread row logged; total energy unchanged. {"undo": id} reverses one spread. Super_Admin only (403 otherwise).
+- **How it works:** Preview (apply false, changes nothing): the site's catch-up hours on that day - after a gateway service stopped, the first hour back carries the gap's energy. Gap = hours without a row and ERROR404 hours (stored as 0); real 0 kWh hours are never taken. Per catch-up: gap, empty_hours / no_data_hours, share per hour, normal hour, spread day vs the aisle's daily average, day totals before / after, manual_required + warnings (share > 3 x normal hour, or spread day outside 0.5-1.5 x the daily average). waiting[] = catch-ups not offered yet (aisle not synced, recovery running, next hour not in); not_spreadable[] = gap start unknown. apply true (ticked legs) spreads as real readings (manual), recalculates hourly and daily, closes the spike alarm and keeps a per-hour record. applied_spreads[]: mode manual (applied_by) / automatic (night job), can_undo and undo_until (5 days). {"undo": id} reverses a spread within 5 days. {"history": true, from, to} lists the site's spreads (max 92 days) with hours_detail (at, kind empty / no_data / catch_up, before, after). Super_Admin only (403 otherwise).
 
 <details><summary>Response</summary>
 
@@ -91,49 +91,48 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 {
  "status": 200,
  "applied": false,
- "catch_ups": [
+ "catch_ups": [],
+ "waiting": [],
+ "not_spreadable": [],
+ "applied_spreads": [
   {
+   "id": 51,
    "leg_id": "672",
    "aisle_name": "F3-D-Block",
    "catch_up_at": "2026/11/20 10:00",
-   "kwh": 4.45,
+   "original_kwh": 4.45,
    "gap_from": "2026/11/20 05:00",
-   "gap_to": "2026/11/20 09:00",
-   "missing_hours": 5,
+   "hours": 6,
    "share_kwh": 0.742,
-   "normal_hour_kwh": 0.84,
-   "days": [
-    {
-     "day": "2026/11/20",
-     "before": 18.07,
-     "after": 18.07
-    }
-   ],
-   "warnings": []
+   "mode": "automatic",
+   "applied_by": "automatic",
+   "applied_at": "2026/11/20 23:52",
+   "undone_at": null,
+   "undo_until": "2026/11/25 23:52",
+   "can_undo": true,
+   "empty_hours": 5,
+   "no_data_hours": 0
   },
   {
+   "id": 52,
    "leg_id": "674",
    "aisle_name": "F3-I&H Block",
    "catch_up_at": "2026/11/20 10:00",
-   "kwh": 0.94,
+   "original_kwh": 0.94,
    "gap_from": "2026/11/20 05:00",
-   "gap_to": "2026/11/20 09:00",
-   "missing_hours": 5,
+   "hours": 6,
    "share_kwh": 0.156,
-   "normal_hour_kwh": 0.311,
-   "days": [
-    {
-     "day": "2026/11/20",
-     "before": 4.61,
-     "after": 4.61
-    }
-   ],
-   "warnings": []
+   "mode": "automatic",
+   "applied_by": "automatic",
+   "applied_at": "2026/11/20 23:52",
+   "undone_at": null,
+   "undo_until": "2026/11/25 23:52",
+   "can_undo": true,
+   "empty_hours": 5,
+   "no_data_hours": 0
   },
   "... 19 items in total"
- ],
- "not_spreadable": [],
- "applied_spreads": []
+ ]
 }
 ```
 
@@ -341,30 +340,30 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    ],
    "type": "column",
    "estimated": [
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
    ]
   },
   "... 39 items in total"
@@ -456,30 +455,30 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    ],
    "type": "column",
    "estimated": [
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
    ]
   },
   "... 38 items in total"
@@ -613,30 +612,30 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    ],
    "type": "column",
    "estimated": [
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true,
-    true
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
    ]
   },
   "... 38 items in total"
@@ -805,7 +804,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 
 - **Features:** D33 | **Auth:** Token, Super_Admin | **Frontend:** Done - Aviconncorp-new-migrated-frontend/src/app/alarm/sync-status.component.ts (site page -> Data sync button)
 - **Request:** `{"site_id": 114}`
-- **How it works:** Current state of every aisle (consumption) and power source (supply time / load runtime) of the site's gateways (AisleSyncRecoveryStatus). States: healthy (data on time) -> late (no packet for 70 min) -> missing (130 min); a gap starts recovery: recovery_requested (the server asked the gateway for the missing hours, retried up to 3 times) -> recovery_received -> recovered -> healthy, or failed (no answer). counts = rows per state; expected_from / expected_to and missing_slots / recovered_slots describe the last gap (kept after the row is healthy again: show it as history); has_data_loss = recovered but the gateway had no data for some hours (stored as 0). Read-only; Super_Admin only.
+- **How it works:** Per aisle (consumption) and power source (supply time / load runtime) of the site's gateways, three cases (no gap details): HEALTHY = sync "synced", recovery "not_needed", last_sync_at = last data message; GAP FILLED = sync "synced", recovery "recovered", last_recovered_at = when the missing data was recovered; NO DATA (70 min or more) = sync "syncing", recovery "not_received", last_sync_at = last data before the gap, attempts = how many times the server asked the gateway for this aisle's missing data (current gap; 0 = not asked yet; max_attempts = 3), last_requested_at = when it last asked (null when 0). recovery "received" only for the moment between the gateway's answer and its rows being applied. counts = rows per sync value and per recovery value. Mapped from the stored AisleSyncRecoveryStatus state: healthy, recovered, then late / missing / recovery_requested / failed = syncing. Read-only; Super_Admin only.
 
 <details><summary>Response</summary>
 
@@ -816,14 +815,17 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
  "site_name": "Myntra BGLR Inventory Saving",
  "total": 38,
  "counts": {
-  "failed": 0,
-  "missing": 0,
-  "late": 0,
-  "recovery_requested": 0,
-  "recovery_received": 0,
-  "recovered": 0,
-  "healthy": 38,
-  "unknown": 0
+  "sync": {
+   "synced": 38,
+   "syncing": 0,
+   "unknown": 0
+  },
+  "recovery": {
+   "not_needed": 38,
+   "recovered": 0,
+   "not_received": 0,
+   "received": 0
+  }
  },
  "data": [
   {
@@ -831,58 +833,34 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    "home_gateway_id": "avc_Myntra_BGLRSvng_000114_1",
    "object_type": "aisle",
    "object_name": "F1-J Block",
-   "aisle_group_id": 688,
    "leg_id": "688",
    "power_source": null,
-   "sync_status": "healthy",
-   "sync_status_display": "Healthy",
-   "last_sync_at": "2026-11-20T20:00:00",
-   "expected_from": "2026-11-17T06:00:00",
-   "expected_to": "2026-11-20T13:00:00",
-   "missing_slots": 79,
-   "recovered_slots": 0,
-   "has_data_loss": false,
-   "last_error": null,
-   "last_recovery_requested_at": "2026-11-20T13:42:58.694648",
-   "last_recovery_received_at": null,
-   "last_recovery_applied_at": null,
-   "updated_at": "2026-11-20T20:02:58.917124",
-   "current_recovery": {
-    "id": 27113,
-    "recovery_type": "hourly_consumption",
-    "status": "failed",
-    "attempt": 3,
-    "requested_at": "2026-11-20T13:42:58.694648"
-   }
+   "sync": "synced",
+   "sync_display": "Synced",
+   "last_sync_at": "2026-11-20T23:00:00",
+   "recovery": "not_needed",
+   "recovery_display": "Not needed",
+   "last_recovered_at": null,
+   "attempts": 0,
+   "max_attempts": 3,
+   "last_requested_at": null
   },
   {
    "id": 559,
    "home_gateway_id": "avc_Myntra_BGLRSvng_000114_1",
    "object_type": "aisle",
    "object_name": "F1-Outward&Hub area",
-   "aisle_group_id": 692,
    "leg_id": "692",
    "power_source": null,
-   "sync_status": "healthy",
-   "sync_status_display": "Healthy",
-   "last_sync_at": "2026-11-20T20:00:00",
-   "expected_from": "2026-11-17T06:00:00",
-   "expected_to": "2026-11-20T13:00:00",
-   "missing_slots": 79,
-   "recovered_slots": 0,
-   "has_data_loss": false,
-   "last_error": null,
-   "last_recovery_requested_at": "2026-11-20T13:48:58.680868",
-   "last_recovery_received_at": null,
-   "last_recovery_applied_at": null,
-   "updated_at": "2026-11-20T20:08:58.931075",
-   "current_recovery": {
-    "id": 27363,
-    "recovery_type": "hourly_consumption",
-    "status": "failed",
-    "attempt": 3,
-    "requested_at": "2026-11-20T13:48:58.680868"
-   }
+   "sync": "synced",
+   "sync_display": "Synced",
+   "last_sync_at": "2026-11-20T23:00:00",
+   "recovery": "not_needed",
+   "recovery_display": "Not needed",
+   "last_recovered_at": null,
+   "attempts": 0,
+   "max_attempts": 3,
+   "last_requested_at": null
   },
   "... 38 items in total"
  ]
@@ -974,22 +952,16 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 ```json
 {
  "status": 200,
- "total_alarm": 31,
- "high_priority": 31,
+ "total_alarm": 28,
+ "high_priority": 28,
  "medium_priority": 0,
- "active_alarms": 7,
+ "active_alarms": 2,
  "data": [
   {
    "name": "Meter Reading Issue",
-   "count": 26,
+   "count": 28,
    "priority": "High",
    "alarm_type": 10
-  },
-  {
-   "name": "Consumption Spike",
-   "count": 5,
-   "priority": "High",
-   "alarm_type": 17
   }
  ]
 }
@@ -1008,45 +980,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
 ```json
 {
  "status": 200,
- "data": [
-  {
-   "get_alarm_type_display": "Consumption Spike",
-   "power_source": null,
-   "get_alarm_priority_display": "High",
-   "r_phase": null,
-   "y_phase": null,
-   "b_phase": null,
-   "fuel_level": null,
-   "run_hours": null,
-   "created": "2026-11-20T00:00:00",
-   "is_active": true,
-   "aisle_group": "F3-D-Block",
-   "issue": "Spike: 10:00 4.45 kWh (catch-up, 5 h gap from 20 Nov 05:00)",
-   "occurrences": 1,
-   "last_seen": "2026-11-20T15:20:59.515727",
-   "open_days": 0,
-   "open_for": "20.4 h"
-  },
-  {
-   "get_alarm_type_display": "Consumption Spike",
-   "power_source": null,
-   "get_alarm_priority_display": "High",
-   "r_phase": null,
-   "y_phase": null,
-   "b_phase": null,
-   "fuel_level": null,
-   "run_hours": null,
-   "created": "2026-11-20T00:00:00",
-   "is_active": true,
-   "aisle_group": "F1-Outward&Hub area",
-   "issue": "Spike: 10:00 6.58 kWh (catch-up, 5 h gap from 20 Nov 05:00)",
-   "occurrences": 1,
-   "last_seen": "2026-11-20T15:20:59.515727",
-   "open_days": 0,
-   "open_for": "20.4 h"
-  },
-  "... 5 items in total"
- ]
+ "data": []
 }
 ```
 
@@ -1077,6 +1011,28 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
      "customer_id": 2,
      "customer_name": "DelhiVery",
      "source": "consumption",
+     "aisle_group_id": 724,
+     "aisle_group_name": "GF_FS/BS_R1&BS_R2",
+     "leg_id": "724",
+     "power_source": null,
+     "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
+     "issue": "Bypassed (during the day, 21:46): consumption so far=7.54, threshold=7.51 (100 % of baseline), baseline=7.51.",
+     "open_days": 0,
+     "open_for": "23.9 h",
+     "alarm_type": 11,
+     "last_seen": "2026-11-20T00:00:00",
+     "occurrences": 1
+    },
+    {
+     "alarm": "Bypassed",
+     "Alarm_priority": 0,
+     "site_id__site_name": "Hassanpur-GGNFC3-GF",
+     "created_time": "2026-11-20T00:00:00",
+     "priority": "High",
+     "site_id": 125,
+     "customer_id": 2,
+     "customer_name": "DelhiVery",
+     "source": "consumption",
      "aisle_group_id": 731,
      "aisle_group_name": "HB-Part-1_NL",
      "leg_id": "731",
@@ -1084,7 +1040,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
      "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
      "issue": "Bypassed (during the day, 17:25): consumption so far=27.99, threshold=27.96 (100 % of baseline), baseline=27.96.",
      "open_days": 0,
-     "open_for": "20.4 h",
+     "open_for": "23.9 h",
      "alarm_type": 11,
      "last_seen": "2026-11-20T00:00:00",
      "occurrences": 1
@@ -1092,34 +1048,34 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    ]
   },
   {
-   "customer_id": 27,
-   "customer_name": "Myntra",
+   "customer_id": 4,
+   "customer_name": "Admin",
    "alarm_list": [
     {
      "alarm": "Bypassed",
      "Alarm_priority": 0,
-     "site_id__site_name": "Myntra Binola Inventory Saving",
+     "site_id__site_name": "Yusen Logistics Highbay-Saving Vizag",
      "created_time": "2026-11-20T00:00:00",
      "priority": "High",
-     "site_id": 29,
-     "customer_id": 27,
-     "customer_name": "Myntra",
+     "site_id": 200,
+     "customer_id": 4,
+     "customer_name": "Admin",
      "source": "consumption",
-     "aisle_group_id": 225,
-     "aisle_group_name": "EL-F-Block-GF",
-     "leg_id": "225",
+     "aisle_group_id": 1260,
+     "aisle_group_name": "HB-LDB2&3",
+     "leg_id": "1260",
      "power_source": null,
-     "home_gateway_id": "avc_myntra_binola_000029_2",
-     "issue": "Bypassed (during the day, 19:46): consumption so far=7.74, threshold=7.73 (100 % of baseline), baseline=7.73.",
+     "home_gateway_id": "avc_YusenLogistics_vizag_000195_1",
+     "issue": "Bypassed (during the day, 23:32): consumption so far=69.76, threshold=69.62 (100 % of baseline), baseline=69.62.",
      "open_days": 0,
-     "open_for": "20.4 h",
+     "open_for": "23.9 h",
      "alarm_type": 11,
      "last_seen": "2026-11-20T00:00:00",
      "occurrences": 1
     }
    ]
   },
-  "... 8 items in total"
+  "... 9 items in total"
  ]
 }
 ```
@@ -1142,7 +1098,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    {
     "Alarm_priority": 0,
     "site_id__site_name": "Hassanpur-GGNFC3-GF",
-    "alarm_count": 1
+    "alarm_count": 2
    }
   ],
   [],
@@ -1179,9 +1135,10 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    "site_name": "Myntra Bhiwandi Inventory Lights",
    "alarms": {
     "Meter Reading Issue": 1,
+    "Bypassed": 1,
     "Gateway Disconnected": 1
    },
-   "total_alarm_count": 2,
+   "total_alarm_count": 3,
    "site_type": "WH_Energy_Saving"
   },
   "... 6 items in total"
@@ -1213,17 +1170,16 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
   {
    "name": "Bypassed",
    "data": [
-    2
+    3
    ],
    "type": "column"
   },
-  "... 4 items in total"
+  "... 3 items in total"
  ],
  "alarm_name_list": [
   "Meter Reading Issue",
   "Bypassed",
-  "Gateway Disconnected",
-  "Consumption Spike"
+  "Gateway Disconnected"
  ]
 }
 ```
@@ -1244,20 +1200,19 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
  "result": 1,
  "data": [
   {
-   "alarm_type": "Consumption Spike",
+   "alarm_type": "Meter Reading Issue",
    "object_type": "Meter",
-   "object_name": "F1-Outward&Hub area",
+   "object_name": "F2-2K Block",
    "alarm_priority": "High",
-   "created_date": "20-11-2026"
+   "created_date": "16-11-2026"
   },
   {
-   "alarm_type": "Consumption Spike",
+   "alarm_type": "Meter Reading Issue",
    "object_type": "Meter",
-   "object_name": "GF-Republishing Area",
+   "object_name": "F1-Part1-EL",
    "alarm_priority": "High",
-   "created_date": "20-11-2026"
-  },
-  "... 7 items in total"
+   "created_date": "16-11-2026"
+  }
  ],
  "msg": "Alarms details on site page"
 }
@@ -1320,7 +1275,7 @@ Responses: Captured on the test server (20 Nov 2026) as a Super Admin; lists cut
    "status": false,
    "health": "offline",
    "health_since": "2026-11-18T19:45:17.298294",
-   "health_detail": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 48.6 h",
+   "health_detail": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 52.1 h",
    "site_id": 109,
    "site_name": "Myntra Bhiwandi Inventory Lights",
    "customer_name": "MyntraTesting"

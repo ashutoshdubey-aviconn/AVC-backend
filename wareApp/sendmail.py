@@ -497,6 +497,37 @@ def send_alarm_email(alarm_name, site_id, details, alarm_type=None):
     return _send_smtp_email(f"{alarm_name} - {site_name}", html_message, to)
 
 
+def send_software_team_email(subject, site_id, details):
+    """Notice for the software team only (not the site's ground team), same layout as the alarm
+    e-mails: e.g. catch-up hours that need a manual spread (wareApp/catch_up_spread.py).
+    Recipients: alarm_recipients.SOFTWARE_TEAM, else ALARM_EMAIL_DEFAULT_TO; ALARM_EMAIL_OVERRIDE_TO
+    replaces them on test servers."""
+    from wareApp.mqtt.services import alarm_recipients
+
+    site = Site.objects.filter(id=site_id).first()
+    site_name = site.site_name if site else f"site {site_id}"
+    rows = "".join(
+        f'<p style="{"color:red;" if highlight else ""}"><strong>{label}: </strong>{value}</p>'
+        for label, value, highlight in details
+    )
+    html_message = f"""
+        <html><head><title>{subject}</title></head>
+        <body style="font-family:Arial,sans-serif;background:#f0f0f0;color:#333;">
+        {_tpl_header(subject)}
+        <div class="container" style="background:#fff;border:1px solid #ccc;border-radius:5px;padding:20px;margin:20px;">
+            <p>Dear Team,</p>
+            <p><strong>Site Name: </strong>{site_name}</p>
+            <p><strong>Time: </strong>{_now_str()}</p>
+            {rows}
+            {_tpl_footer()}
+        </div>
+        </body>
+        </html>
+    """
+    to = list(alarm_recipients.SOFTWARE_TEAM) or list(getattr(settings, "ALARM_EMAIL_DEFAULT_TO", []) or [])
+    return _send_smtp_email(f"{subject} - {site_name}", html_message, to)
+
+
 def send_alarm_for_high_voltage(data):
     site = Site.objects.get(id=data['site_id'])
     site_name = site.site_name

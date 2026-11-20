@@ -4,8 +4,9 @@ A spike hour (consumption_alarms.find_spikes) is either
 * a meter jump - one hour above the aisle's whole daily baseline. With a Meter
   Reading Issue the same day the gateway reported a lower meter reading: the
   meter was reset or replaced and the difference landed in one hour.
-* a catch-up hour - the first hour after a data gap, more than 3 x the day's
-  median hour: it carries the consumption of the missing hours. The cause of
+* a catch-up hour - the first hour after a data gap (no rows, or ERROR404 hours stored as 0),
+  more than 3 x the day's median hour: it carries the consumption of the missing hours. Checked
+  before the meter jump, so a big catch-up is not called a jump (2026-11-20). The cause of
   the gap is named when known: a Gateway Disconnected / Service alarm on the
   site, or our own server / listener restarting in the gap.
 
@@ -26,6 +27,7 @@ from wareApp.mqtt.services import alarm_policy, alarm_sites
 from wareApp.mqtt.services.baseline import baseline_info
 from wareApp.mqtt.services.consumption_alarms import find_spikes, meter_issue_on
 from wareApp.mqtt.services.notifications import notify
+from wareApp.mqtt.services.recovery_status import no_data_hours, no_data_monitors
 from wareApp.sendmail import send_alarm_email
 
 logger = logging.getLogger(__name__)
@@ -98,6 +100,8 @@ def scan(now=None):
         MonitoringMarker.objects.filter(name="mqtt_listener_started_at", at__gte=window_start)
         .values_list("at", flat=True)
     )
+    # ERROR404 hours (stored as 0) count as a gap, so the hour after them is seen as a catch-up.
+    no_data = no_data_monitors(sites, window_start)
     rows = (
         HourlySiteReading.objects.filter(associated_Site_id__in=sites, reading_from__gte=window_start)
         .order_by("associated_Site_id", "leg_id", "reading_from")
@@ -115,6 +119,10 @@ def scan(now=None):
         if target_id != site_id and (target_id not in sites or alarm_policy.is_off(target_id, CONSUMPTION_SPIKE)):
             continue
         series = [(at, kwh) for _, _, at, kwh in group]
+        monitors = no_data.get((site_id, str(leg_id)))
+        if monitors:
+            gap_hours = no_data_hours(monitors, dict(series))
+            series = [(at, kwh) for at, kwh in series if at not in gap_hours]
         site = sites[site_id]
         for day in days:
             info = baseline_info(site_id, leg_id, day)

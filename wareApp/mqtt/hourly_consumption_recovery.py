@@ -73,6 +73,12 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                 ),
             }
 
+        from wareApp.catch_up_spread import spread_hours
+
+        spread = (
+            spread_hours(site.id, aisle_group_id, min(s for s, _ in slots), max(s for s, _ in slots))
+            if slots else set()
+        )
         scope = RecoveryScope.aisle(aisle_group)
         status = RecoveryStatusService(site, home_gateway_id)
         with transaction.atomic():
@@ -100,6 +106,8 @@ def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, me
                     "hourly_baseline_value",
                     "energy_saved",
                 ],
+                # Hours of a catch-up spread stay as spread (decided 2026-11-20).
+                should_update=lambda rows, values: rows[0].reading_from not in spread,
                 build_row=lambda key, values: HourlySiteReading(
                     associated_Site=site,
                     aisle_group=aisle_group,

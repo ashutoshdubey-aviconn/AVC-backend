@@ -1,9 +1,16 @@
 """Data sync and recovery status of a site (Super_Admin only, read-only).
 
 GET /api/syncStatus/?site_id=114
-    The current state of every aisle (consumption) and power source (supply time / load runtime)
-    of the site's gateways: AisleSyncRecoveryStatus, moved by wareApp/mqtt/services/recovery_status.py
-    and the recovery_status_sweep command:
+    Per aisle (consumption) and power source (supply time / load runtime) of the site's gateways
+    (decided 2026-11-20, no gap details):
+        healthy                 -> sync "synced",  recovery "not_needed",   last_sync_at
+        gap filled (recovered)  -> sync "synced",  recovery "recovered",    last_recovered_at
+        no data                 -> sync "syncing", recovery "not_received", last_sync_at, attempts
+                                   (times the server asked the gateway for this aisle's missing data;
+                                   0 = not asked yet, max MQTT_RECOVERY_MAX_ATTEMPTS)
+    recovery "received" only shows for the moment between the gateway's answer and its rows being applied.
+    From AisleSyncRecoveryStatus, moved by wareApp/mqtt/services/recovery_status.py and the
+    recovery_status_sweep command:
         healthy --gap--> recovery_requested --payload--> recovery_received --applied--> recovered --> healthy
         recovery_requested --no answer after MQTT_RECOVERY_MAX_ATTEMPTS--> failed
         healthy --no packet for MQTT_SYNC_LATE_SECONDS (70 min)--> late --MQTT_SYNC_MISSING_SECONDS (130 min)--> missing
@@ -13,6 +20,7 @@ GET /api/recoveryHistory/?site_id=114&status=failed&recovery_type=hourly_consump
     The raw MQTT payloads are not returned.
 """
 
+from django.conf import settings
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -23,8 +31,25 @@ from wareApp.models import AisleSyncRecoveryStatus, MeterSource, RecoveryMonitor
 __all__ = ["SyncStatusApi", "RecoveryHistoryApi"]
 
 SOURCE_NAMES = dict(MeterSource.POWER_SOURCES)
-# Order of the states in "counts" (problems first).
-STATE_ORDER = ["failed", "missing", "late", "recovery_requested", "recovery_received", "recovered", "healthy", "unknown"]
+
+# Stored state (AisleSyncRecoveryStatus.sync_status) -> (sync, recovery) shown to the frontend.
+#   sync: synced = data arriving; syncing = data missing, being asked from the gateway.
+#   recovery: was missing data filled?
+SYNC_VIEW = {
+    "healthy": ("synced", "not_needed"),
+    "recovered": ("synced", "recovered"),
+    "late": ("syncing", "not_received"),
+    "missing": ("syncing", "not_received"),
+    "recovery_requested": ("syncing", "not_received"),
+    "failed": ("syncing", "not_received"),
+    "recovery_received": ("syncing", "received"),
+    "unknown": ("unknown", "not_needed"),
+}
+SYNC_LABELS = {"synced": "Synced", "syncing": "Syncing", "unknown": "Unknown"}
+RECOVERY_LABELS = {"not_needed": "Not needed", "recovered": "Recovered", "not_received": "Not received",
+                   "received": "Received"}
+# Requests that are still open for a gap (their attempt count is the current one).
+OPEN_REQUESTS = {"requested", "response_received", "failed", "timeout"}
 
 
 def _iso(value):
@@ -70,36 +95,34 @@ class SyncStatusApi(APIView):
             .select_related("aisle_group", "recovery_monitor")
             .order_by("home_gateway_id", "aisle_group__aisleGroupName", "power_source")
         )
-        data, counts = [], {state: 0 for state in STATE_ORDER}
+        max_attempts = getattr(settings, "MQTT_RECOVERY_MAX_ATTEMPTS", 3)
+        data = []
+        counts = {"sync": dict.fromkeys(SYNC_LABELS, 0), "recovery": dict.fromkeys(RECOVERY_LABELS, 0)}
         for row in rows:
             kind, name = _object(row)
+            sync, recovery = SYNC_VIEW.get(row.sync_status, ("unknown", "not_needed"))
+            counts["sync"][sync] += 1
+            counts["recovery"][recovery] += 1
             monitor = row.recovery_monitor
-            counts[row.sync_status] = counts.get(row.sync_status, 0) + 1
+            # Times the server asked the gateway for this aisle's missing data (current gap only).
+            attempts = monitor.attempt if sync == "syncing" and monitor and monitor.status in OPEN_REQUESTS else 0
             data.append({
                 "id": row.id,
                 "home_gateway_id": row.home_gateway_id,
                 "object_type": kind,
                 "object_name": name,
-                "aisle_group_id": row.aisle_group_id,
                 "leg_id": row.leg_id,
                 "power_source": row.power_source,
-                "sync_status": row.sync_status,
-                "sync_status_display": row.get_sync_status_display(),
+                "sync": sync,
+                "sync_display": SYNC_LABELS[sync],
                 "last_sync_at": _iso(row.last_sync_at),
-                "expected_from": _iso(row.expected_from),
-                "expected_to": _iso(row.expected_to),
-                "missing_slots": row.missing_slots,
-                "recovered_slots": row.recovered_slots,
-                "has_data_loss": row.has_data_loss,
-                "last_error": row.last_error,
-                "last_recovery_requested_at": _iso(row.last_recovery_requested_at),
-                "last_recovery_received_at": _iso(row.last_recovery_received_at),
-                "last_recovery_applied_at": _iso(row.last_recovery_applied_at),
-                "updated_at": _iso(row.updated_at),
-                "current_recovery": {
-                    "id": monitor.id, "recovery_type": monitor.recovery_type, "status": monitor.status,
-                    "attempt": monitor.attempt, "requested_at": _iso(monitor.requested_at),
-                } if monitor else None,
+                "recovery": recovery,
+                "recovery_display": RECOVERY_LABELS[recovery],
+                "last_recovered_at": _iso(row.last_recovery_applied_at),
+                "attempts": attempts,
+                "max_attempts": max_attempts,
+                # Only for the current gap: an older gap's request time would read as this one's.
+                "last_requested_at": _iso(row.last_recovery_requested_at) if attempts else None,
             })
         return Response({
             "status": 200,

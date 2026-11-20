@@ -26,6 +26,7 @@ ALLOWED_NOTIFICATIONS = frozenset(
         "send_mail_for_pf_fluctuation",
         "send_mail_fire_alarm_user",
         "send_alarm_email",
+        "send_software_team_email",
     }
 )
 

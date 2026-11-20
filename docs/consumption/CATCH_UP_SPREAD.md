@@ -1,63 +1,104 @@
 # Catch-up spread
 
-Since 2026-11-16. Code: `wareApp/catch_up_spread.py`, API view
-`CatchUpSpreadApi` in `wareApp/views/catch_up.py`, models `CatchUpSpread` and
-`HourlySiteReading.is_estimated` (migration 0114). **Triggered from the
-frontend only**; nothing is spread automatically.
+Since 2026-11-16, reworked 2026-11-20 (rules agreed with the user). Code: `wareApp/catch_up_spread.py`,
+API `CatchUpSpreadApi` in `wareApp/views/catch_up.py`, Celery task `auto_spread_catch_ups`,
+models `CatchUpSpread` (migrations 0114, 0115) and `RecoveryMonitor.error_hours` (0115).
+Frontend: site page → **Spread catch-up** (`catch-up-spread.component`).
 
 ## Why
 
-When a gateway stores nothing for a while and then comes back, its first hour
-carries the whole gap's consumption (the meter kept counting). Example: site
-114 Myntra BGLR Inventory, F1-Outward&Hub area: hours until 14 Nov 19:00,
-nothing on 15 Nov, then **16 Nov 09:00 = 43.60 kWh** (≈ 37 missing hours ×
-1.18 kWh). The energy is real but lands on the wrong day: 15 Nov shows 0, and
-16 Nov looked like a Bypassed day. The Consumption Spike alarm reports such an
-hour; this tool moves its energy to the hours it belongs to.
+A gateway service (pymodbus / PostgreSQL / Celery) stops and nothing is saved for some hours. When it
+starts again its first reading is "new meter reading − last saved one", so the whole gap's energy lands
+in **one hour**. Example: site 114 Myntra BGLR Inventory, F1-Outward&Hub area: hours until 14 Nov
+19:00, nothing on 15 Nov, then **16 Nov 09:00 = 43.60 kWh** (≈ 37 missing hours × 1.18 kWh). The
+energy is real but on the wrong hours and days: 15 Nov shows 0, 16 Nov looks like a Bypassed day.
 
-## What it does
+Site 114 on main, 1 Sep – 20 Nov: 863 such catch-up hours on its 38 aisles (469 gaps ≤ 6 h, 264 of
+7–24 h, 130 of 1–7 days); in 798 the share per hour is 0.5–2 × the aisle's normal hour, i.e. the hour
+really carries the missing hours' energy (analysis: `.work/spread_114_analysis/`).
+
+## What is a catch-up (the proof)
+
+* The hour before the gap has **real data**.
+* The gap is hours **without a row**, or hours stored as **0 because the gateway answered ERROR404**
+  during recovery (no data on the gateway). Which hours were ERROR404 is kept on the recovery request
+  (`RecoveryMonitor.error_hours`, since 20 Nov; for older requests: the run of 0 kWh hours right before
+  the recorded catch-up hour, at most `error_slots` long). **Real 0 kWh hours are never taken.**
+* The first hour after the gap is more than **3 × the aisle's normal hour** (median of the non-zero
+  hours of the 7 days before the gap).
+* A normal-sized first hour after a gap is **genuine**: nothing is spread (the gap stays as it is).
+
+The Consumption Spike alarm (17) uses the same proof: since 20 Nov a big hour after a gap is a catch-up
+even when it is above the whole daily baseline (before, it was called a "meter jump"), and ERROR404
+hours count as gap. A big hour **without** a gap is a meter jump: never spread, e-mailed as a
+Consumption Spike alarm.
+
+## When it is offered
+
+Only when all of these hold (else it is listed under **Waiting for sync / recovery** with the reason):
+
+1. the aisle is **synced** again (`AisleSyncRecoveryStatus`: healthy or recovered);
+2. the **hour after** the catch-up has arrived;
+3. **recovery** of the gap has ended (no open request for the aisle).
+
+The gap start must be known: a real reading in the 31 days before (else **not spreadable**).
+
+## Clear case or manual spread required
+
+| Check | Clear (automatic allowed) | Otherwise |
+|---|---|---|
+| Share per hour | ≤ 3 × the normal hour | "probably more than a catch-up (meter jump?)" |
+| Spread day (share × 24) vs the aisle's daily average (median of the non-zero days in the 14 days before the gap) | 0.5–1.5 × | "a spread day would be X kWh, the aisle's daily average is Y kWh" |
+| Daily average known | yes | "no daily average before the gap" |
+
+There is no fixed gap-length limit: a long gap is fine when its spread days match the daily average.
+A case with a reason is shown with **Manual spread required**, is not ticked by default, and is never
+spread automatically.
+
+## What a spread does
 
 ```
-before   14 Nov … 19:00 1.2 │ 20:00 … 15 Nov … 16 Nov 08:00: no rows │ 09:00 43.60 │ 10:00 1.2 …
-after    14 Nov … 19:00 1.2 │ 20:00 … 08:00: 37 rows of 1.147 (estimated) │ 09:00 1.147 (estimated) │ 10:00 1.2 …
-share = 43.60 / (37 missing + 1) = 1.147 kWh
+before   14 Nov … 19:00 1.2 │ 20:00 … 16 Nov 08:00: no rows (or ERROR404 0) │ 09:00 43.60 │ 10:00 1.2 …
+after    14 Nov … 19:00 1.2 │ 20:00 … 08:00: 37 hours of 1.147            │ 09:00 1.147 │ 10:00 1.2 …
+share = 43.60 / (37 gap hours + 1) = 1.147 kWh (flat)
 ```
 
-1. **Find** (preview): on the chosen day, per aisle, an hour that comes right
-   after a gap (no reading the hour before) and is more than 3 × the aisle's
-   normal hour (median of the last 7 days). Gap = from the hour after the last
-   reading to the hour before the catch-up.
-2. **Spread** (apply, one transaction per catch-up):
-   - the catch-up hour becomes the share; every missing hour is created with
-     the share; all of them `is_estimated = True`, with the aisle's hourly
-     baseline and saving;
-   - the daily totals of every touched day are recomputed from the hours
-     (created where missing, e.g. 15 Nov);
-   - that day's Consumption Spike alarm is closed: "Spread: 09:00 43.60 kWh
-     over 38 h from 14 Nov 20:00 (catch-up)";
-   - a `CatchUpSpread` row records site, aisle, hour, original kWh, gap,
-     share, who and when.
-3. **Undo**: removes the created estimated hours, restores the catch-up hour's
-   original value and recomputes the days.
+One transaction per catch-up:
 
-The total energy does not change (no kWh lost or added).
+* every gap hour (created where there is no row, updated where it is an ERROR404 0) and the catch-up
+  hour get the share, with the aisle's hourly baseline and saving; they are **real readings** (no
+  estimated mark);
+* **hourly and daily** of every touched day are recalculated (a missing day such as 15 Nov is created);
+* that day's Consumption Spike alarm is closed: "Spread (manual|automatic): 09:00 43.60 kWh over 38 h
+  from 14 Nov 20:00 (catch-up)";
+* a `CatchUpSpread` row records site, aisle, catch-up hour, original kWh, gap, hours, share, **mode**
+  (manual with the user / automatic), when, and **one line per hour** (`hours_detail`: hour, kind
+  `empty` / `no_data` / `catch_up`, kWh before, kWh after).
 
-## Rules and limits
+Total energy does not change.
 
-| Case | Result |
-|---|---|
-| Big hour right after a gap of ≤ 7 days | Spreadable |
-| Share still > 3 × the normal hour | Spreadable, with a warning: probably more than a catch-up (meter jump?) |
-| Normal-sized hour after a gap (e.g. our own server was down) | Not a catch-up: not listed |
-| Big first hour with **no reading in the 7 days before** | Listed under `not_spreadable` (gap start unknown) |
-| Catch-up hour changed since the preview | Refused, nothing written |
-| Missing hour that already has a row | Kept; only real gaps are filled |
+**After a spread the values are the stored data.** Hourly and daily recovery replies leave the spread
+hours and days alone (`spread_hours` / `spread_days`); only a future manual sync could change them.
 
-Limitation: if the gateway later re-sends real readings for the gap (hourly
-recovery), they overwrite the estimated rows, but the catch-up hour keeps its
-share. Undo the spread first if real recovery is expected.
+## Undo (5 days)
 
-No alarms or e-mails are raised for the recomputed past days.
+Possible for **5 days** after the spread (`undo_until`), then the link shows "closed" and the API
+refuses. Undo uses the per-hour record: created hours removed, ERROR404 hours back to 0, the catch-up
+hour back to its original kWh, days recalculated.
+
+## Automatic spread (night job)
+
+Celery beat task `auto_spread_catch_ups` every `CATCH_UP_AUTO_SECONDS` (1800). It works only
+**19:00–11:00 every day and all day on Sunday** (`CATCH_UP_AUTO_FROM_HOUR` / `_UNTIL_HOUR`), when nobody
+is on duty, over the last `CATCH_UP_AUTO_DAYS` (3) days of every monitored site:
+
+* clear cases are spread with mode **automatic**;
+* cases needing a manual spread are left, and the **software team** gets one e-mail per site per run
+  listing the new ones with their reason ("Catch-up spread: manual spread required"); each catch-up is
+  e-mailed once (14 days).
+
+First run on test (20 Nov 23:52): 49 catch-ups of site 114 spread (18–20 Nov), 4 e-mailed (spread days
+1.6–1.8 × the daily average), 18 waiting.
 
 ## API
 
@@ -67,73 +108,63 @@ No alarms or e-mails are raised for the recomputed past days.
 |---|---|
 | `{"site_id": 114, "day": "2026/11/16"}` | Preview all aisles of the site |
 | `{"site_id": 114, "day": "2026/11/16", "legs": ["692"]}` | Preview some aisles (leg ids) |
-| `… "apply": true` | Spread what the preview shows |
-| `{"undo": 12}` | Undo spread 12 |
+| `… "apply": true` | Spread what the preview shows (manual) |
+| `{"undo": 12}` | Undo spread 12 (within 5 days) |
+| `{"site_id": 114, "history": true, "from": "2026/11/01", "to": "2026/11/20"}` | The site's spreads (≤ 92 days), with their hours |
 
-Response (preview):
+Preview response (shortened):
 
 ```json
 {
-  "status": 200,
-  "applied": false,
+  "status": 200, "applied": false,
   "catch_ups": [
     {"leg_id": "692", "aisle_name": "F1-Outward&Hub area", "catch_up_at": "2026/11/16 09:00", "kwh": 43.6,
      "gap_from": "2026/11/14 20:00", "gap_to": "2026/11/16 08:00", "missing_hours": 37,
-     "share_kwh": 1.147, "normal_hour_kwh": 1.2,
-     "days": [{"day": "2026/11/14", "before": 24.0, "after": 28.59},
-              {"day": "2026/11/15", "before": 0.0, "after": 27.54},
-              {"day": "2026/11/16", "before": 54.4, "after": 22.27}],
-     "warnings": []}
+     "empty_hours": 37, "no_data_hours": 0, "share_kwh": 1.147, "normal_hour_kwh": 1.2,
+     "spread_day_kwh": 27.54, "daily_average_kwh": 27.5,
+     "days": [{"day": "2026/11/14", "before": 24.0, "after": 28.59}, {"day": "2026/11/15", "before": 0.0, "after": 27.54}],
+     "manual_required": false, "warnings": []}
   ],
-  "not_spreadable": [
-    {"leg_id": "...", "aisle_name": "...", "at": "2026/11/16 09:00", "kwh": 31.17, "normal_hour_kwh": 0.9,
-     "reason": "no reading in the 7 days before it: the gap's start is unknown"}
-  ],
-  "applied_spreads": [
-    {"id": 12, "leg_id": "692", "aisle_name": "F1-Outward&Hub area", "catch_up_at": "2026/11/16 09:00", "original_kwh": 43.6,
-     "gap_from": "2026/11/14 20:00", "hours": 38, "share_kwh": 1.147, "applied_by": "AVCadmin", "applied_at": "2026/11/17 12:00"}
-  ]
+  "waiting": [{"leg_id": "680", "aisle_name": "F2-E~G Block", "at": "2026/11/20 10:00", "kwh": 5.1,
+               "missing_hours": 5, "reason": "recovery of the gap is still running (asked from the gateway)"}],
+  "not_spreadable": [],
+  "applied_spreads": [{"id": 12, "mode": "automatic", "applied_by": "automatic", "applied_at": "2026/11/20 23:52",
+                       "can_undo": true, "undo_until": "2026/11/25 23:52", "empty_hours": 5, "no_data_hours": 0, "...": "..."}]
 }
 ```
 
-`applied_spreads` (since 2026-11-17) lists the spreads of the site's catch-up hours on
-that day that are not undone, so the screen can offer Undo after a reload.
+Apply adds `"applied": true, "spreads": [{"id", "leg_id", "catch_up_at", "hours", "share_kwh", "mode"}]`.
+Undo returns `{"status": 200, "undone": 12, "hours_reverted": 37}`. Errors: HTTP 400 `{"error": ...}`
+(bad day, unknown site / leg / spread, nothing to spread, changed since the preview, already undone,
+undo after 5 days, history longer than 92 days).
 
-Apply adds `"applied": true, "spreads": [{"id": 12, "leg_id": "692", "catch_up_at": "...", "hours": 38, "share_kwh": 1.147}]`.
-Undo returns `{"status": 200, "undone": 12, "estimated_hours_removed": 37}`.
-Errors: HTTP 400 `{"status": 400, "error": "..."}` (bad day, unknown site / leg / spread, nothing to spread, changed since preview, already undone).
+## Frontend
 
-## Frontend (built 2026-11-17)
+Site page → **Spread catch-up** (or **Spread…** on a Consumption Spike row):
 
-`Aviconncorp-new-migrated-frontend`, `src/app/alarm/catch-up-spread.component.*`
-(Super Admin only; calls the alarm server, `environment.alarmApiUrl`):
-
-1. Site page: **Spread catch-up** button next to Select Site (today), or
-   **Spread…** on a Consumption Spike row whose text says "catch-up" in the
-   alarm panel (opens on that spike's day).
-2. Day picker → preview table: aisle, catch-up hour, kWh, gap from → to, hours,
-   kWh per hour after, normal hour, and per touched day the total before → after.
-   Rows with a warning (probably a meter jump) are highlighted and not ticked;
-   `not_spreadable` is a grey list with the reason.
-3. Tick aisles → **Spread N catch-up hour(s)…** → inline confirmation
-   (**Yes, spread**; no browser dialog) → result message, preview reloads.
-4. **Spread on this day** lists `applied_spreads` with **Undo** (inline confirmation).
-5. Charts may later show `is_estimated` hours differently once the hourly API
-   returns the flag (feature tracker F04).
+1. Day picker → table of catch-ups to spread: gap (with "N without data · M ERROR404"), share, normal
+   hour, day totals before → after; **Manual spread required** tag and reason on doubtful rows (not
+   ticked).
+2. **Waiting for sync / recovery** and **cannot be spread** lists with the reason.
+3. Tick → **Spread N catch-up hour(s)…** → inline confirmation.
+4. **Spread on this day**: each spread as **Manual · user** or **Automatic**, Undo with "until …" for 5
+   days, then "closed (5 days passed)".
+5. **History**: date range, every spread (manual / automatic, undo state); click the hours to see each
+   hour before → after.
 
 ## Tests
 
-`wareApp/tests/test_catch_up_spread.py`: preview of the site 114 case (gap,
-share, day totals) changes nothing; apply creates 37 estimated hours, keeps
-the total energy, recomputes 14 / 15 / 16 Nov (15 Nov created), closes the
-spike, records the spread; undo restores everything and refuses a second undo;
-changed since preview is refused; a normal hour after a gap is not a catch-up;
-a huge jump gets a warning; a big first hour without earlier readings is
-reported as not spreadable; API preview / apply / undo, Super_Admin only, bad
-input.
+`wareApp/tests/test_catch_up_spread.py` (18): preview of the site 114 case changes nothing; apply makes
+real hours, recalculates 14 / 15 / 16 Nov, keeps the total energy, closes the spike, records every
+hour; undo within 5 days and refused after; ERROR404 hours are the gap (and the older-request
+fallback); real 0 kWh hours are not a gap; waiting until synced / recovered / next hour in; daily-
+average and meter-jump doubts; recovery leaves spread hours and days alone; a big hour after a gap is a
+catch-up, not a meter jump; night window; automatic spread of a clear case; doubtful case e-mailed
+once; API preview / apply / undo / history, permissions and errors. Frontend:
+`catch-up-spread.component.spec.ts`.
 
 ## Rolling back
 
-Undo each applied spread (API or `catch_up_spread.undo`); then revert the
-commit. Migration 0114 adds the `is_estimated` column (instant) and the
-`CatchUpSpread` table.
+Undo the spreads within 5 days (API or `catch_up_spread.undo`), set `CATCH_UP_AUTO_SECONDS=0` to stop
+the night job, then revert the commit. Before migration 0115 on test, the spreads and their hours were
+saved in `fov2_backup_catchupspread_20261120` and `fov2_backup_spread_hours_20261120`.

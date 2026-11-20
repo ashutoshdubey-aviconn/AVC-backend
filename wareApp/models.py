@@ -1342,6 +1342,10 @@ class RecoveryMonitor(models.Model):
     # First hour that carries the consumption of an outage reported as
     # ERROR404 (the meter's cumulative difference lands here). Alarms skip it.
     catch_up_at = models.DateTimeField(blank=True, null=True)
+    # Hour starts ("YYYY-MM-DDTHH:MM:SS") the gateway answered ERROR404 for (no data on
+    # the gateway, stored as 0 kWh). Lets a catch-up spread fill exactly those hours
+    # (wareApp/catch_up_spread.py); real 0 kWh hours are never taken for them.
+    error_hours = models.JSONField(default=list, blank=True)
 
     class Meta:
         indexes = [
@@ -1516,7 +1520,8 @@ class PendingEmail(models.Model):
 
 class CatchUpSpread(models.Model):
     """One catch-up hour spread over the data gap before it (wareApp/catch_up_spread.py,
-    POST /api/catchUpSpread/; decided 2026-11-16). Kept for the record and for undo."""
+    POST /api/catchUpSpread/; decided 2026-11-16, reworked 2026-11-20: spread hours are
+    real readings, manual or automatic, undo for 5 days). Kept for the record and for undo."""
 
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
@@ -1529,6 +1534,12 @@ class CatchUpSpread(models.Model):
     applied_by = models.CharField(max_length=150, blank=True, default="")
     applied_at = models.DateTimeField(auto_now_add=True)
     undone_at = models.DateTimeField(null=True, blank=True)
+    MANUAL, AUTOMATIC = "manual", "automatic"
+    mode = models.CharField(max_length=10, choices=((MANUAL, "Manual"), (AUTOMATIC, "Automatic")), default=MANUAL)
+    # One entry per hour of the spread, for checking and for undo:
+    # {"at": "YYYY-MM-DDTHH:MM:SS", "kind": "empty" | "no_data" | "catch_up", "before": kWh or null, "after": kWh}
+    # empty = no row (created), no_data = ERROR404 row stored as 0, catch_up = the catch-up hour.
+    hours_detail = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"site {self.site_id} leg {self.leg_id} {self.catch_up_at:%Y-%m-%d %H:%M}: {self.original_kwh} kWh / {self.hours} h"

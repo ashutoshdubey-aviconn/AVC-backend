@@ -106,6 +106,8 @@ class GatewayActivityTests(TestCase):
         self.site = Site.objects.create(site_name="Activity site", site_type=1, is_live=True)
         HomeGatewayId.objects.create(hgw_id=GW, connected_to=self.site)
         gateway_activity._pending.clear()
+        # seen() flushes by itself 60 s after the last flush; a long test run must not trigger that.
+        gateway_activity._last_flush = time.monotonic()
 
     def test_data_packets_update_status_and_consumption_ping(self):
         gateway_activity.seen(self.site.id, GW, "consumption", now=NOW)

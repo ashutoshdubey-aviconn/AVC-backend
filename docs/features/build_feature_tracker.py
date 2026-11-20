@@ -59,11 +59,12 @@ add("F01", "Gateway health report topic", "MQTT / gateway", "Waiting for input",
     "Colleague: payload format (JSON or Python-dict text), send interval, which service states are healthy ('exited' for pymodbus?)",
     "-", "-")
 add("F02", "Catch-up spread screen", "Frontend", "Done",
-    "Site page: Spread catch-up button and Spread... on Consumption Spike rows; preview, tick aisles, apply, undo "
-    "(inline confirmations). First real spread 17 Nov: site 114 F1-Outward&Hub area, 43.60 kWh over 38 h, total energy unchanged, "
-    "spike alarm closed (proof: .work/spread_114_20261117/).",
-    "2026-11-16", "2026-11-17", "Used on test 17 Nov (site 114 hours 9-15 Nov copied from main first); 19 more site-114 catch-ups spreadable",
-    T, "Push the frontend commit; spread the other 19 when wanted.", "User", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9 + frontend")
+    "Site page: Spread catch-up button and Spread... on Consumption Spike rows; preview, tick aisles, apply (inline "
+    "confirmations). Since 20 Nov: 'Manual spread required' tag with the reason, 'Waiting for sync / recovery' list, "
+    "each spread shown as Manual (who) or Automatic, Undo for 5 days (then 'closed'), History view (date range, every "
+    "spread with its hours before -> after).",
+    "2026-11-16", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114: 49 automatic + 20 manual in the history)",
+    T, "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9 + frontend")
 add("F03", "Baseline setup screen", "Frontend", "Done",
     "Baseline page: Automatic baseline -> sample days -> Calculate (preview, changes nothing) -> edit per aisle -> "
     "Set baseline (inline confirmation). Errors block it; warnings shown; site total follows edits.",
@@ -137,9 +138,13 @@ add("N01", "Alarms 3, 4, 5 (DG Overtime, DG Fuel Under Level, Mains Higher Consu
 add("O01", "API view optimization", "API", "Out of scope",
     "Query / N+1 work in wareApp/views is not part of this branch; issues found are only reported.", "2026-10-26", "2026-10-28",
     "-", "-", "-", "-", "-", "-")
-add("O02", "Automatic catch-up spreading", "Consumption", "Out of scope",
-    "Catch-ups are spread only when someone triggers it from the frontend (F02), never automatically.", "2026-10-28",
-    "2026-11-16", "-", "-", "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "-")
+add("O02", "Automatic catch-up spreading", "Consumption", "Done",
+    "Was out of scope until 20 Nov; now (user decision): the night job spreads clear catch-ups 19:00-11:00 every day and "
+    "all day on Sunday (Celery beat every 30 min over the last 3 days). Clear = aisle synced again, next hour in, "
+    "recovery ended, share not > 3 x the normal hour, spread day within 0.5-1.5 x the aisle's daily average. Doubtful "
+    "ones are left for a manual spread and e-mailed once to the software team.",
+    "2026-10-28", "2026-11-20", "Deployed 20 Nov; first run on test 23:52: 49 spread, 4 e-mailed", T, "-", "-",
+    "docs/consumption/CATCH_UP_SPREAD.md", "-")
 
 # ---- Done -------------------------------------------------------------------------------------------
 add("D27", "Code inventory and merge check", "Docs / merge", "Done",
@@ -175,11 +180,12 @@ add("D32", "'Open for' on the alarm lists", "Alarms / frontend", "Done",
     "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome", T,
     "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
 add("D33", "Data sync / recovery status screen", "Recovery / frontend", "Done",
-    "Site page -> Data sync (Super Admin): whether each aisle and power source is sending its data (healthy / late "
-    "/ missing / recovery requested / received / recovered / failed, with counts and a filter), the last gap and "
-    "its recovery, and the recovery requests asked from the gateways (status filter, paging). New read-only APIs "
-    "GET syncStatus/ and recoveryHistory/; the data was stored but nothing served it.",
-    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114: 38 healthy, 576 requests)", T,
+    "Site page -> Data sync (Super Admin), per aisle and power source (no gap details, decided 20 Nov): healthy = "
+    "Synced / recovery Not needed / last sync time; gap filled = Synced / Recovered / last recovered time; no "
+    "data = Syncing / Not received / last data time + Attempts (times asked from the gateway, e.g. 3 of 3, last "
+    "asked). Counts and a Synced / Syncing filter; below, the recovery requests (status filter, paging). New "
+    "read-only APIs GET syncStatus/ and recoveryHistory/; the data was stored but nothing served it.",
+    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 109: 27 synced, 20 syncing, 3 of 3 attempts)", T,
     "-", "-", "docs/features/FRONTEND_API_GUIDE.md", "-")
 add("D30", "Gateway Status panel: Gateway Service issue", "Alarms / frontend", "Done",
     "gateway-status/ adds health (online / offline / modbus_issue) with health_since / health_detail, from the open "
@@ -210,9 +216,12 @@ add("D24", "Alarms on merged sites (virtual aisle groups)", "Alarms", "Done",
     "(site 185, shown under 183) silent since 6 Nov without an alarm.", "2026-11-17", "2026-11-17",
     "Deployed 17 Nov; main's 12 newest gateways copied to test; 10:46 alarm raised for ..._185_2 under site 183 and e-mailed", T, "-", "-", "docs/alarms/MERGED_SITES.md", "-")
 add("D01", "Catch-up spread API", "Consumption", "Done",
-    "POST /api/catchUpSpread/ (Super_Admin): preview / apply / undo; spread hours marked is_estimated; days recomputed; "
-    "spike alarm closed; CatchUpSpread log.", "2026-11-16", "2026-11-16", "Deployed 16 Nov (migration 0114)", T, "Frontend: F02", "-",
-    "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9")
+    "POST /api/catchUpSpread/ (Super_Admin): preview / apply / undo / history. Since 20 Nov: gap = hours without a row "
+    "and ERROR404 hours (stored as 0; RecoveryMonitor.error_hours), offered only when synced again, the next hour in and "
+    "recovery ended; spread hours are real readings (no estimated mark); hourly and daily recalculated; per-hour record "
+    "(CatchUpSpread.hours_detail) and mode manual / automatic; undo for 5 days; recovery replies leave spread hours and "
+    "days alone.", "2026-11-16", "2026-11-20", "Deployed 20 Nov (migration 0115; 20 old spreads converted)", T,
+    "Frontend: F02", "-", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9")
 add("D02", "Alarms verified from hourly data", "Alarms", "Done",
     "High Consumption / Bypassed are counted from the hourly rows (incl. the 2 days before, to find gaps), never from the "
     "stored daily total. Found by a false Bypassed at site 114.", "2026-11-16", "2026-11-16", "Deployed 16 Nov", T, "-", "-",
@@ -257,8 +266,10 @@ add("D13", "Outage alarms open until solved, daily reminder", "Alarms", "Done",
     "of no pings.", "2026-11-02", "2026-11-02", "Deployed 2 Nov", T, "-", "-",
     "docs/alarms/ALARM_CATALOGUE.xlsx (types 14-16)", "df8001b3, 92420365")
 add("D14", "Consumption Spike alarm (17)", "Alarms", "Done",
-    "Meter jump / meter reset / catch-up hours with their cause, one e-mail per site per scan.", "2026-10-30", "2026-11-02",
-    "Deployed 30 Oct", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 17)", "a323f5d6, 6c2cd379")
+    "Meter jump / meter reset / catch-up hours with their cause, one e-mail per site per scan. Since 20 Nov a big hour "
+    "after a gap is a catch-up even above the whole daily baseline (was called a meter jump), and ERROR404 hours count "
+    "as gap.", "2026-10-30", "2026-11-20",
+    "Deployed 30 Oct; detection fix 20 Nov", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 17)", "a323f5d6, 6c2cd379")
 add("D15", "Fewer false alarms (our downtime, data spikes)", "Alarms", "Done",
     "Our own listener restarts and data spikes no longer raise alarms.", "2026-10-30", "2026-10-30", "Deployed 30 Oct", T,
     "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx", "64f7c3f1")
@@ -369,10 +380,13 @@ api("F01", "(not designed) latest gateway health report", "GET", "-", "-",
     "Gateway Status panel (extra columns) or gateway detail", "To decide",
     "Waits on the colleague's gateway_health topic; then decide: new endpoint or extra fields in gateway-status/.")
 # Catch-up spread, baselines
-api("D01, D14, F02", "/api/catchUpSpread/", "POST", "Token, Super_Admin",
-    '{"site_id": 114, "day": "2026/11/16", "legs": ["692"], "apply": false} or {"undo": 12}',
-    "catch_ups[] (gap, missing hours, share, days before / after, warnings), not_spreadable[], spread id",
-    FE + "alarm/catch-up-spread.component.ts (preview, apply, undo); Spread... on Consumption Spike rows", "Done", "-")
+api("D01, D14, F02, O02", "/api/catchUpSpread/", "POST", "Token, Super_Admin",
+    '{"site_id": 114, "day": "2026/11/16", "legs": ["692"], "apply": false} or {"undo": 12} or '
+    '{"site_id": 114, "history": true, "from": "2026/11/01", "to": "2026/11/20"}',
+    "catch_ups[] (gap, empty / no_data hours, share, days before / after, daily average, manual_required, warnings), "
+    "waiting[], not_spreadable[], applied_spreads[] (mode, can_undo, undo_until); history: spreads[] with hours_detail",
+    FE + "alarm/catch-up-spread.component.ts (preview, apply, undo, waiting, history); Spread... on Consumption Spike rows",
+    "Done", "-")
 api("D08, F03", "/api/baselineSetup/", "POST", "Token, Super_Admin", "sample days, aisles, apply flag",
     "per-aisle baselines (preview), errors, warnings, site total", FE + "baseline/baseline-setup.service.ts, baseline-setup.component.ts",
     "Done", "-")
@@ -396,9 +410,10 @@ api("D18, D31, H04", "/api/alarmSettings/", "GET / POST", "Token, Super_Admin",
     "H04: Low Consumption can now be switched on per site here (Auto or Manual).")
 # Data sync / recovery status (read-only)
 api("D33", "/api/syncStatus/", "GET", "Token, Super_Admin", "?site_id=114",
-    "site_id, site_name, total, counts {state: n}, data[]: home_gateway_id, object_type (aisle / power_source), "
-    "object_name, leg_id, power_source, sync_status, last_sync_at, expected_from / expected_to (gap), missing_slots, "
-    "recovered_slots, has_data_loss, last_error, last_recovery_*_at, current_recovery {id, recovery_type, status, attempt}",
+    "site_id, site_name, total, counts {sync: {..}, recovery: {..}}, data[]: home_gateway_id, object_type "
+    "(aisle / power_source), object_name, leg_id, power_source, sync (synced / syncing / unknown), sync_display, "
+    "last_sync_at, recovery (not_needed / recovered / not_received / received), recovery_display, "
+    "last_recovered_at, attempts, max_attempts, last_requested_at",
     FE + "alarm/sync-status.component.ts (site page -> Data sync button)", "Done", "-")
 api("D33", "/api/recoveryHistory/", "GET", "Token, Super_Admin",
     "?site_id=114&status=failed&recovery_type=hourly_consumption&limit=20&offset=0",
@@ -431,13 +446,17 @@ SAMPLES = json.loads(SAMPLES_FILE.read_text()) if SAMPLES_FILE.exists() else {}
 FEATURE_API, ALARM_API, OTHER_API = "Feature APIs", "Alarm APIs", "Not called by the frontend"
 HOW = {
     "/api/catchUpSpread/": (FEATURE_API, "catchUpSpread",
-        "Preview (apply false, changes nothing): finds the site's catch-up hours on that day - the first hour after a "
-        "gap that holds the whole gap's energy - and per aisle returns the gap, the missing hours, the share each "
-        "missing hour would get and each day's total before / after. not_spreadable lists catch-ups that can't be "
-        "spread (and why). apply true (with the ticked legs) writes the spread: missing hours created with "
-        "is_estimated, the catch-up hour lowered, day totals recomputed, the Consumption Spike alarm closed, a "
-        "CatchUpSpread row logged; total energy unchanged. {\"undo\": id} reverses one spread. Super_Admin only "
-        "(403 otherwise)."),
+        "Preview (apply false, changes nothing): the site's catch-up hours on that day - after a gateway service "
+        "stopped, the first hour back carries the gap's energy. Gap = hours without a row and ERROR404 hours (stored "
+        "as 0); real 0 kWh hours are never taken. Per catch-up: gap, empty_hours / no_data_hours, share per hour, "
+        "normal hour, spread day vs the aisle's daily average, day totals before / after, manual_required + warnings "
+        "(share > 3 x normal hour, or spread day outside 0.5-1.5 x the daily average). waiting[] = catch-ups not offered "
+        "yet (aisle not synced, recovery running, next hour not in); not_spreadable[] = gap start unknown. apply true "
+        "(ticked legs) spreads as real readings (manual), recalculates hourly and daily, closes the spike alarm and "
+        "keeps a per-hour record. applied_spreads[]: mode manual (applied_by) / automatic (night job), can_undo and "
+        "undo_until (5 days). {\"undo\": id} reverses a spread within 5 days. {\"history\": true, from, to} lists "
+        "the site's spreads (max 92 days) with hours_detail (at, kind empty / no_data / catch_up, before, after). "
+        "Super_Admin only (403 otherwise)."),
     "/api/baselineSetup/": (FEATURE_API, "baselineSetup",
         "Preview (apply false, changes nothing): per aisle the stored consumption of each sample day, the average, an "
         "override if sent, the proposed baseline and warnings (missing hours, alarms, spikes in the sample); errors "
@@ -516,13 +535,16 @@ HOW = {
         "one type (validated: manual needs threshold > 0 and a type with a unit; 400 {msg} otherwise) and returns "
         "the whole list; mode default deletes the setting. Applies at the next alarm check. Super_Admin only."),
     "/api/syncStatus/": (FEATURE_API, "syncStatus",
-        "Current state of every aisle (consumption) and power source (supply time / load runtime) of the site's "
-        "gateways (AisleSyncRecoveryStatus). States: healthy (data on time) -> late (no packet for 70 min) -> missing "
-        "(130 min); a gap starts recovery: recovery_requested (the server asked the gateway for the missing hours, "
-        "retried up to 3 times) -> recovery_received -> recovered -> healthy, or failed (no answer). counts = rows per "
-        "state; expected_from / expected_to and missing_slots / recovered_slots describe the last gap (kept after "
-        "the row is healthy again: show it as history); has_data_loss = recovered but the gateway had no data for "
-        "some hours (stored as 0). Read-only; Super_Admin only."),
+        "Per aisle (consumption) and power source (supply time / load runtime) of the site's gateways, three cases "
+        "(no gap details): HEALTHY = sync \"synced\", recovery \"not_needed\", last_sync_at = last data message; "
+        "GAP FILLED = sync \"synced\", recovery \"recovered\", last_recovered_at = when the missing data was "
+        "recovered; NO DATA (70 min or more) = sync \"syncing\", recovery \"not_received\", last_sync_at = last data "
+        "before the gap, attempts = how many times the server asked the gateway for this aisle's missing data "
+        "(current gap; 0 = not asked yet; max_attempts = 3), last_requested_at = when it last asked (null when 0). "
+        "recovery \"received\" only for the moment between the gateway's answer and its rows being applied. "
+        "counts = rows per sync value and per recovery value. Mapped from the stored AisleSyncRecoveryStatus "
+        "state: healthy, recovered, then late / missing / recovery_requested / failed = syncing. Read-only; "
+        "Super_Admin only."),
     "/api/recoveryHistory/": (FEATURE_API, "recoveryHistory",
         "The site's recovery requests (RecoveryMonitor), newest first: one row per gap asked from a gateway, with "
         "type (hourly / daily consumption, load runtime), status (requested -> response_received -> applied -> "

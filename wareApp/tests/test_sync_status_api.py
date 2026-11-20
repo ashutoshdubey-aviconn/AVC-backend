@@ -28,21 +28,53 @@ class SyncStatusApiTests(TestCase):
         AisleSyncRecoveryStatus.objects.create(
             site=self.site, home_gateway_id="avc_sync_000001_1", aisle_group=self.aisle, leg_id=leg,
             sync_status="failed", missing_slots=3, last_sync_at=AT, recovery_monitor=self.monitor,
+            last_recovery_requested_at=datetime(2026, 11, 20, 9, 30),
         )
         AisleSyncRecoveryStatus.objects.create(site=self.site, home_gateway_id="avc_sync_000001_1",
-                                               power_source=1, sync_status="healthy", last_sync_at=AT)
+                                               power_source=1, sync_status="healthy", last_sync_at=AT,
+                                               last_recovery_applied_at=datetime(2026, 11, 19, 10, 0))
         self.client = APIClient()
         self.client.force_authenticate(User.objects.create(username="admin", UserType=1))
 
-    def test_sync_status_per_aisle_and_power_source(self):
+    def test_synced_and_syncing_rows(self):
         body = self.client.get("/api/syncStatus/", {"site_id": self.site.id}).json()
-        self.assertEqual((body["total"], body["counts"]["failed"], body["counts"]["healthy"]), (2, 1, 1))
+        self.assertEqual(body["total"], 2)
+        self.assertEqual(body["counts"]["sync"], {"synced": 1, "syncing": 1, "unknown": 0})
+        self.assertEqual(body["counts"]["recovery"], {"not_needed": 1, "recovered": 0, "not_received": 1, "received": 0})
         rows = {row["object_type"]: row for row in body["data"]}
-        aisle = rows["aisle"]
-        self.assertEqual((aisle["object_name"], aisle["sync_status"], aisle["missing_slots"]), ("Aisle A", "failed", 3))
-        self.assertEqual(aisle["current_recovery"]["status"], "failed")
-        self.assertEqual(rows["power_source"]["object_name"], "DG_1")
-        self.assertIsNone(rows["power_source"]["current_recovery"])
+        aisle, source = rows["aisle"], rows["power_source"]
+        # No data: Syncing, recovery Not received, how many times it was asked.
+        self.assertEqual((aisle["object_name"], aisle["sync_display"], aisle["recovery_display"]),
+                         ("Aisle A", "Syncing", "Not received"))
+        self.assertEqual((aisle["attempts"], aisle["max_attempts"]), (3, 3))
+        self.assertTrue(aisle["last_requested_at"].startswith("2026-11-20T09:30"))
+        self.assertIsNone(aisle["last_recovered_at"])
+        # Healthy: Synced, recovery Not needed, last sync time; no attempts.
+        self.assertEqual((source["object_name"], source["sync_display"], source["recovery_display"]),
+                         ("DG_1", "Synced", "Not needed"))
+        self.assertTrue(source["last_sync_at"].startswith("2026-11-20T09:00"))
+        self.assertEqual((source["attempts"], source["last_requested_at"]), (0, None))
+        self.assertTrue(source["last_recovered_at"].startswith("2026-11-19T10:00"))
+        for gone in ("expected_from", "expected_to", "missing_slots", "recovered_slots", "current_recovery", "sync_status"):
+            self.assertNotIn(gone, aisle)
+
+    def test_old_request_is_not_shown_as_an_attempt_for_a_new_gap(self):
+        old = RecoveryMonitor.objects.create(site=self.site, gateway_id="avc_sync_000001_1", power_source=2,
+                                             recovery_type="load_runtime", status="verified", attempt=2,
+                                             missing_from=AT, requested_at=datetime(2026, 11, 6, 11, 0))
+        AisleSyncRecoveryStatus.objects.create(site=self.site, home_gateway_id="avc_sync_000001_1", power_source=2,
+                                               sync_status="missing", recovery_monitor=old,
+                                               last_recovery_requested_at=datetime(2026, 11, 6, 11, 0))
+        body = self.client.get("/api/syncStatus/", {"site_id": self.site.id}).json()
+        row = next(r for r in body["data"] if r["power_source"] == 2)
+        self.assertEqual((row["sync"], row["attempts"], row["last_requested_at"]), ("syncing", 0, None))
+
+    def test_states_map_to_sync_and_recovery(self):
+        from wareApp.views.sync_status import SYNC_VIEW
+        self.assertEqual(SYNC_VIEW["healthy"], ("synced", "not_needed"))
+        self.assertEqual(SYNC_VIEW["recovered"], ("synced", "recovered"))
+        for state in ("late", "missing", "recovery_requested", "failed"):
+            self.assertEqual(SYNC_VIEW[state], ("syncing", "not_received"))
 
     def test_recovery_history_newest_first_filtered_without_payloads(self):
         body = self.client.get("/api/recoveryHistory/", {"site_id": self.site.id}).json()

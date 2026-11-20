@@ -203,14 +203,18 @@ def find_spikes(rows, day_start, daily_baseline):
     spikes, previous = [], None
     for at, kwh in rows:
         if day_start <= at < day_start + timedelta(days=1) and kwh:
-            if daily_baseline and kwh > daily_baseline:
-                spikes.append(Spike(at, kwh, "jump", previous))
-            elif previous is None or at - previous > timedelta(hours=1):
+            catch_up = False
+            # After a gap a big hour is a catch-up, even above the whole daily baseline: it carries
+            # the gap's energy (decided 2026-11-20; before, it was called a meter jump).
+            if previous is None or at - previous > timedelta(hours=1):
                 others = sorted(value for value in today if value != kwh)
                 median = others[len(others) // 2] if others else 0.0
                 minimum = 2 * daily_baseline / 24 if daily_baseline else 1.0
-                if median > 0 and kwh > CATCH_UP_FACTOR * median and kwh > minimum:
-                    spikes.append(Spike(at, kwh, "catch_up", previous))
+                catch_up = median > 0 and kwh > CATCH_UP_FACTOR * median and kwh > minimum
+            if catch_up:
+                spikes.append(Spike(at, kwh, "catch_up", previous))
+            elif daily_baseline and kwh > daily_baseline:
+                spikes.append(Spike(at, kwh, "jump", previous))
         previous = at
     return spikes
 

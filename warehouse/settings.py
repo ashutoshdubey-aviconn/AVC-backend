@@ -386,6 +386,20 @@ if CONSUMPTION_SPIKE_CHECK_SECONDS > 0:
         "options": {"queue": "queue2_processing", "expires": max(CONSUMPTION_SPIKE_CHECK_SECONDS - 10, 10)},
     }
 
+# Automatic catch-up spread (wareApp/catch_up_spread.py, decided 2026-11-20): clear cases only,
+# from CATCH_UP_AUTO_FROM_HOUR to CATCH_UP_AUTO_UNTIL_HOUR every day and all day on Sunday, over the
+# last CATCH_UP_AUTO_DAYS days. 0 seconds = off.
+CATCH_UP_AUTO_SECONDS = config("CATCH_UP_AUTO_SECONDS", default=1800, cast=int)
+CATCH_UP_AUTO_FROM_HOUR = config("CATCH_UP_AUTO_FROM_HOUR", default=19, cast=int)
+CATCH_UP_AUTO_UNTIL_HOUR = config("CATCH_UP_AUTO_UNTIL_HOUR", default=11, cast=int)
+CATCH_UP_AUTO_DAYS = config("CATCH_UP_AUTO_DAYS", default=3, cast=int)
+if CATCH_UP_AUTO_SECONDS > 0:
+    CELERY_BEAT_SCHEDULE["auto-spread-catch-ups"] = {
+        "task": "wareApp.tasks.auto_spread_catch_ups",
+        "schedule": CATCH_UP_AUTO_SECONDS,
+        "options": {"queue": "queue2_processing", "expires": max(CATCH_UP_AUTO_SECONDS - 10, 10)},
+    }
+
 # Closing resolved alarms (wareApp/mqtt/services/alarm_closer.py).
 ALARM_CLOSE_CHECK_SECONDS = config("ALARM_CLOSE_CHECK_SECONDS", default=300, cast=int)
 ALARM_CLOSE_POWER_MINUTES = config("ALARM_CLOSE_POWER_MINUTES", default=60, cast=int)

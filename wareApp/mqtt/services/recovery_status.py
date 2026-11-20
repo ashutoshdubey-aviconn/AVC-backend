@@ -22,7 +22,7 @@ recorded as ``RecoveryMonitor.catch_up_at`` so alarms can skip it.
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db.models import F
@@ -275,6 +275,10 @@ class RecoveryStatusService:
         error_slots = sum(1 for slot in slots if slot.is_error)
         monitor.recovered_slots = len(slots) - error_slots
         monitor.error_slots = error_slots
+        # Which hours had no data on the gateway (a later answer adds to the list).
+        monitor.error_hours = sorted(
+            set(monitor.error_hours or []) | {f"{slot.start:%Y-%m-%dT%H:%M:%S}" for slot in slots if slot.is_error}
+        )
         monitor.applied_at = self.now
         monitor.catch_up_at = self._catch_up_slot(monitor, slots)
         monitor.status = "applied"
@@ -352,3 +356,48 @@ class RecoveryStatusService:
             .distinct()
             .count()
         )
+
+
+# ------------------------------------------------------------ no-data hours
+# ERROR404 hours are stored as 0 kWh rows, so they no longer look like a gap. A catch-up hour
+# after them is still a catch-up (decided 2026-11-20): these helpers tell them from real 0 kWh
+# hours (lights off at night), which must stay as they are.
+def no_data_monitors(site_ids, since, until=None):
+    """``{(site_id, leg_id): [(catch_up_at, error_slots, error_hours)]}``: hourly recoveries whose
+    gateway had no data for some hours, with their catch-up hour in [since, until)."""
+    rows = RecoveryMonitor.objects.filter(
+        site_id__in=list(site_ids), recovery_type=HOURLY_CONSUMPTION, error_slots__gt=0,
+        catch_up_at__gte=since, leg_id__isnull=False,
+    )
+    if until is not None:
+        rows = rows.filter(catch_up_at__lt=until)
+    found = {}
+    for site_id, leg_id, catch_up_at, error_slots, error_hours in rows.values_list(
+        "site_id", "leg_id", "catch_up_at", "error_slots", "error_hours"
+    ):
+        found.setdefault((site_id, str(leg_id)), []).append((catch_up_at, error_slots, error_hours or []))
+    return found
+
+
+def no_data_hours(monitors, values):
+    """Hours of one aisle stored as 0 because the gateway had no data.
+
+    ``monitors``: that aisle's list from ``no_data_monitors``; ``values``: ``{hour start: kWh}``.
+    Uses the ERROR404 hours kept on the request; for older requests (before 2026-11-20) the run
+    of 0 kWh hours right before the catch-up hour, at most ``error_slots`` long. An hour whose
+    value is no longer 0 (real data came later) is not counted.
+    """
+    hours = set()
+    for catch_up_at, error_slots, error_hours in monitors:
+        if error_hours:
+            for text in error_hours:
+                hour = datetime.fromisoformat(text)
+                if values.get(hour) == 0:
+                    hours.add(hour)
+            continue
+        step = catch_up_at - HOUR
+        while error_slots > 0 and values.get(step) == 0:
+            hours.add(step)
+            step -= HOUR
+            error_slots -= 1
+    return hours
