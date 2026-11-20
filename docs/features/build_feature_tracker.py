@@ -179,6 +179,13 @@ add("D32", "'Open for' on the alarm lists", "Alarms / frontend", "Done",
     "orange from 1 day); the super-admin column sorts by days.",
     "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome", T,
     "-", "-", "docs/CHANGELOG.md (20 Nov)", "-")
+add("D34", "Frontend API handoff workbook", "Docs / frontend", "Done",
+    "docs/features/FRONTEND_API_HANDOFF.xlsx for the frontend developer: login and token, every API built in this branch "
+    "(gateway status with Gateway Service issue, catch-up spread preview / apply / undo / history, sync status, recovery "
+    "history, baseline preview / apply / saveBaseline, alarm settings GET / POST, hourly estimated flag, alarm 'Open for'): "
+    "method, URL, auth header, who, request and response fields, real responses from test, errors, how it works, screen, "
+    "values to show.", "2026-11-21", "2026-11-21", "-", "-", "Hand it to the frontend developer.", "-",
+    "docs/features/FRONTEND_API_HANDOFF.xlsx", "-")
 add("D33", "Data sync / recovery status screen", "Recovery / frontend", "Done",
     "Site page -> Data sync (Super Admin), per aisle and power source (no gap details, decided 20 Nov): healthy = "
     "Synced / recovery Not needed / last sync time; gap filled = Synced / Recovered / last recovered time; no "

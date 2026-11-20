@@ -1,5 +1,5 @@
 {
- "_note": "Captured on the test server (20 Nov 2026) as a Super Admin; lists cut to 2 items. Site 114 (Myntra BGLR Inventory Saving), WH-metering site 136, spread day 2026/11/15.",
+ "_note": "Captured on the test server (21 Nov 2026) as a Super Admin; lists cut to 2 items. Site 114 (Myntra BGLR Inventory Saving), WH-metering site 136, spread day 2026/11/15.",
  "_gateways": 73,
  "alarmList": {
   "method": "POST",
@@ -10,14 +10,14 @@
   "http": 200,
   "body": {
    "status": 200,
-   "total_alarm": 28,
-   "high_priority": 28,
+   "total_alarm": 30,
+   "high_priority": 30,
    "medium_priority": 0,
    "active_alarms": 2,
    "data": [
     {
      "name": "Meter Reading Issue",
-     "count": 28,
+     "count": 30,
      "priority": "High",
      "alarm_type": 10
     }
@@ -45,61 +45,11 @@
   "body": {
    "data": [
     {
-     "customer_id": 2,
-     "customer_name": "DelhiVery",
-     "alarm_list": [
-      {
-       "alarm": "Bypassed",
-       "Alarm_priority": 0,
-       "site_id__site_name": "Hassanpur-GGNFC3-GF",
-       "created_time": "2026-11-20T00:00:00",
-       "priority": "High",
-       "site_id": 125,
-       "customer_id": 2,
-       "customer_name": "DelhiVery",
-       "source": "consumption",
-       "aisle_group_id": 724,
-       "aisle_group_name": "GF_FS/BS_R1&BS_R2",
-       "leg_id": "724",
-       "power_source": null,
-       "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
-       "issue": "Bypassed (during the day, 21:46): consumption so far=7.54, threshold=7.51 (100 % of baseline), baseline=7.51.",
-       "open_days": 0,
-       "open_for": "23.9 h",
-       "alarm_type": 11,
-       "last_seen": "2026-11-20T00:00:00",
-       "occurrences": 1
-      },
-      {
-       "alarm": "Bypassed",
-       "Alarm_priority": 0,
-       "site_id__site_name": "Hassanpur-GGNFC3-GF",
-       "created_time": "2026-11-20T00:00:00",
-       "priority": "High",
-       "site_id": 125,
-       "customer_id": 2,
-       "customer_name": "DelhiVery",
-       "source": "consumption",
-       "aisle_group_id": 731,
-       "aisle_group_name": "HB-Part-1_NL",
-       "leg_id": "731",
-       "power_source": null,
-       "home_gateway_id": "avc_GGNFC3gf_Hassnpur_000125_1",
-       "issue": "Bypassed (during the day, 17:25): consumption so far=27.99, threshold=27.96 (100 % of baseline), baseline=27.96.",
-       "open_days": 0,
-       "open_for": "23.9 h",
-       "alarm_type": 11,
-       "last_seen": "2026-11-20T00:00:00",
-       "occurrences": 1
-      }
-     ]
-    },
-    {
      "customer_id": 4,
      "customer_name": "Admin",
      "alarm_list": [
       {
-       "alarm": "Bypassed",
+       "alarm": "High Consumption",
        "Alarm_priority": 0,
        "site_id__site_name": "Yusen Logistics Highbay-Saving Vizag",
        "created_time": "2026-11-20T00:00:00",
@@ -108,21 +58,72 @@
        "customer_id": 4,
        "customer_name": "Admin",
        "source": "consumption",
-       "aisle_group_id": 1260,
-       "aisle_group_name": "HB-LDB2&3",
-       "leg_id": "1260",
+       "aisle_group_id": 1259,
+       "aisle_group_name": "HB-LDB1",
+       "leg_id": "1259",
        "power_source": null,
        "home_gateway_id": "avc_YusenLogistics_vizag_000195_1",
-       "issue": "Bypassed (during the day, 23:32): consumption so far=69.76, threshold=69.62 (100 % of baseline), baseline=69.62.",
-       "open_days": 0,
-       "open_for": "23.9 h",
-       "alarm_type": 11,
+       "issue": "High consumption: consumption=189.74, threshold=153.69, baseline=204.92.",
+       "open_days": 1,
+       "open_for": "1 day 0 h",
+       "alarm_type": 7,
        "last_seen": "2026-11-20T00:00:00",
        "occurrences": 1
       }
      ]
     },
-    "... 9 items in total"
+    {
+     "customer_id": 28,
+     "customer_name": "MyntraTesting",
+     "alarm_list": [
+      {
+       "alarm": "Gateway Disconnected",
+       "Alarm_priority": 0,
+       "site_id__site_name": "Myntra Bhiwandi Inventory Lights",
+       "created_time": "2026-11-18T19:45:17.298294",
+       "priority": "High",
+       "site_id": 109,
+       "customer_id": 28,
+       "customer_name": "MyntraTesting",
+       "source": "gateway",
+       "aisle_group_id": null,
+       "aisle_group_name": null,
+       "leg_id": null,
+       "power_source": null,
+       "home_gateway_id": "avc_myntra_bhiwSvng_000109_2",
+       "issue": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 52.3 h",
+       "open_days": 2,
+       "open_for": "2 days 4 h",
+       "alarm_type": 15,
+       "last_seen": "2026-11-21T00:00:58.944197",
+       "occurrences": 1
+      },
+      {
+       "alarm": "Gateway Disconnected",
+       "Alarm_priority": 0,
+       "site_id__site_name": "Myntra  Kolkata Phase-2 Saving Ext.",
+       "created_time": "2026-11-06T19:45:11.724533",
+       "priority": "High",
+       "site_id": 170,
+       "customer_id": 28,
+       "customer_name": "MyntraTesting",
+       "source": "gateway",
+       "aisle_group_id": null,
+       "aisle_group_name": null,
+       "leg_id": null,
+       "power_source": null,
+       "home_gateway_id": "avc_myn_kolkataSvng_000170_3",
+       "issue": "Gateway avc_myn_kolkataSvng_000170_3: no data and no ping for 340.3 h",
+       "open_days": 14,
+       "open_for": "14 days 4 h",
+       "alarm_type": 15,
+       "last_seen": "2026-11-21T00:00:58.944197",
+       "occurrences": 1
+      },
+      "... 6 items in total"
+     ]
+    },
+    "... 7 items in total"
    ]
   }
  },
@@ -133,13 +134,7 @@
   "http": 200,
   "body": {
    "data": [
-    [
-     {
-      "Alarm_priority": 0,
-      "site_id__site_name": "Hassanpur-GGNFC3-GF",
-      "alarm_count": 2
-     }
-    ],
+    [],
     [],
     "... 21 items in total"
    ]
@@ -154,10 +149,10 @@
   "http": 200,
   "body": {
    "current_date": "2026/11/01",
-   "alarms": 29,
-   "total_unit_consumed": 557096.93,
-   "total_energy_saved": 102632.0,
-   "total_saved_percentage": "14.94"
+   "alarms": 19,
+   "total_unit_consumed": 557241.48,
+   "total_energy_saved": 109909.96,
+   "total_saved_percentage": "15.83"
   }
  },
  "alarmListOnCustomerPage": {
@@ -171,26 +166,25 @@
    "result": "1",
    "data": [
     {
-     "site_id": 71,
-     "site_name": "Myntra Bilaspur Inventory Saving",
+     "site_id": 109,
+     "site_name": "Myntra Bhiwandi Inventory Lights",
      "alarms": {
-      "Bypassed": 2
+      "Meter Reading Issue": 1,
+      "Gateway Disconnected": 1
      },
      "total_alarm_count": 2,
      "site_type": "WH_Energy_Saving"
     },
     {
-     "site_id": 109,
-     "site_name": "Myntra Bhiwandi Inventory Lights",
+     "site_id": 114,
+     "site_name": "Myntra BGLR Inventory Saving",
      "alarms": {
-      "Meter Reading Issue": 1,
-      "Bypassed": 1,
-      "Gateway Disconnected": 1
+      "Meter Reading Issue": 2
      },
-     "total_alarm_count": 3,
+     "total_alarm_count": 2,
      "site_type": "WH_Energy_Saving"
     },
-    "... 6 items in total"
+    "... 5 items in total"
    ]
   }
  },
@@ -212,17 +206,15 @@
      "type": "column"
     },
     {
-     "name": "Bypassed",
+     "name": "Gateway Disconnected",
      "data": [
-      3
+      2
      ],
      "type": "column"
-    },
-    "... 3 items in total"
+    }
    ],
    "alarm_name_list": [
     "Meter Reading Issue",
-    "Bypassed",
     "Gateway Disconnected"
    ]
   }
@@ -236,9 +228,9 @@
   "http": 200,
   "body": {
    "result": 1,
-   "alarms": 9,
-   "energy_consumed": 3048628.5,
-   "saved_energy": 13373661.4,
+   "alarms": 6,
+   "energy_consumed": 3052941.3,
+   "saved_energy": 13391121.8,
    "percentage_saved": "81.4 %"
   }
  },
@@ -253,12 +245,12 @@
   "body": {
    "result": 1,
    "alarms": 2,
-   "energy_consumed": "541432.6",
-   "saved_energy": "1940769.2",
+   "energy_consumed": "542202.7",
+   "saved_energy": "1943208.4",
    "carbon_emission_saved": "0.0",
    "percentage_saved": "78.2 %",
    "live_date": "01-Mar-2024",
-   "previous_date": "19-Nov-2026",
+   "previous_date": "20-Nov-2026",
    "site_live_date": "2024-02-22T12:17:51"
   }
  },
@@ -336,7 +328,7 @@
      "status": false,
      "health": "offline",
      "health_since": "2026-11-18T19:45:17.298294",
-     "health_detail": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 52.1 h",
+     "health_detail": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 52.3 h",
      "site_id": 109,
      "site_name": "Myntra Bhiwandi Inventory Lights",
      "customer_name": "MyntraTesting"
@@ -385,7 +377,7 @@
   "url": "/api/catchUpSpread/",
   "request": {
    "site_id": 114,
-   "day": "2026/11/20",
+   "day": "2026/11/21",
    "apply": false
   },
   "http": 200,
@@ -395,45 +387,7 @@
    "catch_ups": [],
    "waiting": [],
    "not_spreadable": [],
-   "applied_spreads": [
-    {
-     "id": 51,
-     "leg_id": "672",
-     "aisle_name": "F3-D-Block",
-     "catch_up_at": "2026/11/20 10:00",
-     "original_kwh": 4.45,
-     "gap_from": "2026/11/20 05:00",
-     "hours": 6,
-     "share_kwh": 0.742,
-     "mode": "automatic",
-     "applied_by": "automatic",
-     "applied_at": "2026/11/20 23:52",
-     "undone_at": null,
-     "undo_until": "2026/11/25 23:52",
-     "can_undo": true,
-     "empty_hours": 5,
-     "no_data_hours": 0
-    },
-    {
-     "id": 52,
-     "leg_id": "674",
-     "aisle_name": "F3-I&H Block",
-     "catch_up_at": "2026/11/20 10:00",
-     "original_kwh": 0.94,
-     "gap_from": "2026/11/20 05:00",
-     "hours": 6,
-     "share_kwh": 0.156,
-     "mode": "automatic",
-     "applied_by": "automatic",
-     "applied_at": "2026/11/20 23:52",
-     "undone_at": null,
-     "undo_until": "2026/11/25 23:52",
-     "can_undo": true,
-     "empty_hours": 5,
-     "no_data_hours": 0
-    },
-    "... 19 items in total"
-   ]
+   "applied_spreads": []
   }
  },
  "baselineSetup": {
@@ -1232,6 +1186,319 @@
      "catch_up_at": null,
      "is_active": false
     }
+   ]
+  }
+ },
+ "gateway-status-health": {
+  "method": "GET",
+  "url": "/api/gateway-status/",
+  "request": {
+   "limit": 1000
+  },
+  "http": 200,
+  "body": {
+   "status": 200,
+   "count": 73,
+   "limit": 1000,
+   "offset": 0,
+   "results": [
+    {
+     "id": 1,
+     "gateway_id": "avc_purplleOldInvt_farukhnagar_000135_1",
+     "latitude": null,
+     "longitude": null,
+     "status": true,
+     "health": "online",
+     "health_since": null,
+     "health_detail": null,
+     "site_id": 135,
+     "site_name": "Purplle GGN Inventory",
+     "customer_name": "Purplle"
+    },
+    {
+     "id": 2,
+     "gateway_id": "avc_myntra_bhiwSvng_000109_2",
+     "latitude": null,
+     "longitude": null,
+     "status": false,
+     "health": "offline",
+     "health_since": "2026-11-18T19:45:17.298294",
+     "health_detail": "Gateway avc_myntra_bhiwSvng_000109_2: no data and no ping for 52.3 h",
+     "site_id": 109,
+     "site_name": "Myntra Bhiwandi Inventory Lights",
+     "customer_name": "MyntraTesting"
+    },
+    "... 3 items in total"
+   ]
+  }
+ },
+ "syncStatus-syncing": {
+  "method": "GET",
+  "url": "/api/syncStatus/",
+  "request": {
+   "site_id": 109
+  },
+  "http": 200,
+  "body": {
+   "status": 200,
+   "site_id": 109,
+   "site_name": "Myntra Bhiwandi Inventory Lights",
+   "total": 47,
+   "counts": {
+    "sync": {
+     "synced": 27,
+     "syncing": 20,
+     "unknown": 0
+    },
+    "recovery": {
+     "not_needed": 27,
+     "recovered": 0,
+     "not_received": 20,
+     "received": 0
+    }
+   },
+   "data": [
+    {
+     "id": 405,
+     "home_gateway_id": "avc_myntra_bhiwSvng_000109_1",
+     "object_type": "aisle",
+     "object_name": "F1-1P-PH1&PH2",
+     "leg_id": "645",
+     "power_source": null,
+     "sync": "synced",
+     "sync_display": "Synced",
+     "last_sync_at": "2026-11-20T23:00:00",
+     "recovery": "not_needed",
+     "recovery_display": "Not needed",
+     "last_recovered_at": "2026-11-18T15:56:33.540563",
+     "attempts": 0,
+     "max_attempts": 3,
+     "last_requested_at": null
+    },
+    {
+     "id": 532,
+     "home_gateway_id": "avc_myntra_bhiwSvng_000109_2",
+     "object_type": "aisle",
+     "object_name": "F1&F2-Inward Area",
+     "leg_id": "650",
+     "power_source": null,
+     "sync": "syncing",
+     "sync_display": "Syncing",
+     "last_sync_at": "2026-11-17T19:00:00",
+     "recovery": "not_received",
+     "recovery_display": "Not received",
+     "last_recovered_at": "2026-10-26T11:25:29.196609",
+     "attempts": 3,
+     "max_attempts": 3,
+     "last_requested_at": "2026-11-18T14:21:37.412717"
+    }
+   ]
+  }
+ },
+ "recoveryHistory-syncing": {
+  "method": "GET",
+  "url": "/api/recoveryHistory/",
+  "request": {
+   "site_id": 109,
+   "limit": 2
+  },
+  "http": 200,
+  "body": {
+   "status": 200,
+   "site_id": 109,
+   "count": 1147,
+   "limit": 2,
+   "offset": 0,
+   "results": [
+    {
+     "id": 27283,
+     "recovery_type": "hourly_consumption",
+     "recovery_type_display": "Hourly Consumption",
+     "status": "failed",
+     "gateway_id": "avc_myntra_bhiwSvng_000109_1",
+     "object_name": "F1-1P-PH1&PH2",
+     "leg_id": "645",
+     "power_source": null,
+     "missing_from": "2026-11-18T20:00:00",
+     "missing_to": "2026-11-20T14:00:00",
+     "expected_slots": 42,
+     "recovered_slots": 0,
+     "error_slots": 0,
+     "attempt": 3,
+     "requested_at": "2026-11-20T14:44:58.646592",
+     "response_received_at": null,
+     "applied_at": null,
+     "verified_at": null,
+     "failed_reason": "No response after 3 attempts",
+     "catch_up_at": null,
+     "is_active": false
+    },
+    {
+     "id": 27388,
+     "recovery_type": "hourly_consumption",
+     "recovery_type_display": "Hourly Consumption",
+     "status": "failed",
+     "gateway_id": "avc_myntra_bhiwSvng_000109_1",
+     "object_name": "F4-ST04",
+     "leg_id": "619",
+     "power_source": null,
+     "missing_from": "2026-11-18T20:00:00",
+     "missing_to": "2026-11-20T14:00:00",
+     "expected_slots": 42,
+     "recovered_slots": 0,
+     "error_slots": 0,
+     "attempt": 3,
+     "requested_at": "2026-11-20T14:44:58.637622",
+     "response_received_at": null,
+     "applied_at": null,
+     "verified_at": null,
+     "failed_reason": "No response after 3 attempts",
+     "catch_up_at": null,
+     "is_active": false
+    }
+   ]
+  }
+ },
+ "catchUpSpread-spread-day": {
+  "method": "POST",
+  "url": "/api/catchUpSpread/",
+  "request": {
+   "site_id": 114,
+   "day": "2026/11/16",
+   "apply": false
+  },
+  "http": 200,
+  "body": {
+   "status": 200,
+   "applied": false,
+   "catch_ups": [],
+   "waiting": [],
+   "not_spreadable": [],
+   "applied_spreads": [
+    {
+     "id": 1,
+     "leg_id": "692",
+     "aisle_name": "F1-Outward&Hub area",
+     "catch_up_at": "2026/11/16 09:00",
+     "original_kwh": 43.6,
+     "gap_from": "2026/11/14 20:00",
+     "hours": 38,
+     "share_kwh": 1.147,
+     "mode": "manual",
+     "applied_by": "AVCadmin",
+     "applied_at": "2026/11/17 11:48",
+     "undone_at": null,
+     "undo_until": "2026/11/22 11:48",
+     "can_undo": true,
+     "empty_hours": 37,
+     "no_data_hours": 0
+    },
+    {
+     "id": 2,
+     "leg_id": "672",
+     "aisle_name": "F3-D-Block",
+     "catch_up_at": "2026/11/16 09:00",
+     "original_kwh": 31.17,
+     "gap_from": "2026/11/14 20:00",
+     "hours": 38,
+     "share_kwh": 0.82,
+     "mode": "manual",
+     "applied_by": "AVCadmin",
+     "applied_at": "2026/11/20 13:23",
+     "undone_at": null,
+     "undo_until": "2026/11/25 13:23",
+     "can_undo": true,
+     "empty_hours": 37,
+     "no_data_hours": 0
+    },
+    "... 20 items in total"
+   ]
+  }
+ },
+ "catchUpSpread-history": {
+  "method": "POST",
+  "url": "/api/catchUpSpread/",
+  "request": {
+   "site_id": 114,
+   "history": true,
+   "from": "2026/11/14",
+   "to": "2026/11/21"
+  },
+  "http": 200,
+  "body": {
+   "status": 200,
+   "site_id": 114,
+   "from": "2026/11/14",
+   "to": "2026/11/21",
+   "count": 69,
+   "spreads": [
+    {
+     "id": 69,
+     "leg_id": "923",
+     "aisle_name": "New-Expansion-Area-EL-GF~SF",
+     "catch_up_at": "2026/11/20 10:00",
+     "original_kwh": 3.75,
+     "gap_from": "2026/11/20 05:00",
+     "hours": 6,
+     "share_kwh": 0.626,
+     "mode": "automatic",
+     "applied_by": "automatic",
+     "applied_at": "2026/11/20 23:52",
+     "undone_at": null,
+     "undo_until": "2026/11/25 23:52",
+     "can_undo": true,
+     "empty_hours": 5,
+     "no_data_hours": 0,
+     "hours_detail": [
+      {
+       "at": "2026-11-20T05:00:00",
+       "kind": "empty",
+       "after": 0.625646,
+       "before": null
+      },
+      {
+       "at": "2026-11-20T06:00:00",
+       "kind": "empty",
+       "after": 0.625646,
+       "before": null
+      },
+      "... 6 items in total"
+     ]
+    },
+    {
+     "id": 68,
+     "leg_id": "922",
+     "aisle_name": "New-Expansion-Area-NL-GF~SF",
+     "catch_up_at": "2026/11/20 10:00",
+     "original_kwh": 5.07,
+     "gap_from": "2026/11/20 05:00",
+     "hours": 6,
+     "share_kwh": 0.846,
+     "mode": "automatic",
+     "applied_by": "automatic",
+     "applied_at": "2026/11/20 23:52",
+     "undone_at": null,
+     "undo_until": "2026/11/25 23:52",
+     "can_undo": true,
+     "empty_hours": 5,
+     "no_data_hours": 0,
+     "hours_detail": [
+      {
+       "at": "2026-11-20T05:00:00",
+       "kind": "empty",
+       "after": 0.845625,
+       "before": null
+      },
+      {
+       "at": "2026-11-20T06:00:00",
+       "kind": "empty",
+       "after": 0.845625,
+       "before": null
+      },
+      "... 6 items in total"
+     ]
+    },
+    "... 69 items in total"
    ]
   }
  }

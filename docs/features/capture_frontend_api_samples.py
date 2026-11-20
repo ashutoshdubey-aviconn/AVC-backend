@@ -14,7 +14,7 @@ Lists of objects are cut to 2 items (+ a note with the full count); lists of num
 """
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from rest_framework.test import APIClient
@@ -25,6 +25,8 @@ SITE_ID = 114              # Myntra BGLR Inventory Saving: alarms, spread hours 
 WH_SITE_ID = 136           # PPL GGN WHTM (WH-metering)
 SPREAD_DAY = "2026/11/15"  # a day with spread (estimated) hours at site 114
 TODAY = date.today().strftime("%Y/%m/%d")
+WEEK_AGO = (date.today() - timedelta(days=7)).strftime("%Y/%m/%d")
+SYNCING_SITE_ID = 109      # Myntra Bhiwandi Inventory Lights: a gateway offline, aisles syncing
 
 
 def trim(value, depth=0):
@@ -73,7 +75,34 @@ CALLS = [
     ("alarmSettings", "GET", "alarmSettings/", {"site_id": SITE_ID}),
     ("syncStatus", "GET", "syncStatus/", {"site_id": SITE_ID}),
     ("recoveryHistory", "GET", "recoveryHistory/", {"site_id": SITE_ID, "limit": 2}),
+    # Extra examples for the frontend handoff workbook (build_frontend_api_handoff.py).
+    ("gateway-status-health", "GET", "gateway-status/", {"limit": 1000}),
+    ("syncStatus-syncing", "GET", "syncStatus/", {"site_id": SYNCING_SITE_ID}),
+    ("recoveryHistory-syncing", "GET", "recoveryHistory/", {"site_id": SYNCING_SITE_ID, "limit": 2}),
+    ("catchUpSpread-spread-day", "POST", "catchUpSpread/", {"site_id": SITE_ID, "day": "2026/11/16", "apply": False}),
+    ("catchUpSpread-history", "POST", "catchUpSpread/", {"site_id": SITE_ID, "history": True,
+                                                        "from": WEEK_AGO, "to": TODAY}),
 ]
+
+
+def _one_of_each(rows, key, values):
+    """First row for each value of ``key`` (an example of every state)."""
+    picked = []
+    for value in values:
+        picked += [row for row in rows if row.get(key) == value][:1]
+    return picked
+
+
+# Before trimming: keep one example of every state.
+PICK = {
+    "gateway-status-health": lambda body: {
+        **body, "limit": 1000,
+        "results": _one_of_each(body.get("results", []), "health", ["online", "offline", "modbus_issue"]),
+    },
+    "syncStatus-syncing": lambda body: {
+        **body, "data": _one_of_each(body.get("data", []), "sync", ["synced", "syncing"]),
+    },
+}
 
 out = {
     "_note": f"Captured on the test server ({date.today():%d %b %Y}) as a Super Admin; lists cut to 2 items. "
@@ -91,6 +120,8 @@ for name, method, path, body in CALLS:
             data = response.json()
         except ValueError:
             data = response.content.decode(errors="replace")[:300]
+        if name in PICK and isinstance(data, dict):
+            data = PICK[name](data)
         out[name] = {"method": method, "url": url, "request": body, "http": response.status_code, "body": trim(data)}
     except Exception as error:  # keep going: one failing API must not hide the others
         out[name] = {"method": method, "url": url, "request": body, "error": repr(error)[:300]}
