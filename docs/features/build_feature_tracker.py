@@ -1,4 +1,5 @@
-"""Build the feature tracker: FEATURE_TRACKER.xlsx and .csv (every feature: done, in progress, waiting, planned).
+"""Build the feature tracker: FEATURE_TRACKER.xlsx and .csv (every feature: done, in progress, waiting, planned),
+plus the "Frontend APIs" sheet / FRONTEND_APIS.csv (every API a feature uses and how the frontend handles it).
 
     python3 docs/features/build_feature_tracker.py
 
@@ -15,7 +16,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 HERE = pathlib.Path(__file__).resolve().parent
-UPDATED = "2026-11-19"
+UPDATED = "2026-11-20"
 
 # Status -> (meaning, cell colour). Order = order of the Summary sheet.
 STATUSES = {
@@ -159,6 +160,13 @@ add("D28", "Colleague's code vs main's code", "Docs / merge", "Done",
     "login has no rate limit and re-activates disabled users.",
     "2026-11-19", "2026-11-19", "-", "-", "Not run: confirm by running his code on a copy of main's DB with the frontend.", "-",
     "docs/merge/COLLEAGUE_VS_MAIN.md", "-")
+add("D30", "Gateway Status panel: Gateway Service issue", "Alarms / frontend", "Done",
+    "gateway-status/ adds health (online / offline / modbus_issue) with health_since / health_detail, from the open "
+    "Gateway Disconnected (15) and Gateway Service / Modbus Issue (16) alarms; status (bool) unchanged. Dashboard panel: "
+    "\"Gateway Service issue\" filter + count and an amber badge with the alarm text as tooltip; sorted offline, "
+    "Gateway Service issue, online (label renamed from \"Modbus issue\" the same day at the user's request).",
+    "2026-11-20", "2026-11-20", "Deployed 20 Nov; checked in Chrome (69 / 3 / 1: site 119)", T,
+    "Frontend: commit in Aviconncorp-new-migrated-frontend", "-", "docs/CHANGELOG.md (20 Nov)", "-")
 add("D29", "Three-way comparison: main / ours / colleague", "Docs / merge", "Done",
     "Side by side of main's code, ours and the colleague's: API contract for every pair (ours replacing main: 4 frontend "
     "APIs differ, all deliberate fixes; colleague replacing main 42 / ours 40), DB, DG fuel, LoadData, MQTT, alarms, "
@@ -262,7 +270,120 @@ add("D23", "Alarm catalogue and MQTT flow docs", "Docs", "Done",
     "docs/alarms/, docs/mqtt-flows/", "8a760a89, 9a0877be")
 
 
-def write_sheet(book, title, columns, rows, status_col=None, first=False):
+# ---- Frontend APIs: what each feature exposes and how the frontend handles it ----------------------
+# Frontend status -> (meaning, colour).
+FE_STATUSES = {
+    "Done": ("The frontend calls it and shows what the feature needs.", "C6EFCE"),
+    "To build": ("The API exists (or needs a small change); the frontend part is not built yet.", "FFEB9C"),
+    "To decide": ("No API yet: what to build needs a decision (named in 'Next step').", "F8CBAD"),
+    "Not frontend": ("Called by a gateway, a provider or a script, not by the frontend.", "D9D9D9"),
+    "Not used": ("The API exists but no frontend screen calls it.", "EDEDED"),
+}
+API_COLUMNS = [
+    ("Feature IDs", 12), ("Endpoint", 30), ("Method", 8), ("Auth", 16), ("Request", 34),
+    ("Response (what the frontend reads)", 46), ("Frontend screen / file", 40), ("Frontend status", 14),
+    ("Next step for the frontend", 46),
+]
+A = []
+FE = "Aviconncorp-new-migrated-frontend/src/app/"
+
+
+def api(*row):
+    assert len(row) == len(API_COLUMNS), row[:2]
+    assert row[7] in FE_STATUSES, row[7]
+    A.append(list(row))
+
+
+# Alarm lists
+api("D12, D16, D17, D19, D24, N01", "/api/alarmList/", "POST", "Token", '{"siteId": 114}',
+    "total_alarm, high_priority, medium_priority, active_alarms (one line per type, active only)",
+    FE + "alarm/alarm.component.ts, warehouse/warehouse.component.ts (siteAlarmList)", "Done",
+    "N01: types 3 / 4 / 5 will show here once raised; no frontend change.")
+api("D12, D14, D16, D24", "/api/alarmListDetail/", "POST", "Token", '{"siteId": 114, "alarm_type": 10}',
+    "data[]: type, priority, aisle_group, issue, created, last_seen, occurrences, is_active",
+    FE + "alarm/alarm.component.ts (siteAlarmDetail)", "Done", "-")
+api("D13", "/api/alarmListDetail/ (open_days, open_for)", "POST", "Token", '{"siteId": 114, "alarm_type": 15}',
+    "open_days, open_for of each row (returned today, not shown)", FE + "alarm/alarm.component.ts (detail table)",
+    "To build", "Add an 'Open for' column ('3 days') for outage alarms 14 / 15 / 16.")
+api("D12, D26", "/api/alarmTypeApi/", "POST", "Token, Super_Admin", "{}",
+    "data[]: customer_id, customer_name, alarm_list[] (site, aisle, type, priority, issue)",
+    FE + "super-admin/super-admin.component.ts (allAlarmsByCustomer)", "Done", "-")
+api("D13", "/api/alarmTypeApi/ (open_days, open_for)", "POST", "Token, Super_Admin", "{}",
+    "alarm_list[].open_days, open_for (returned today, not shown)", FE + "super-admin/super-admin.component.ts",
+    "To build", "Show 'Open for' in the super-admin alarm list.")
+api("D26", "/api/alarmapi/", "POST", "Token", "{}", "data[][]: Alarm_priority, site_id__site_name, alarm_count",
+    FE + "alarm/alarm-api.service.ts (alarmCounts) - no screen calls it", "Not used",
+    "Superseded by alarmTypeApi/ on the super-admin page; drop from the service or keep for later.")
+api("D26", "/api/snapshot/", "POST", "Token", '{"user_id": 1, "start_date": "YYYY/MM/DD", "end_date": "YYYY/MM/DD"}',
+    "alarms, total_unit_consumed, total_energy_saved, total_saved_percentage",
+    FE + "super-admin/super-admin.component.ts (superAdminSnapshot), services/user.service.ts", "Done", "-")
+api("D07, D26", "/api/alarmListOnCustomerPage/", "POST", "Token", '{"id": <customer user id>}',
+    "data[]: site_id, site_name, alarms {type: count}, total_alarm_count, site_type",
+    FE + "customer-dashboard/customer-dashboard.component.ts (customerSiteAlarms)", "Done", "-")
+api("D07, D26", "/api/getCustAlarmGraph/", "POST", "Token", '{"id": <customer user id>}',
+    "Data[]: name, data [count]; alarm_name_list",
+    FE + "customer-dashboard/customer-dashboard.component.ts (customerAlarmGraph)", "Done", "-")
+api("D07, D26", "/api/customerSnapShotEnergySavingApi/", "POST", "Token", "(customer snapshot request)",
+    "energy figures + alarms (open alarm count)", FE + "services/user.service.ts (customer dashboard)", "Done", "-")
+api("D07, D26", "/api/siteSnapShotEnergySavingApi/", "POST", "Token", '{"site_id": 183, "user_type": 1}',
+    "energy figures + alarms (open alarm count of the site)", FE + "services/user.service.ts (site page ALARMS tile)",
+    "Done", "-")
+api("D07", "/api/alarmListOnSitePage/", "POST", "Token", '{"site_id": 114}',
+    "data[]: alarm_type, object_type, object_name, alarm_priority, created_date", "- (no screen calls it)", "Not used",
+    "The site page uses alarmList/ + alarmListDetail/ instead.")
+api("H04", "/api/consumptionAlarms/", "POST", "Token", '{"site_id": 134, "start_date": "...", "end_date": "..."}',
+    "data[]: id, alarm_type (High / Low Consumption), priority, aisle_group, created_time",
+    FE + "alarm/alarm-api.service.ts (consumptionAlarms) - no screen calls it", "Not used",
+    "Low Consumption (H04) is on hold; High / Low already show in alarmList/.")
+# Gateway / meter state
+api("D16, D30", "/api/gateway-status/", "GET", "None (AllowAny)", "?limit=1000&offset=0",
+    "results[]: gateway_id, status, health (online / offline / modbus_issue), health_since, health_detail, site_id, site_name, customer_name",
+    FE + "alarm/gateway-status.component.ts (dashboard Gateway Status panel)", "Done",
+    "Label 'Gateway Service issue' for health = modbus_issue.")
+api("D16", "/api/meter-disconnections/", "GET", "Token", "?site_id=&meter_id=&status=&from=&to=&limit=&offset=",
+    "count, limit, offset, results[]: meter_id, meter_number, meter_name, status, last_seen_at",
+    FE + "alarm/alarm.component.ts (meterDisconnections)", "Done", "-")
+api("F01", "(not designed) latest gateway health report", "GET", "-", "-",
+    "Proposed: temperature, CPU, RAM, PostgreSQL / service states (e.g. pymodbus.service) per gateway",
+    "Gateway Status panel (extra columns) or gateway detail", "To decide",
+    "Waits on the colleague's gateway_health topic; then decide: new endpoint or extra fields in gateway-status/.")
+# Catch-up spread, baselines
+api("D01, D14, F02", "/api/catchUpSpread/", "POST", "Token, Super_Admin",
+    '{"site_id": 114, "day": "2026/11/16", "legs": ["692"], "apply": false} or {"undo": 12}',
+    "catch_ups[] (gap, missing hours, share, days before / after, warnings), not_spreadable[], spread id",
+    FE + "alarm/catch-up-spread.component.ts (preview, apply, undo); Spread... on Consumption Spike rows", "Done", "-")
+api("D08, F03", "/api/baselineSetup/", "POST", "Token, Super_Admin", "sample days, aisles, apply flag",
+    "per-aisle baselines (preview), errors, warnings, site total", FE + "baseline/baseline-setup.service.ts, baseline-setup.component.ts",
+    "Done", "-")
+api("D08", "/api/saveBaseline/", "POST", "Token", "baseline values per aisle",
+    "status (first baseline no longer crashes)", FE + "baseline/baseline.component.ts, services/data.service.ts", "Done", "-")
+# Hourly charts: estimated hours
+api("F04", "/api/hourlySavingData/", "POST", "Token", "site, date range",
+    "hourly bars; to add: is_estimated per hour", FE + "services/user.service.ts (warehouse hourly chart)", "To build",
+    "Backend: return is_estimated. Frontend: draw spread hours hatched / lighter, with a legend.")
+api("F04", "/api/submeteringHourlyData/", "POST", "Token", "site, date range",
+    "hourly bars; to add: is_estimated per hour", FE + "submetering/submetering.component.ts", "To build",
+    "Same as hourlySavingData/.")
+api("F04", "/api/getSiteHourlyConsumptionData/", "POST", "Token", "site, date range",
+    "hourly bars; to add: is_estimated per hour", FE + "wh-metering/wh-metering.component.ts, baseline/baseline.component.ts",
+    "To build", "Same as hourlySavingData/.")
+# Alarm settings: no API yet
+api("D18, H03, H04", "(none) alarm settings per site: Auto / Manual / Off", "-", "-", "-",
+    "AlarmSetting (site, alarm type, mode, manual threshold); recipients by team",
+    "- (set in Django admin today)", "To decide",
+    "Decide whether admins should change alarm settings from the frontend; if yes, needs a new GET / POST API.")
+# Not called by the frontend
+api("F11", "/api/createCustomer/, createSite/, createAisleGroups/, createHomeGatewayId/", "POST", "None (open)",
+    "provisioning payload", "created ids", "- (provisioning script)", "Not frontend",
+    "Backend fix (F11): require login and take the password from the request.")
+api("F08", "/api/dgFuelAlerts/, /api/dgFuelPushInterface/", "POST", "None (provider)", "provider payload",
+    "status", "- (fuel providers)", "Not frontend", "-")
+api("D16", "/api/meter-disconnections/ingest/", "POST", "None (gateway)", "meter events", "saved count",
+    "- (gateway)", "Not frontend", "-")
+
+
+def write_sheet(book, title, columns, rows, status_col=None, first=False, colours=None):
+    colours = colours or STATUSES
     ws = book.active if first else book.create_sheet()
     ws.title = title
     thin = Side(style="thin", color="BFBFBF")
@@ -277,8 +398,8 @@ def write_sheet(book, title, columns, rows, status_col=None, first=False):
             cell = ws.cell(row=r, column=c, value=value)
             cell.alignment = Alignment(wrap_text=True, vertical="top")
             cell.border = Border(top=thin, bottom=thin, left=thin, right=thin)
-        if status_col is not None and row[status_col] in STATUSES:
-            ws.cell(row=r, column=status_col + 1).fill = PatternFill("solid", fgColor=STATUSES[row[status_col]][1])
+        if status_col is not None and row[status_col] in colours:
+            ws.cell(row=r, column=status_col + 1).fill = PatternFill("solid", fgColor=colours[row[status_col]][1])
     ws.freeze_panes = "C2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(rows) + 1}"
 
@@ -291,21 +412,41 @@ def main():
     summary.append(["Total", len(F), f"Updated {UPDATED}", ""])
     write_sheet(book, "Summary", [("Status", 20), ("Count", 8), ("Meaning", 60), ("IDs", 60)], summary, status_col=0, first=True)
     order = list(STATUSES)
-    rows = sorted(F, key=lambda row: order.index(row[3]))
-    write_sheet(book, "Features", COLUMNS, rows, status_col=3)
+    # "Frontend APIs" column (after "Main server"), from the Frontend APIs sheet.
+    known = {row[0] for row in F}
+    for row in A:
+        assert {i.strip() for i in row[0].split(",")} <= known, row[:2]
+    columns = COLUMNS[:9] + [("Frontend APIs", 40)] + COLUMNS[9:]
+    rows = []
+    for row in sorted(F, key=lambda row: order.index(row[3])):
+        apis = [f"{a[1]} ({a[7]})" for a in A if row[0] in {i.strip() for i in a[0].split(",")}]
+        rows.append(row[:9] + ["; ".join(apis) or "-"] + row[9:])
+    write_sheet(book, "Features", columns, rows, status_col=3)
+    write_sheet(book, "Frontend APIs", API_COLUMNS, A, status_col=7, colours=FE_STATUSES)
+    fe_counts = Counter(row[7] for row in A)
+    write_sheet(book, "Frontend API status", [("Frontend status", 16), ("APIs", 8), ("Meaning", 70)],
+                [[status, fe_counts.get(status, 0), meaning] for status, (meaning, _) in FE_STATUSES.items()],
+                status_col=0, colours=FE_STATUSES)
     write_sheet(book, "How to update", [("Step", 6), ("What to do", 110)], [
         [1, "Edit FEATURES in docs/features/build_feature_tracker.py (one add(...) per feature) and set UPDATED."],
         [2, "New idea / request: add a row (F = open, H = on hold, N = not started, O = out of scope, D = done) with status Planned."],
         [3, "When it moves on: change Status, Last update, Test server / Main server, Next step and Waiting on; keep the ID."],
         [4, "When it is done: status Done, link its doc and commit, and add a row to docs/CHANGELOG.md."],
-        [5, "Run: python3 docs/features/build_feature_tracker.py (writes FEATURE_TRACKER.xlsx and .csv)."],
+        [5, "API added / changed / built in the frontend: edit A (one api(...) per endpoint, with the feature IDs) - the "
+            "Features sheet's 'Frontend APIs' column is filled from it."],
+        [6, "Run: python3 docs/features/build_feature_tracker.py (writes FEATURE_TRACKER.xlsx, .csv and FRONTEND_APIS.csv)."],
     ])
     book.save(HERE / "FEATURE_TRACKER.xlsx")
     with open(HERE / "FEATURE_TRACKER.csv", "w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow([name for name, _ in COLUMNS])
+        writer.writerow([name for name, _ in columns])
         writer.writerows(rows)
-    print(f"{len(F)} features ({', '.join(f'{s} {n}' for s, n in counts.items())}) -> {HERE / 'FEATURE_TRACKER.xlsx'}")
+    with open(HERE / "FRONTEND_APIS.csv", "w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow([name for name, _ in API_COLUMNS])
+        writer.writerows(A)
+    print(f"{len(F)} features ({', '.join(f'{s} {n}' for s, n in counts.items())}); "
+          f"{len(A)} APIs ({', '.join(f'{s} {n}' for s, n in fe_counts.items())}) -> {HERE / 'FEATURE_TRACKER.xlsx'}")
 
 
 if __name__ == "__main__":

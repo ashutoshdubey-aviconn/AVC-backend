@@ -1,5 +1,6 @@
 """Site/gateway health: pings, gateway status, meter disconnections."""
 
+import re
 from collections import defaultdict
 
 from django.utils.dateparse import parse_datetime
@@ -10,6 +11,7 @@ from rest_framework.views import APIView
 
 from wareApp.models import (
     AisleGroup,
+    AlarmNotifications,
     CustomerSiteManager,
     DailySiteReading,
     HomeGatewayId,
@@ -500,7 +502,54 @@ class MeterDisconnectionListView(APIView):
         )
 
 
+# Gateway health alarms start their text with "Gateway <hgw_id>: ..."
+# (wareApp/mqtt/services/gateway_health.py); the alarm may be stored under a
+# merged site, so the gateway is matched by this id, not by site.
+_GATEWAY_ALARM_TEXT = re.compile(r"^Gateway (?P<hgw_id>\S+):")
+GATEWAY_HEALTH_ONLINE = "online"
+GATEWAY_HEALTH_OFFLINE = "offline"
+GATEWAY_HEALTH_MODBUS = "modbus_issue"
+
+
+def open_gateway_alarms():
+    """``{hgw_id: (health, since, detail)}`` from the open Gateway Disconnected
+    (15) and Gateway Service / Modbus Issue (16) alarms. 15 wins over 16."""
+    found = {}
+    rows = (
+        AlarmNotifications.objects.filter(
+            is_active=True,
+            Alarm_type__in=(
+                AlarmNotifications.GATEWAY_DISCONNECTED,
+                AlarmNotifications.GATEWAY_SERVICE_ISSUE,
+            ),
+        )
+        .order_by("created_time")
+        .values_list("Alarm_type", "created_time", "to_do")
+    )
+    for alarm_type, since, text in rows:
+        match = _GATEWAY_ALARM_TEXT.match(text or "")
+        if not match:
+            continue
+        health = (
+            GATEWAY_HEALTH_OFFLINE
+            if alarm_type == AlarmNotifications.GATEWAY_DISCONNECTED
+            else GATEWAY_HEALTH_MODBUS
+        )
+        hgw_id = match.group("hgw_id")
+        if health == GATEWAY_HEALTH_OFFLINE:
+            found[hgw_id] = (health, since, text)
+        else:
+            found.setdefault(hgw_id, (health, since, text))
+    return found
+
+
 class HomeGatewayStatusApi(APIView):
+    """Gateways and their state. ``status`` (bool, unchanged): data in the last
+    hour. ``health``: "modbus_issue" while a Gateway Service / Modbus Issue
+    alarm (16) is open (pings but no meter data), "offline" while a Gateway
+    Disconnected alarm (15) is open, else "online" / "offline" from ``status``.
+    ``health_since`` / ``health_detail``: start and text of that alarm."""
+
     permission_classes = [AllowAny]
     throttle_classes = []
 
@@ -532,10 +581,14 @@ class HomeGatewayStatusApi(APIView):
             offset = max(0, offset)
 
             gateways = queryset[offset : offset + limit]
+            alarms = open_gateway_alarms()
 
             data = []
             for gw in gateways:
                 hgw = gw.home_gateway
+                health, since, detail = alarms.get(hgw.hgw_id if hgw else None, (None, None, None))
+                if health is None:
+                    health = GATEWAY_HEALTH_ONLINE if gw.status else GATEWAY_HEALTH_OFFLINE
                 site = hgw.connected_to if hgw else None
                 customer_name = "N/A"
                 if hgw:
@@ -555,6 +608,9 @@ class HomeGatewayStatusApi(APIView):
                             float(gw.longitude) if gw.longitude is not None else None
                         ),
                         "status": gw.status,
+                        "health": health,
+                        "health_since": since.isoformat() if since else None,
+                        "health_detail": detail,
                         "site_id": site.id if site else None,
                         "site_name": site.site_name if site else "N/A",
                         "customer_name": customer_name,
