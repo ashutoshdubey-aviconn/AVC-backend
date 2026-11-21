@@ -12,9 +12,9 @@ Annotated git tags, local (pushed only when we push tags).
 
 | Tag | Commit | Meaning |
 |---|---|---|
-| `fov2-pre-merge-20261119` | `b92d3c43` | Our code before any merge work started (19 Nov). |
-| `ours-before-daksh-views-merge-20261121` | `135ed251` | Our code just before his views came in. Everything up to here is ours, apart from main's own hotfixes listed in [MERGE_GUIDE.md](MERGE_GUIDE.md). |
-| `daksh-views-merge-20261121` | `5d2e932f` | His 4 API views merged: `LightsDataApi`, `FansDataApi`, `SubmeteringMonthlyBarChart_new`, `SubmeteringSnapshotAPI`. |
+| `fov2-pre-merge-20261119` | `841432b9` | Our code before any merge work started (19 Nov). |
+| `ours-before-daksh-views-merge-20261121` | `cd46f69c` | Our code just before his views came in. Everything up to here is ours, apart from main's own hotfixes listed in [MERGE_GUIDE.md](MERGE_GUIDE.md). |
+| `daksh-views-merge-20261121` | `6771ed97` | His 4 API views merged: `LightsDataApi`, `FansDataApi`, `SubmeteringMonthlyBarChart_new`, `SubmeteringSnapshotAPI`. |
 
 ## Where each area comes from today
 
