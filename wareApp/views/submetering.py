@@ -1,10 +1,12 @@
 """Sub-metering charts, trends and snapshot."""
 
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from django.db.models import Case, IntegerField, Max, Sum, When
 from django.db.models.functions import TruncMonth
+from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,75 +16,88 @@ from wareApp.utility import entryExit, logger
 
 
 class SubmeteringMonthlyBarChart_new(APIView):
+    # Merged from the colleague's code (54313d5, views/metering_views.py), 2026-11-21:
+    # one query for all rooms instead of one per room. Same response keys; also
+    # finds a room's rows by aisle_group_id or attached_leg_id when leg_id differs.
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
         try:
-            # Extracting the data from the request
             data = request.data
-            site_id, from_date, till_date, user_type = (
-                data.get("site_id", ""),
-                data.get("from_date", ""),
-                data.get("till_date", ""),
-                data.get("user_type", ""),
-            )
+            site_id = data.get("site_id", "")
+            from_date_str = data.get("from_date", "")
+            till_date_str = data.get("till_date", "")
 
-            # Extracting the Daily Data for the given Date Range
-            from_date = datetime.strptime(from_date, "%Y/%m/%d")
-            till_date = datetime.strptime(till_date, "%Y/%m/%d")
+            if not site_id:
+                return Response({"status": 400, "msg": "site_id is required"}, status=400)
 
-            dates = [
-                (from_date + timedelta(days=x)).strftime("%Y-%m-%d")
-                for x in range((till_date - from_date).days + 1)
-            ]
+            # Parse dates
+            try:
+                from_date = datetime.strptime(from_date_str, "%Y/%m/%d")
+                till_date = datetime.strptime(till_date_str, "%Y/%m/%d")
+            except (ValueError, TypeError):
+                return Response({"status": 400, "msg": "Invalid date format, expected YYYY/MM/DD"}, status=400)
+
+            dates = [(from_date + timedelta(days=x)).strftime("%Y-%m-%d") for x in range((till_date - from_date).days + 1)]
+
+            site = Site.objects.filter(id=site_id).values('live_date').first()
+            if not site:
+                return Response({"status": 404, "msg": "Site not found"}, status=404)
+
+            live_date = site['live_date']
+            if live_date:
+                # Handle aware/naive datetime comparison
+                live_date_naive = live_date.replace(tzinfo=None) if isinstance(live_date, datetime) else live_date
+                from_date_naive = from_date.replace(tzinfo=None)
+                if from_date_naive < live_date_naive:
+                    from_date = live_date
+
+            # Bulk fetch aisle groups (1 query)
+            rooms = list(AisleGroup.objects.filter(site_id=site_id).values('id', 'aisleGroupName', 'attached_leg_id'))
+
+            # Bulk fetch DailySiteReading (1 query)
+            readings = DailySiteReading.objects.filter(
+                associated_Site_id=site_id,
+                reading_for__range=[
+                    from_date.date() if isinstance(from_date, datetime) else from_date,
+                    till_date.date() if isinstance(till_date, datetime) else till_date
+                ],
+                is_visible=True
+            ).values('leg_id', 'aisle_group_id', 'reading_for', 'unit_consumption')
+
+            # Populate readings in-memory with dual-key mapping for compatibility
+            readings_by_room = defaultdict(dict)
+            for r in readings:
+                if r['reading_for']:
+                    date_str = r['reading_for'].strftime("%Y-%m-%d")
+                    val = r['unit_consumption'] or 0.0
+
+                    if r['aisle_group_id']:
+                        readings_by_room[str(r['aisle_group_id'])][date_str] = val
+                    if r['leg_id']:
+                        readings_by_room[str(r['leg_id']).strip()][date_str] = val
+
             dataList = []
-            site = Site.objects.get(id=site_id)
-            if from_date < site.live_date.replace(tzinfo=None):
-                from_date = site.live_date
-
-            # Extracting the Site Data and the Available Rooms
-            rooms = AisleGroup.objects.filter(site=site_id).values_list(
-                "id", "aisleGroupName"
-            )
-
-            # Extracting the Data for the given Date Range
             for room in rooms:
-                Dailydata = DailySiteReading.objects.filter(
-                    associated_Site=site,
-                    leg_id=room[0],
-                    reading_for__range=[from_date, till_date],
-                    is_visible=True,
-                ).order_by("reading_for")
-                Dailydata = Dailydata.values_list("reading_for", "unit_consumption")
-                if Dailydata.exists:
-                    DailydataDict = dict(Dailydata)
-                    new_list = [
-                        round(
-                            DailydataDict.get(
-                                datetime.strptime(d, "%Y-%m-%d").date(), 0
-                            ),
-                            2,
-                        )
-                        for d in dates
-                    ]
-                    dataList.append(
-                        {"name": room[1], "data": new_list, "type": "column"}
-                    )
-                else:
-                    Dailydata = [0] * len(dates)
-                    dataList.append(
-                        {"name": room[1], "data": Dailydata, "type": "column"}
-                    )
+                room_id_str = str(room['id'])
+                leg_id_str = str(room['attached_leg_id']).strip() if room['attached_leg_id'] else ""
 
-            # Returning the Response
-            return Response(
-                {"status": 200, "Dates": dates, "Data": dataList}, status=200
-            )
+                # Retrieve from map
+                room_readings = readings_by_room.get(room_id_str)
+                if not room_readings and leg_id_str:
+                    room_readings = readings_by_room.get(leg_id_str)
+
+                if not room_readings:
+                    room_readings = {}
+
+                new_list = [round(room_readings.get(d, 0.0), 2) for d in dates]
+                dataList.append({"name": room['aisleGroupName'], "data": new_list, "type": "column"})
+
+            return Response({"status": 200, "Dates": dates, "Data": dataList}, status=200)
 
         except Exception as err:
             return Response({"status": 500, "msg": str(err)}, status=500)
-
 
 class SubmeteringMonthlyBarChart(APIView):
     @entryExit
@@ -399,49 +414,66 @@ class SubMeteringMonthlyTrendApi(APIView):
 
 
 class SubmeteringSnapshotAPI(APIView):
+    # Merged from the colleague's code (54313d5, views/site_views.py), 2026-11-21:
+    # totals with one SUM query instead of a Python loop; a site without live_date
+    # no longer fails. Same response keys.
     permission_classes = [AllowAny]
 
     def post(self, request):
-        data = request.data
-        logger.debug("%s %s", "data : ", data)
-        current_date = datetime.now()
-        site_id = data.get("site_id")
-        site = Site.objects.get(id=site_id)
-        live_date = site.live_date
-        logger.debug("%s %s", "live_ate : ", live_date)
-        firstdate = current_date.replace(day=1)
-        firstmnthDate = datetime.strftime(firstdate, "%Y-%m-%d")
-        fromDate = datetime.strftime(live_date, "%Y-%m-%d")
-        previous_date = current_date - timedelta(days=1)
-        tillDate = datetime.strftime(previous_date, "%Y-%m-%d")
-        logger.debug("%s %s", "dattata : ", type(tillDate))
-        days = current_date - live_date
-        logger.debug("%s %s", "days : ", days)
-        totaldays = days.days + 1
-        logger.debug("%s %s", "Totaldays :", totaldays)
-        aisles = AisleGroup.objects.filter(site=site)
-        all_leg_id = [aisle.attached_leg_id for aisle in aisles]
-        daily = DailySiteReading.objects.filter(
-            associated_Site=site,
-            leg_id__in=all_leg_id,
-            reading_for__gte=fromDate,
-            reading_for__lte=tillDate,
-        )
-        energyConsumed = 0.0
-        avgData = 0.0
-        if daily.exists():
-            for i in daily:
-                energyConsumed += i.unit_consumption
-                avgData = round(energyConsumed / totaldays, 2)
-        monthly = DailySiteReading.objects.filter(
-            associated_Site=site,
-            leg_id__in=all_leg_id,
-            reading_for__gte=firstmnthDate,
-            reading_for__lte=tillDate,
-        ).aggregate(Sum("unit_consumption"))
-        unit_consumed = monthly["unit_consumption__sum"]
-        return Response(
-            {
+        try:
+            data = request.data
+            site_id = data.get('site_id')
+            if not site_id:
+                return Response({'error': 'Site ID required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            site = Site.objects.filter(id=site_id).values('live_date').first()
+            if not site:
+                return Response({'error': 'Site not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            live_date = site['live_date']
+            if not live_date:
+                # Fallback if live_date is not set
+                live_date = datetime.now()
+
+            current_date = datetime.now()
+            firstdate = current_date.replace(day=1)
+            firstmnthDate = firstdate.strftime("%Y-%m-%d")
+            fromDate = live_date.strftime("%Y-%m-%d")
+
+            previous_date = current_date - timedelta(days=1)
+            tillDate = previous_date.strftime("%Y-%m-%d")
+
+            # Days count calculation
+            if isinstance(live_date, datetime):
+                days = (current_date - live_date)
+            else:
+                days = (current_date.date() - live_date)
+            totaldays = max(days.days + 1, 1)
+
+            # Get leg IDs for the site
+            leg_ids = list(AisleGroup.objects.filter(site_id=site_id).values_list('attached_leg_id', flat=True))
+
+            # Bulk sum energy consumed from live date to yesterday
+            daily_agg = DailySiteReading.objects.filter(
+                associated_Site_id=site_id,
+                leg_id__in=leg_ids,
+                reading_for__gte=fromDate,
+                reading_for__lte=tillDate
+            ).aggregate(total_energy=Sum('unit_consumption'))
+            energyConsumed = daily_agg['total_energy'] or 0.0
+
+            avgData = round(energyConsumed / totaldays, 2)
+
+            # Bulk sum monthly consumed energy
+            monthly_agg = DailySiteReading.objects.filter(
+                associated_Site_id=site_id,
+                leg_id__in=leg_ids,
+                reading_for__gte=firstmnthDate,
+                reading_for__lte=tillDate
+            ).aggregate(total_energy=Sum('unit_consumption'))
+            unit_consumed = monthly_agg['total_energy'] or 0.0
+
+            return Response({
                 "status": 200,
                 "alarms": 0,
                 "energy_consumed": round(energyConsumed, 2),
@@ -449,10 +481,11 @@ class SubmeteringSnapshotAPI(APIView):
                 "monthlyAvg": round(unit_consumed, 2),
                 "firstmnthDate": firstmnthDate,
                 "current_date": tillDate,
-                "live_date": fromDate,
-            }
-        )
+                "live_date": fromDate
+            }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response({"error": str(e), "status": 0, 'msg': 'Data Not Present'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SubmeteringHourlyBarChart(APIView):
     @entryExit

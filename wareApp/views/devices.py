@@ -10,47 +10,68 @@ from wareApp.utility import entryExit, logger
 
 
 class LightsDataApi(APIView):
+    # Merged from the colleague's code (54313d5, views/fire_views.py), 2026-11-21:
+    # reads only the needed columns with .values(). Same response as before.
+    # His AllowAny is not taken: this API keeps the default (login required).
     @entryExit
     def post(self, request):
-        data = request.data
-        logger.debug("%s %s", "data :", data)
-        data = LightsData.objects.all().order_by("-id")
-        list = []
-        for i in data:
-            list.append(
-                {
-                    "areaName": i.areaName,
-                    "totalLights": i.totalLights,
-                    "18Watt": i.watt_18_Lights,
-                    "20Watt": i.watt_20_Lights,
-                    "24Watt": i.watt_24_Lights,
-                    "36Watt": i.watt_36_Lights,
-                    "40Watt": i.watt_40_Lights,
-                    "totalWattLights": i.totalWattLights,
-                    "totalUnits": i.totalUnits,
-                }
-            )
-        return Response({"status": 200, "data": list})
+        lights_data = LightsData.objects.values(
+            "areaName",
+            "totalLights",
+            "watt_18_Lights",
+            "watt_20_Lights",
+            "watt_24_Lights",
+            "watt_36_Lights",
+            "watt_40_Lights",
+            "totalWattLights",
+            "totalUnits",
+        ).order_by("-id")
+        results = [
+            {
+                "areaName": row["areaName"],
+                "totalLights": row["totalLights"],
+                "18Watt": row["watt_18_Lights"],
+                "20Watt": row["watt_20_Lights"],
+                "24Watt": row["watt_24_Lights"],
+                "36Watt": row["watt_36_Lights"],
+                "40Watt": row["watt_40_Lights"],
+                "totalWattLights": row["totalWattLights"],
+                "totalUnits": row["totalUnits"],
+            }
+            for row in lights_data
+        ]
+        return Response({"status": 200, "data": results})
 
 
 class FansDataApi(APIView):
+    # Merged from the colleague's code (54313d5, views/fire_views.py), 2026-11-21:
+    # reads only the needed columns with .values(). Same response as before.
     @entryExit
     def post(self, request):
-        data = request.data
-        data = FansData.objects.all().order_by("id")
-        list = []
-        for i in data:
-            list.append(
-                {
-                    "areaName": i.areaName,
-                    "totalFans": i.totalFans,
-                    "80watt": i.watt_80_Lights,
-                    "100watt": i.watt_100_Lights,
-                    "totalWattFans": i.totalWattFans,
-                    "totalUnits": i.totalUnits,
-                }
+        fans = (
+            FansData.objects.all()
+            .order_by("id")
+            .values(
+                "areaName",
+                "totalFans",
+                "watt_80_Lights",
+                "watt_100_Lights",
+                "totalWattFans",
+                "totalUnits",
             )
-        return Response({"status": 200, "data": list})
+        )
+        results = [
+            {
+                "areaName": f["areaName"],
+                "totalFans": f["totalFans"],
+                "80watt": f["watt_80_Lights"],
+                "100watt": f["watt_100_Lights"],
+                "totalWattFans": f["totalWattFans"],
+                "totalUnits": f["totalUnits"],
+            }
+            for f in fans
+        ]
+        return Response({"status": 200, "data": results})
 
 
 class avgDataApi(APIView):
