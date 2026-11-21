@@ -64,19 +64,19 @@ add("F02", "Catch-up spread screen", "Frontend", "Done",
     "each spread shown as Manual (who) or Automatic, Undo for 5 days (then 'closed'), History view (date range, every "
     "spread with its hours before -> after).",
     "2026-11-16", "2026-11-20", "Deployed 20 Nov; checked in Chrome (site 114: 49 automatic + 20 manual in the history)",
-    T, "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9 + frontend")
+    T, "-", "-", "docs/consumption/CATCH_UP_SPREAD.md", "7064f428 + frontend")
 add("F03", "Baseline setup screen", "Frontend", "Done",
     "Baseline page: Automatic baseline -> sample days -> Calculate (preview, changes nothing) -> edit per aisle -> "
     "Set baseline (inline confirmation). Errors block it; warnings shown; site total follows edits.",
     "2026-11-05", "2026-11-17", "API deployed 5 Nov; screen checked 17 Nov on site 114 (preview, cancelled; nothing set)", T,
     "Push the frontend commit; set a real baseline when a site needs one.", "-",
-    "docs/consumption/BASELINE_SETUP_FRONTEND.md", "4bd8744e + frontend")
+    "docs/consumption/BASELINE_SETUP_FRONTEND.md", "bea167b6 + frontend")
 add("F05", "Alarm e-mails: Gmail login refused", "Alarms / e-mail", "Waiting for input",
     "Gmail has refused the alarm account's SMTP login since 6 Nov 14:55 (test and main share the account). Retries keep "
     "failed e-mails for 24 h; 8 e-mails sent before the retries existed were lost.",
     "2026-11-06", "2026-11-17", "Sending again (e-mails sent 17 Nov 10:26 and 10:46)", "Same account",
     "Login works again; decide whether to re-send the 8 e-mails lost before the retries existed.", "User (Gmail account)",
-    "docs/mqtt-flows/EMAIL_RETRIES.md", "807ff4b3")
+    "docs/mqtt-flows/EMAIL_RETRIES.md", "7eb51135")
 add("F06", "Midnight check after a day change", "Operations", "Waiting for input",
     "One-time check of the consumption batch at a day change (flush tasks, daily = sum of hourly, day-change alarms). The "
     "21 Oct run never happened (test server off for Diwali).",
@@ -98,7 +98,7 @@ add("F09", "Credential clean-up", "Security", "Planned",
     "Remove hard-coded provider tokens from code, rotate them, keep credentials in .env only. The DB password was already "
     "moved out of the setup scripts (26 Oct).",
     "2026-08-18", "2026-10-26", "-", "-", "Agree which credentials to rotate.", "User",
-    "docs/roadmaps/TODO.md", "4643371d (DB password)")
+    "docs/roadmaps/TODO.md", "81397093 (DB password)")
 add("F11", "Provisioning API: require login, no fixed password", "Security", "Not started",
     "Found 19 Nov in the three-way comparison: CreateCustomerUsingProvisioning (and the other provisioning APIs) need no login "
     "and create customers with one fixed default password. Inherited from main; same on main and ours.",
@@ -127,14 +127,14 @@ add("H02", "Main server rollout of this branch", "Deploy", "On hold",
 add("H03", "Location teams for alarm e-mails", "Alarms / e-mail", "On hold",
     "LOCATION_TEAMS in alarm_recipients.py (e-mails by site location) is built but empty.", "2026-10-28", "2026-10-28",
     "Empty", T, "Fill when the teams are given.", "User",
-    "docs/alarms/ALARM_CATALOGUE.xlsx (Configuration)", "61cd0fc3")
+    "docs/alarms/ALARM_CATALOGUE.xlsx (Configuration)", "a80e5cb8")
 add("H04", "Low Consumption alarm on sites", "Alarms", "On hold",
     "Alarm 8 is built but opt-in (Site.min_threshold_value or AlarmSetting Auto); no site has it on, a default would flood.",
     "2026-10-23", "2026-11-02", "Off on every site", T, "Switch on per site when wanted.", "User",
     "docs/alarms/ALARM_CATALOGUE.xlsx (type 8)", "-")
 add("N01", "Alarms 3, 4, 5 (DG Overtime, DG Fuel Under Level, Mains Higher Consumption)", "Alarms", "Not started",
     "Types exist; no code raises them. Old rows are closed by the alarm closer.", "-", "2026-11-02", "-", "-",
-    "Define rules if they are wanted.", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (types 3-5)", "b15b9880")
+    "Define rules if they are wanted.", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (types 3-5)", "1e14892b")
 add("O01", "API view optimization", "API", "Out of scope",
     "Query / N+1 work in wareApp/views is not part of this branch; issues found are only reported.", "2026-10-26", "2026-10-28",
     "-", "-", "-", "-", "-", "-")
@@ -228,85 +228,85 @@ add("D01", "Catch-up spread API", "Consumption", "Done",
     "recovery ended; spread hours are real readings (no estimated mark); hourly and daily recalculated; per-hour record "
     "(CatchUpSpread.hours_detail) and mode manual / automatic; undo for 5 days; recovery replies leave spread hours and "
     "days alone.", "2026-11-16", "2026-11-20", "Deployed 20 Nov (migration 0115; 20 old spreads converted)", T,
-    "Frontend: F02", "-", "docs/consumption/CATCH_UP_SPREAD.md", "1244b7c9")
+    "Frontend: F02", "-", "docs/consumption/CATCH_UP_SPREAD.md", "7064f428")
 add("D02", "Alarms verified from hourly data", "Alarms", "Done",
     "High Consumption / Bypassed are counted from the hourly rows (incl. the 2 days before, to find gaps), never from the "
     "stored daily total. Found by a false Bypassed at site 114.", "2026-11-16", "2026-11-16", "Deployed 16 Nov", T, "-", "-",
-    "docs/consumption/READING_RULES.md (Alarms)", "5a6e9331")
+    "docs/consumption/READING_RULES.md (Alarms)", "7b7875da")
 add("D03", "DB optimization", "Database", "Done",
     "Redundant indexes dropped, aisle + time index on hourly readings, SSD settings, no FKs on telemetry tables.",
     "2026-11-06", "2026-11-06", "Deployed 6 Nov", T, "-", "-", "docs/operations/DB_OPTIMIZATION_2026-11-06.md",
-    "19138914, a80f8474")
+    "239de9f3, 1093d213")
 add("D04", "Alarm e-mail retries", "Alarms / e-mail", "Done",
     "Failed alarm e-mails kept in PendingEmail and retried with back-off for up to 24 h.", "2026-11-06", "2026-11-06",
-    "Deployed 6 Nov", T, "-", "-", "docs/mqtt-flows/EMAIL_RETRIES.md", "807ff4b3")
+    "Deployed 6 Nov", T, "-", "-", "docs/mqtt-flows/EMAIL_RETRIES.md", "7eb51135")
 add("D05", "Gateway pings from main", "MQTT / gateway", "Done",
     "Test reads gateway pings from main's broker log over a restricted read-only SSH key, so it tells 15 from 16.",
     "2026-11-06", "2026-11-06", "Enabled 6 Nov", "Not needed (reads its own log)", "-", "-",
-    "docs/mqtt-flows/GATEWAY_PINGS_FROM_MAIN.md", "1d8641c4")
+    "docs/mqtt-flows/GATEWAY_PINGS_FROM_MAIN.md", "bd063c53")
 add("D06", "Meter Reading Issue fixed after 24 h", "Alarms", "Done",
     "Counts as fixed only after 24 h without a repeat plus a normal hourly reading (was 1 h).", "2026-11-06", "2026-11-06",
-    "Deployed 6 Nov", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 10)", "0df4ad2e")
+    "Deployed 6 Nov", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 10)", "c1b7ee40")
 add("D07", "Customer / site page alarm APIs", "Alarms / API", "Done",
     "alarmListOnCustomerPage, alarmListOnSitePage, getCustAlarmGraph and the snapshot alarm count read the open alarms "
     "(were always empty).", "2026-11-06", "2026-11-06", "Deployed 6 Nov", T, "-", "-",
-    "docs/alarms/ALARM_CATALOGUE.xlsx (Alarm API list)", "f8484404")
+    "docs/alarms/ALARM_CATALOGUE.xlsx (Alarm API list)", "0efc5738")
 add("D08", "Automatic baseline setup API", "Consumption", "Done",
     "POST /api/baselineSetup/ previews and applies baselines from sample days; fixes the saveBaseline first-baseline crash.",
     "2026-11-05", "2026-11-06", "Deployed 5 Nov", T, "Frontend: F03", "-", "docs/consumption/BASELINE_SETUP.md",
-    "4bd8744e")
+    "bea167b6")
 add("D09", "Spike hours left out of the day total", "Consumption", "Done",
     "On saving / submetering sites an hour above the aisle's whole daily baseline does not count in the day.",
-    "2026-11-05", "2026-11-05", "Deployed 5 Nov", T, "-", "-", "docs/consumption/READING_RULES.md (rule 2)", "b24a6084")
+    "2026-11-05", "2026-11-05", "Deployed 5 Nov", T, "-", "-", "docs/consumption/READING_RULES.md (rule 2)", "ab8fd265")
 add("D10", "10,000 kWh glitch limit by site type", "Consumption", "Done",
     "Cap only on saving (2) and submetering (5) sites, on every write path; never on WH-metering (1).",
-    "2026-11-03", "2026-11-03", "Deployed 3 Nov", T, "-", "-", "docs/consumption/READING_RULES.md (rule 1)", "f63fc814")
+    "2026-11-03", "2026-11-03", "Deployed 3 Nov", T, "-", "-", "docs/consumption/READING_RULES.md (rule 1)", "b8f60914")
 add("D11", "Skip sites in the gateway check", "MQTT / gateway", "Done",
     "GATEWAY_HEALTH_SKIP_SITES; test skips site 35 (not forwarded by main).", "2026-11-03", "2026-11-03", "Deployed 3 Nov", T,
-    "-", "-", "wareApp/mqtt/services/gateway_health.py", "39451340")
+    "-", "-", "wareApp/mqtt/services/gateway_health.py", "40d13e1d")
 add("D12", "Automatic alarm closing; active alarms only on the frontend", "Alarms", "Done",
     "Alarm closer every 5 min; 'active' means still happening; frontend lists show active alarms only; day-only "
     "High / Low / Bypassed.", "2026-11-02", "2026-11-02", "Deployed 2 Nov", T, "-", "-",
-    "docs/alarms/ALARM_CATALOGUE.xlsx (E-mail flow)", "be758d81, 0636779e, b15b9880")
+    "docs/alarms/ALARM_CATALOGUE.xlsx (E-mail flow)", "ec47914d, fb3085c0, 1e14892b")
 add("D13", "Outage alarms open until solved, daily reminder", "Alarms", "Done",
     "14 / 15 / 16 open since the outage began, open_days in the APIs, e-mail once a day until solved; 15 only with proof "
     "of no pings.", "2026-11-02", "2026-11-02", "Deployed 2 Nov", T, "-", "-",
-    "docs/alarms/ALARM_CATALOGUE.xlsx (types 14-16)", "df8001b3, 92420365")
+    "docs/alarms/ALARM_CATALOGUE.xlsx (types 14-16)", "993b7a1d, 604a7610")
 add("D14", "Consumption Spike alarm (17)", "Alarms", "Done",
     "Meter jump / meter reset / catch-up hours with their cause, one e-mail per site per scan. Since 20 Nov a big hour "
     "after a gap is a catch-up even above the whole daily baseline (was called a meter jump), and ERROR404 hours count "
     "as gap.", "2026-10-30", "2026-11-20",
-    "Deployed 30 Oct; detection fix 20 Nov", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 17)", "a323f5d6, 6c2cd379")
+    "Deployed 30 Oct; detection fix 20 Nov", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 17)", "cc2f190c, 00056819")
 add("D15", "Fewer false alarms (our downtime, data spikes)", "Alarms", "Done",
     "Our own listener restarts and data spikes no longer raise alarms.", "2026-10-30", "2026-10-30", "Deployed 30 Oct", T,
-    "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx", "64f7c3f1")
+    "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx", "aceb2e1b")
 add("D16", "Data-missing alarms 14 / 15 / 16", "Alarms", "Done",
     "Meter Disconnected, Gateway Disconnected, Gateway Service / Modbus Issue (zero-consumption cases 3, 5, 6).",
     "2026-10-28", "2026-11-06", "Deployed 28 Oct (14 waits for a live case: gateways post meter events to main only)", T,
-    "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (types 14-16)", "e8a3009b, c8c0a0cf")
+    "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (types 14-16)", "2d57123f, 46a2acfe")
 add("D17", "Bypassed alarm automatic and during the day", "Alarms", "Done",
     "Per aisle at >= 100 % of its daily baseline, raised as soon as today's running total crosses it.", "2026-10-23",
-    "2026-11-16", "Deployed 28 Oct", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 11)", "582f1fee, 33f4cf57")
+    "2026-11-16", "Deployed 28 Oct", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (type 11)", "c9257fed, aaf05940")
 add("D18", "Alarm recipients and Auto / Manual / Off per site", "Alarms / e-mail", "Done",
     "Software / ground / location teams; AlarmSetting per site and type; no repeat e-mails for near-equal values.",
     "2026-10-27", "2026-10-28", "Deployed 28 Oct (test e-mails go to the override)", T, "-", "-",
-    "docs/alarms/ALARM_CATALOGUE.xlsx (Configuration)", "e70d5025, 0ee4c075, 61cd0fc3")
+    "docs/alarms/ALARM_CATALOGUE.xlsx (Configuration)", "ad6df086, a07118c7, a80e5cb8")
 add("D19", "One alarm table", "Alarms", "Done",
     "Power / DG alarms moved into AlarmNotifications; NewAlarmsNotifications dropped.", "2026-10-26", "2026-10-28",
-    "Deployed", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (Models)", "19c2d009")
+    "Deployed", T, "-", "-", "docs/alarms/ALARM_CATALOGUE.xlsx (Models)", "f0669b95")
 add("D20", "LoadData roll-up optimization", "Load data", "Done",
     "Roll up only since the last rolled minute; monthly bounds cached.", "2026-10-27", "2026-10-27", "Deployed", T, "-", "-",
-    "docs/load-data/LOAD_DATA_FLOW_AND_OPTIMIZATION.md", "44b4fd43")
+    "docs/load-data/LOAD_DATA_FLOW_AND_OPTIMIZATION.md", "deb72bea")
 add("D21", "Recovery speed-ups", "Recovery", "Done",
     "Stored hours loaded by time range (336 ms -> 0.6 ms); stored hours left unchanged; alarms only for changed days.",
-    "2026-10-28", "2026-10-28", "Deployed", T, "-", "-", "docs/mqtt-flows/README.md", "a136576b, dab6a704")
+    "2026-10-28", "2026-10-28", "Deployed", T, "-", "-", "docs/mqtt-flows/README.md", "f4757513, a8d577ab")
 add("D22", "CPU analysis of test and main", "Monitoring", "Done",
     "Per-core CPU use (who uses each core) every minute to local CSVs, with a report.", "2026-11-02", "2026-11-02",
-    "Running", "Read only", "-", "-", "docs/monitoring/README.md", "5266567e, b208e6d3")
+    "Running", "Read only", "-", "-", "docs/monitoring/README.md", "b0f20c82, 85aec992")
 add("D23", "Alarm catalogue and MQTT flow docs", "Docs", "Done",
     "ALARM_CATALOGUE.xlsx (every alarm, status, APIs, models, logs) and one draw.io flow per MQTT topic / alarm.",
     "2026-10-26", "2026-11-17", "-", "-", "Keep updated with every change.", "-",
-    "docs/alarms/, docs/mqtt-flows/", "8a760a89, 9a0877be")
+    "docs/alarms/, docs/mqtt-flows/", "26a7098c, a8ed5f0a")
 
 
 # ---- Frontend APIs: what each feature exposes and how the frontend handles it ----------------------

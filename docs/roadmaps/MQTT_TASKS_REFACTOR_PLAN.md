@@ -514,20 +514,20 @@ Redis: config cache, status cache, cooldowns, idempotency and voltage windows. R
 
 | Step | Status | Commit |
 | --- | --- | --- |
-| Baseline: local `fully_optimization` work | done | `8f834c9` |
-| M1 parity (site_type 2 cap, recovery list check) | done | `e4df7b3` |
-| M2 single Celery app units + settings | done (root `tasks.py` stays until main cutover) | `774cf8a` |
-| M3 site partitions, cooldown, persistent publisher, async email | done | `70e2748` |
-| M4 DB-hit reduction (+ alarm `site_id` bug fix) | done | `e589d7e` |
-| M5 recovery status completion | done | `94f79cd` |
-| M6 delivery guarantees, dead letters | done | `41601d0` |
-| M7 part 1: consumption de-duplication, duplicate report | done | `1dc4a69` |
+| Baseline: local `fully_optimization` work | done | `437ed68` |
+| M1 parity (site_type 2 cap, recovery list check) | done | `ef8d17a` |
+| M2 single Celery app units + settings | done (root `tasks.py` stays until main cutover) | `78c3f02` |
+| M3 site partitions, cooldown, persistent publisher, async email | done | `00006aa` |
+| M4 DB-hit reduction (+ alarm `site_id` bug fix) | done | `d962103` |
+| M5 recovery status completion | done | `74a94b8` |
+| M6 delivery guarantees, dead letters | done | `a9822bf` |
+| M7 part 1: consumption de-duplication, duplicate report | done | `6b468f2` |
 | M7 part 2: unique constraints + `acks_late` | on hold: report only for now (decision 2026-10-19); see 5.1 | — |
 | M8 ingestion daemon (paho 2.x, manual ack) | next | — |
 | Code shape part 1: `MqttEnvelope`, `KeyValuePayload` (replaces 4 parser copies), handler registry | done | (this commit) |
-| Code shape part 2: `MessageHandler` classes, single `process_mqtt_message` task (per-type tasks kept as wrappers) | done, running on test | `8ba3ffc` |
-| Test-server deploy (bridge migrations, new units, cache and listener fixes, readable logs) | done 2026-10-19 | `7ea6bd5`..`c84fe3c` |
-| Phase C: hourly baseline (EL 24 h, NL hours or legacy working_hours, dated baseline row) for live + recovery; `rebuild_hourly_baseline` backfill (34,538 rows on test, 2026-09-20..10-20; old values in table `fov2_hourly_baseline_backup_20261020`) | done 2026-10-20 | `bb7335f` |
+| Code shape part 2: `MessageHandler` classes, single `process_mqtt_message` task (per-type tasks kept as wrappers) | done, running on test | `e3fcaec` |
+| Test-server deploy (bridge migrations, new units, cache and listener fixes, readable logs) | done 2026-10-19 | `dee0195`..`6b9dc18` |
+| Phase C: hourly baseline (EL 24 h, NL hours or legacy working_hours, dated baseline row) for live + recovery; `rebuild_hourly_baseline` backfill (34,538 rows on test, 2026-09-20..10-20; old values in table `fov2_hourly_baseline_backup_20261020`) | done 2026-10-20 | `703ecc9` |
 | Test-server readiness: all tests green (SQLite + PostgreSQL), `0095`, rollout runbook | done | (this commit) |
 
 `python scripts/dev/run_tests.py`: 45 unit tests + 243 app tests pass on SQLite; the 243 app tests
