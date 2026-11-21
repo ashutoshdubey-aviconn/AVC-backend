@@ -18,6 +18,8 @@ Files here:
 
 ## Marking our code before the merge
 
+Since 21 Nov: tags `ours-before-daksh-<area>-merge-*` / `daksh-<area>-merge-*` and a `Source: daksh@...` commit trailer for every merge from his code: [CODE_ORIGIN.md](CODE_ORIGIN.md).
+
 1. **Git tag, not comments in the code.** `fov2-pre-merge-20261119` marks exactly what we had before the merge. Use it to compare, review or go back. Do not add `# ours` markers to functions: every marker is a changed line, which means more conflicts, not fewer.
 2. **Fingerprints.** Every function and class in the Functions sheet has a fingerprint, a hash of its source with comments and formatting ignored. After the merge, the check below shows which of our functions changed.
 3. **Ownership comes from the inventory.** Each function's "Origin" (New / Changed / Moved, unchanged) says what this branch wrote. The overlap sheet says what the other side touched.
