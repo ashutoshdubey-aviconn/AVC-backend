@@ -8,6 +8,8 @@
 
 **Side by side:** workbook [`CODE_INVENTORY.xlsx`](CODE_INVENTORY.xlsx), sheet "Ours vs colleague".
 **Function by function:** sheet "Merge overlap (colleague)", or [`overlap_colleague_20261119.csv`](overlap_colleague_20261119.csv).
+**Every API, his vs ours, what each does (21 Nov):** [`API_COMPARISON_COLLEAGUE_VS_OURS.xlsx`](API_COMPARISON_COLLEAGUE_VS_OURS.xlsx) (built by `build_api_comparison.py`).
+**Detailed analysis, his vs ours, with examples (21 Nov):** [`COLLEAGUE_CODE_ANALYSIS.xlsx`](COLLEAGUE_CODE_ANALYSIS.xlsx) (built by `build_colleague_analysis.py`).
 **His code vs the code on main's server** (APIs the frontend calls, DG fuel, LoadData, DB): [COLLEAGUE_VS_MAIN.md](COLLEAGUE_VS_MAIN.md).
 
 ## What his code is
