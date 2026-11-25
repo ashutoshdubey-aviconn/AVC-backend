@@ -315,6 +315,105 @@ def add_main_vs_his(wb, fe, called):
     return rows
 
 
+# ------------------------------------------------------------------ same work, other name
+
+def forward_target(cls):
+    """View this class only hands the request to (`return Other().post(request)`, or a subclass
+    with no methods of its own); None when it has its own code."""
+    meths = [f for f in cls.body if isinstance(f, ast.FunctionDef) and f.name in HTTP]
+    others = [f for f in cls.body if isinstance(f, ast.FunctionDef) and f.name not in HTTP]
+    bases = [ast.unparse(b) for b in cls.bases if ast.unparse(b).split(".")[-1] not in ("APIView", "GenericAPIView")]
+    if not meths and not others and bases:
+        return bases[0].split(".")[-1]
+    targets = set()
+    for m in meths:
+        body = [x for x in m.body if not (isinstance(x, ast.Expr) and isinstance(getattr(x, "value", None), ast.Constant))]
+        v = body[0].value if len(body) == 1 and isinstance(body[0], ast.Return) else None
+        if not (isinstance(v, ast.Call) and isinstance(v.func, ast.Attribute) and v.func.attr in HTTP
+                and isinstance(v.func.value, ast.Call)):
+            return None
+        targets.add(ast.unparse(v.func.value.func).split(".")[-1])
+    return targets.pop() if len(targets) == 1 else None
+
+
+def normalised(cls):
+    c = ast.parse(ast.unparse(cls)).body[0]
+    c.name, c.decorator_list = "X", []
+    for n in ast.walk(c):
+        if (isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.body and isinstance(n.body[0], ast.Expr)
+                and isinstance(getattr(n.body[0], "value", None), ast.Constant) and isinstance(n.body[0].value.value, str)):
+            n.body = n.body[1:] or [ast.Pass()]
+        if isinstance(n, ast.Call) and getattr(getattr(n.func, "value", None), "id", "") == "logger":
+            n.args = []
+    return ast.unparse(c)
+
+
+def same_work_rows(called):
+    """Routes that do the same work under another name, per side (main / his / ours)."""
+    import difflib
+    import itertools
+    main_cls = acc.classes(MAIN)
+    main_r = {r: v for r, v, _ in url_routes(MAIN)}
+    rows = []
+    for side, root in (("main", MAIN), ("his", THEIRS), ("ours", ROOT)):
+        cls = acc.classes(root)
+
+        def chain(v, seen=()):
+            if v not in cls or v in seen:
+                return [v]
+            t = forward_target(cls[v][0])
+            return [v] + chain(t, seen + (v,)) if t else [v]
+
+        routes = [(r, v) for r, v, a in url_routes(root) if not a]
+        groups = {}
+        for r, v in routes:
+            groups.setdefault(chain(v)[-1], []).append((r, chain(v)))
+        for tgt, rs in sorted(groups.items(), key=lambda kv: kv[0].lower()):
+            if len(rs) < 2:
+                continue
+            for r, ch in rs:
+                how = "the view itself" if len(ch) == 1 else ("forwards: " + " -> ".join(ch))
+                mv = main_r.get(r, "")
+                main_own = ""
+                if side == "his" and mv and mv in main_cls and forward_target(main_cls[mv][0]) is None and mv != tgt:
+                    main_own = f"main: own code in {mv} ({len(ast.unparse(main_cls[mv][0]).splitlines())} lines)"
+                effect = ("his answer is a different view's answer" if main_own else
+                          "same answer under two names (old / test route)")
+                rows.append([side, "Same view", tgt, cls[tgt][1] if tgt in cls else "", r, ch[0], how,
+                             mv, main_own, called(r), effect])
+        real = {}
+        for r, v in routes:
+            f = chain(v)[-1]
+            if f in cls and f not in real:
+                real[f] = (r, normalised(cls[f][0]), len(ast.unparse(cls[f][0]).splitlines()))
+        for (a, (ra, ba, la)), (b, (rb, bb, lb)) in itertools.combinations(sorted(real.items()), 2):
+            if min(la, lb) < 8 or abs(len(ba) - len(bb)) > 0.2 * max(len(ba), len(bb)):
+                continue
+            sm = difflib.SequenceMatcher(None, ba, bb, autojunk=False)
+            if sm.quick_ratio() < 0.9 or sm.ratio() < 0.9:
+                continue
+            diff = [ln.strip() for ln in difflib.unified_diff(ba.splitlines(), bb.splitlines(), lineterm="", n=0)
+                    if ln[:1] in "+-" and ln[:3] not in ("+++", "---")]
+            note = f"{round(sm.ratio() * 100)}% the same code; differs in: " + " | ".join(diff[:4])
+            for r, v, other in ((ra, a, b), (rb, b, a)):
+                rows.append([side, "Near copy", f"{a} / {b}", cls[v][1], r, v, f"near copy of {other}",
+                             main_r.get(r, ""), "", called(r), note[:400]])
+    return rows
+
+
+def add_same_work(wb, called):
+    rows = same_work_rows(called)
+    cols = ["Side", "Kind", "Does the work", "File", "Route", "Route's view", "How",
+            "Main view for this route", "Main has own code", "Frontend calls it", "Effect / note"]
+    widths = [7, 11, 36, 30, 32, 34, 50, 34, 40, 9, 60]
+    sh = wb.create_sheet("Same work, other name")
+    title(sh, f"Same work, other name: {len(rows)} rows",
+          "Same view = several routes end in one view (directly or by forwarding). Near copy = two views with "
+          ">= 90% the same code (docstrings, logging, class name ignored). Main = snapshot " + MAIN_DATE + ".")
+    table(sh, 3, cols, rows, widths)
+    return rows
+
+
 # ------------------------------------------------------------------ build
 
 def build():
@@ -394,6 +493,7 @@ def build():
         ("Decision", "From the 21 Nov views merge (views_merge_decisions_20261121.csv)."),
         ("Main vs his", f"Every route on the main server ({MAIN_DATE}, read-only snapshot) next to his code: missing routes, methods the frontend sends that his view does not accept, and login rule changes."),
         ("Main vs his - problems", "Only the rows of Main vs his that are not the same."),
+        ("Same work, other name", "Routes that end in the same view (one class on several routes, or a view that only forwards to another), and views that are near copies of each other; for main, his code and ours."),
         ("Rebuild", "virtualwarehouse/bin/python docs/merge/build_api_comparison.py"),
     ]
     for i, (k, v) in enumerate(info, 4):
@@ -442,6 +542,7 @@ def build():
         table(sheet, 3, cols, sel, widths, fill_col=1)
 
     mrows = add_main_vs_his(wb, fe, called)
+    srows = add_same_work(wb, called)
     mrng = f"'Main vs his'!$B$4:$B${3 + len(mrows)}"
     r2 = r1 + 5
     ws.cell(row=r2, column=1, value="Main server vs his (formulas)").font = Font(name=FONT, bold=True, size=12)
@@ -461,6 +562,8 @@ def build():
     from collections import Counter
     print(f"Wrote {OUT}: {n} routes", dict(Counter(r[1] for r in rows)))
     print("Main vs his:", dict(Counter(r[1] for r in mrows)))
+    print("Same work:", dict(Counter((r[0], r[1]) for r in srows)),
+          "his routes answering another view's answer:", sum(1 for r in srows if r[8]))
 
 
 if __name__ == "__main__":
