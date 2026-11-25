@@ -16,10 +16,17 @@ def entryExit(aFunc):
     only the handlers that crashed (they read a ``.detail`` that AttributeError
     and ValueError do not have) are fixed, and unexpected errors are logged with
     their traceback. Arguments and results are logged at DEBUG only.
+
+    Origin: Ashu (changed from main)
     """
 
     @wraps(aFunc)
     def loggedFunc(*args, **kw):
+        """Runs the view with debug logs on entry / exit; an unexpected error is logged and returned as
+        status 400.
+
+        Origin: Ashu (changed from main)
+        """
         logger.debug("enter %s", aFunc.__qualname__)
         try:
             result = aFunc(*args, **kw)

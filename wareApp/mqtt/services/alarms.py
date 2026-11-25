@@ -46,6 +46,8 @@ def raise_power_alarm(
                   ``worse_when_higher`` says which direction is worse.
     Returns None when the alarm is Off for the site or ``repeat_every`` has not
     passed since the last occurrence.
+
+    Origin: Ashu
     """
     if alarm_policy.is_off(getattr(site, "id", site), alarm_type):
         return None

@@ -19,7 +19,10 @@ def collect_level_cycle(
     fetch_roadcast: Callable[[], Any],
     dry_run: bool = True,
 ) -> Dict[str, Any]:
-    """Collect provider fuel levels and optionally persist normalized samples."""
+    """Collect provider fuel levels and optionally persist normalized samples.
+
+    Origin: Ashu
+    """
     loconav_sites = []
     roadcast_sites = []
     skipped_sites = []

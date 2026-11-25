@@ -25,8 +25,21 @@ from wareApp.utility import entryExit, logger
 
 
 class ParticularSiteSnapshotEnergySavingApi(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    AlarmNotifications, DailySiteReading, Site. Takes site_id, user_type. Returns alarms,
+    carbon_emission_saved, energy_consumed, live_date, percentage_saved, previous_date, result,
+    saved_energy, site_live_date.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: site_id, user_type. Response keys: alarms,
+        carbon_emission_saved, energy_consumed, live_date, percentage_saved, previous_date, result,
+        saved_energy, site_live_date.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         # print("data of site snapshot", data)
         site_id = data.get("site_id", "")
@@ -169,8 +182,19 @@ class ParticularSiteSnapshotEnergySavingApi(APIView):
 
 
 class EnergySavingMonthlyBarChartOld(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site, SiteBaseline. Takes from_date, site_id, till_date,
+    user_type. Returns Data, Dates, SavingData, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date, user_type.
+        Response keys: Data, Dates, SavingData, result.
+
+        Origin: Ashu (changed from main)
+        """
         t1 = time.time()
         data = request.data
         site_id = data.get("site_id", "")
@@ -430,10 +454,19 @@ class EnergySavingMonthlyBarChartOld(APIView):
 
 
 class EnergySavingMonthlyTrendApi(APIView):
+    """API view for /api/savingMonthlyTrend/ (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site. Takes site_id, user_type. Returns error.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/savingMonthlyTrend/. Request fields: site_id, user_type. Response keys: error.
+
+        Origin: Ashu (changed from main)
+        """
         import hashlib
 
         from django.core.cache import cache
@@ -500,6 +533,10 @@ class EnergySavingMonthlyTrendApi(APIView):
         percentage_saved_list = []
 
         def month_bounds(reference_date):
+            """First day of the month and of the next month.
+
+            Origin: Ashu
+            """
             month_start = reference_date.replace(day=1).date()
             if reference_date.month == 12:
                 next_month_start = reference_date.replace(
@@ -604,7 +641,18 @@ class EnergySavingMonthlyTrendApi(APIView):
 
 
 class EnergySavingMonthlyTrendExcelDownload(APIView):
+    """API view for /api/savingMonthlyTrendExcel/ (POST; Login required (default)). Builds an Excel /
+    file download. Reads AisleGroup, DailySiteReading, Site. Takes from_month, site_id, to_month,
+    user_type. Returns data, msg, status.
+
+    Origin: Ashu
+    """
     def post(self, request):
+        """POST /api/savingMonthlyTrendExcel/. Request fields: from_month, site_id, to_month,
+        user_type. Response keys: data, msg, status.
+
+        Origin: Ashu
+        """
         data = request.data
         try:
             site_id = data.get("site_id", "")
@@ -828,8 +876,19 @@ class EnergySavingMonthlyTrendExcelDownload(APIView):
 
 
 class NewEnergySavingMonthlyTrendApi(APIView):
+    """API view for /api/NewMonthlyTrendAPi/ (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, Site. Takes site_id, user_type. Returns carbon_saved, energyConsumed,
+    energySaved, months, msg, percentageSaved, result, status.
+
+    Origin: Ashu
+    """
     @entryExit
     def post(self, request):
+        """POST /api/NewMonthlyTrendAPi/. Request fields: site_id, user_type. Response keys:
+        carbon_saved, energyConsumed, energySaved, months, msg, percentageSaved, result, status.
+
+        Origin: Ashu
+        """
         try:
             from django.core.cache import cache
 
@@ -990,8 +1049,19 @@ class NewEnergySavingMonthlyTrendApi(APIView):
 
 
 class EnergySavingsHourlyBarChartOld(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site, SiteBaseline. Takes date, site_id. Returns Data,
+    Hours, SavingData, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: Data, Hours,
+        SavingData, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         start_time = datetime.now()
@@ -1158,10 +1228,21 @@ class EnergySavingsHourlyBarChartOld(APIView):
 
 
 class EnergySavingsHourlyBarChart(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site, SiteBaseline. Takes date, site_id. Returns Data,
+    Hours, SavingData, result.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: Data, Hours,
+        SavingData, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         start_time = datetime.now()
@@ -1245,9 +1326,20 @@ class EnergySavingsHourlyBarChart(APIView):
 
 
 class EnergySavingsHourlyBarChartV2(APIView):
+    """API view for /api/hourlySavingData/ (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site, SiteBaseline. Takes date, site_id. Returns Data,
+    Hours, SavingData, msg, result.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/hourlySavingData/. Request fields: date, site_id. Response keys: Data, Hours,
+        SavingData, msg, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         start_time = datetime.now()
@@ -1358,9 +1450,19 @@ class EnergySavingsHourlyBarChartV2(APIView):
 
 
 class DownloadExcel(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Builds an Excel / file
+    download. Reads AisleGroup, DailySiteReading. Takes end_date, from_date, site_id, user_type.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: end_date, from_date, site_id, user_type.
+        Response keys: built in code (not a fixed dict).
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data", data)
         site_id = data.get("site_id")
@@ -1419,10 +1521,21 @@ class DownloadExcel(APIView):
 
 
 class EnergySavingMonthlyBarChartbackup(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site, SiteBaseline. Takes from_date, site_id, till_date, user_type. Returns
+    Data, Dates, SavingData, a, dates, msg, result, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date, user_type.
+        Response keys: Data, Dates, SavingData, a, dates, msg, result, status.
+
+        Origin: Ashu (changed from main)
+        """
         t1 = time.time()
         data = request.data
         site_id = data.get("site_id", "")
@@ -1659,10 +1772,21 @@ class EnergySavingMonthlyBarChartbackup(APIView):
 
 
 class EnergySavingMonthlyBarChart(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site, SiteBaseline. Takes from_date, site_id, till_date, user_type. Returns
+    Data, Dates, SavingData, a, dates, msg, result, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date, user_type.
+        Response keys: Data, Dates, SavingData, a, dates, msg, result, status.
+
+        Origin: Ashu (changed from main)
+        """
         t1 = time.time()
         data = request.data
         site_id = data.get("site_id", "")
@@ -1904,11 +2028,23 @@ class EnergySavingMonthlyBarChart(APIView):
 
 
 class EnergySavingMonthlyBarChart_new(APIView):
+    """API view for /api/savingMonthly/, /api/dailyData_test/, /api/monthly/data/test (POST; Open: no
+    login (AllowAny); no rate limit). Reads AisleGroup, DailySiteReading, Site, SiteBaseline. Takes
+    from_date, site_id, till_date, user_type. Returns Data, Dates, SavingData, msg, result, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
     throttle_classes = []
 
     @entryExit
     def post(self, request):
+        """POST /api/savingMonthly/, /api/dailyData_test/, /api/monthly/data/test. Request fields:
+        from_date, site_id, till_date, user_type. Response keys: Data, Dates, SavingData, msg,
+        result, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = int(data.get("site_id", 0))
 
@@ -2026,9 +2162,20 @@ class EnergySavingMonthlyBarChart_new(APIView):
 
 
 class DownloadExcel_new(APIView):
+    """API view for /api/DownloadExcel/, /api/dataConsExcelTest/ (POST; Open: no login (AllowAny)).
+    Builds an Excel / file download. Reads AisleGroup, DailySiteReading. Takes end_date, from_date,
+    site_id, user_type. Returns message.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/DownloadExcel/, /api/dataConsExcelTest/. Request fields: end_date, from_date,
+        site_id, user_type. Response keys: message.
+
+        Origin: main (unchanged)
+        """
         try:
             data = request.data
             site_id = int(data.get("site_id"))
@@ -2101,9 +2248,20 @@ class DownloadExcel_new(APIView):
 
 
 class EnergySavingMonthlyBarChartTestVB(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site, SiteBaseline. Takes from_date, site_id, till_date, user_type. Returns
+    Data, Dates, SavingData, msg, result, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date, user_type.
+        Response keys: Data, Dates, SavingData, msg, result, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = int(data.get("site_id", 0))
 
@@ -2193,10 +2351,22 @@ class EnergySavingMonthlyBarChartTestVB(APIView):
 
 
 class EnergySavingsHourlyExcelDownloadVB(APIView):
+    """API view for /api/hourly/data/excel/V1 (GET, POST; Login required; checks user type; no rate
+    limit). Builds an Excel / file download. Reads AisleGroup, HourlySiteReading, Site,
+    SiteBaseline. Takes date, end_date, from, from_date, site_id, till_date, to, to_date. Returns
+    msg, result.
+
+    Origin: Ashu
+    """
     permission_classes = [IsAuthenticated]
     throttle_classes = []
 
     def get(self, request):
+        """GET /api/hourly/data/excel/V1. Request fields: date, end_date, from, from_date, site_id,
+        till_date, to, to_date. Response keys: msg, result.
+
+        Origin: Ashu
+        """
         import re
         from datetime import date
 
@@ -2298,6 +2468,10 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
                 end_date_str = from_date_str
 
             def parse_date(d_str):
+                """Parses a date as YYYY/MM/DD, YYYY-MM-DD or DD-Mon-YYYY; ValueError otherwise.
+
+                Origin: Ashu
+                """
                 for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%d-%b-%Y"):
                     try:
                         return datetime.strptime(d_str, fmt)
@@ -2410,6 +2584,10 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
 
             # Helper to calculate daily baseline value for any date in the range
             def get_daily_baseline_for_date(d):
+                """Site's total daily baseline in force on a day (0 when the site is not live).
+
+                Origin: Ashu
+                """
                 if not site.is_live:
                     return 0.0
                 total_val = 0.0
@@ -2564,17 +2742,29 @@ class EnergySavingsHourlyExcelDownloadVB(APIView):
             )
 
     def post(self, request):
+        """POST /api/hourly/data/excel/V1. Request fields: date, end_date, from, from_date, site_id,
+        till_date, to, to_date. Response keys: msg, result.
+
+        Origin: Ashu
+        """
         return self.get(request)
 
 
 class EnergySavingsHourlyBarChartVB(APIView):
     """
     This API is used to get the hourly energy consumption data for a site on a given date. (For Savings Only)
+
+    Origin: Ashu (changed from main)
     """
 
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/hourly/data/test. Request fields: date, site_id. Response keys: Data, Hours,
+        SavingData, msg, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         start_time = datetime.now()
@@ -2693,9 +2883,20 @@ class EnergySavingsHourlyBarChartVB(APIView):
 
 
 class DownloadExcelVB(APIView):
+    """API view for /api/download/excel/test (POST; Open: no login (AllowAny)). Builds an Excel / file
+    download. Reads AisleGroup, DailySiteReading, SiteBaseline. Takes end_date, from_date, site_id,
+    user_type. Returns message.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/download/excel/test. Request fields: end_date, from_date, site_id, user_type.
+        Response keys: message.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             site_id = int(data.get("site_id"))
@@ -2793,8 +2994,21 @@ class DownloadExcelVB(APIView):
 
 
 class ParticularSiteSnapshotEnergySavingApiVB(APIView):
+    """API view for /api/siteSnapShotEnergySavingApi/ (POST; Login required (default)). Reads
+    AisleGroup, AlarmNotifications, DailySiteReading, Site. Takes site_id, user_type. Returns
+    alarms, carbon_emission_saved, energy_consumed, live_date, percentage_saved, previous_date,
+    result, saved_energy, site_live_date.
+
+    Origin: Ashu
+    """
     @entryExit
     def post(self, request):
+        """POST /api/siteSnapShotEnergySavingApi/. Request fields: site_id, user_type. Response keys:
+        alarms, carbon_emission_saved, energy_consumed, live_date, percentage_saved, previous_date,
+        result, saved_energy, site_live_date.
+
+        Origin: Ashu
+        """
         data = request.data
         # print("data of site snapshot", data)
         site_id = data.get("site_id", "")

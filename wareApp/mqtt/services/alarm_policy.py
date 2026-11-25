@@ -36,6 +36,11 @@ _NO_ROW = "none"
 
 
 def _version():
+    """Current version number of the alarm settings cache; bumping it makes every cached setting stale
+    at once.
+
+    Origin: Ashu
+    """
     version = cache.get(_VERSION_KEY)
     if version is None:
         version = 1
@@ -44,6 +49,10 @@ def _version():
 
 
 def clear_cache():
+    """Makes all cached alarm settings stale (bumps the cache version).
+
+    Origin: Ashu
+    """
     try:
         cache.incr(_VERSION_KEY)
     except ValueError:
@@ -51,6 +60,10 @@ def clear_cache():
 
 
 def setting(site_id, alarm_type):
+    """The AlarmSetting row for a site and alarm type (cached), or None when there is none.
+
+    Origin: Ashu
+    """
     key = f"alarm-policy:{_version()}:setting:{site_id}:{alarm_type}"
     row = cache.get(key)
     if row is None:
@@ -60,17 +73,27 @@ def setting(site_id, alarm_type):
 
 
 def mode(site_id, alarm_type):
-    """AlarmSetting.AUTO / MANUAL / OFF, or None without a setting row."""
+    """AlarmSetting.AUTO / MANUAL / OFF, or None without a setting row.
+
+    Origin: Ashu
+    """
     row = setting(site_id, alarm_type)
     return row.mode if row else None
 
 
 def is_off(site_id, alarm_type):
+    """True when the alarm type is switched off for the site.
+
+    Origin: Ashu
+    """
     return mode(site_id, alarm_type) == AlarmSetting.OFF
 
 
 def manual_threshold(site_id, alarm_type):
-    """The typed-in threshold when the type is in Manual mode, else None."""
+    """The typed-in threshold when the type is in Manual mode, else None.
+
+    Origin: Ashu
+    """
     row = setting(site_id, alarm_type)
     if row and row.mode == AlarmSetting.MANUAL:
         return row.threshold
@@ -78,7 +101,10 @@ def manual_threshold(site_id, alarm_type):
 
 
 def site_location(site_id):
-    """The LOCATION_TEAMS name of a site (keywords in its location or name), or None."""
+    """The LOCATION_TEAMS name of a site (keywords in its location or name), or None.
+
+    Origin: Ashu
+    """
     key = f"alarm-policy:{_version()}:location:{site_id}"
     location = cache.get(key)
     if location is None:
@@ -97,7 +123,10 @@ def site_location(site_id):
 
 
 def recipients(site_id, alarm_type=None):
-    """E-mail addresses for one alarm of a site (software + ground team)."""
+    """E-mail addresses for one alarm of a site (software + ground team).
+
+    Origin: Ashu
+    """
     row = setting(site_id, alarm_type) if alarm_type is not None else None
     software = alarm_recipients.SOFTWARE_TEAM if (row.email_software if row else True) else []
     all_sites = getattr(alarm_recipients, "GROUND_TEAM_ALL_SITES", [])
@@ -124,6 +153,11 @@ def recipients(site_id, alarm_type=None):
 
 
 def tolerance_percent(site_id, alarm_type):
+    """How much worse (in %) a repeat must be before it is e-mailed again: the site's setting or
+    ALARM_REPEAT_TOLERANCE_PERCENT (5).
+
+    Origin: Ashu
+    """
     row = setting(site_id, alarm_type)
     if row and row.repeat_tolerance_percent is not None:
         return row.repeat_tolerance_percent
@@ -131,7 +165,10 @@ def tolerance_percent(site_id, alarm_type):
 
 
 def should_email(last_value, value, worse_when_higher, tolerance):
-    """True when nothing was e-mailed yet or ``value`` is > tolerance % worse."""
+    """True when nothing was e-mailed yet or ``value`` is > tolerance % worse.
+
+    Origin: Ashu
+    """
     if last_value is None or value is None:
         return True
     margin = abs(last_value) * tolerance / 100
@@ -146,6 +183,8 @@ def last_emailed_value(site, alarm_type, now=None, **issue):
     ``issue`` narrows the alarm: aisle_group=..., object_id=..., power_source=...
     An alarm whose newest occurrence is older than ALARM_REPEAT_CLEAR_HOURS has
     cleared; its next occurrence counts as new.
+
+    Origin: Ashu
     """
     now = now or timezone.now()
     since = now - timedelta(hours=getattr(settings, "ALARM_REPEAT_CLEAR_HOURS", 24))
@@ -164,7 +203,10 @@ def last_emailed_value(site, alarm_type, now=None, **issue):
 
 
 def decide_email(site, alarm_type, value, worse_when_higher, **issue):
-    """``(send, last_value)`` for an occurrence of an issue with ``value``."""
+    """``(send, last_value)`` for an occurrence of an issue with ``value``.
+
+    Origin: Ashu
+    """
     last_value = last_emailed_value(site, alarm_type, **issue)
     site_id = getattr(site, "id", site)
     send = should_email(
@@ -175,4 +217,8 @@ def decide_email(site, alarm_type, value, worse_when_higher, **issue):
 
 @receiver([post_save, post_delete], sender=AlarmSetting)
 def _settings_changed(**kwargs):
+    """Signal handler: an AlarmSetting was saved or deleted, so the cached settings are cleared.
+
+    Origin: Ashu
+    """
     clear_cache()

@@ -70,6 +70,11 @@ OPERATION_HOURS_INCREASED = 12
 
 
 def _high_percent(site):
+    """High Consumption limit in % of baseline: the site's value or
+    ALARM_HIGH_CONSUMPTION_DEFAULT_PERCENT (75).
+
+    Origin: Ashu
+    """
     value = getattr(site, "high_consumption_baseline_percent", None)
     if value is not None:
         return value
@@ -81,6 +86,8 @@ def _bypass_threshold(site, baseline):
 
     The site's ``bypass_consumption_units`` overrides; otherwise the aisle's
     own daily baseline x ALARM_BYPASS_DEFAULT_PERCENT %. No baseline, no alarm.
+
+    Origin: Ashu
     """
     value = getattr(site, "bypass_consumption_units", None)
     if value is not None:
@@ -95,6 +102,8 @@ def _threshold(site, alarm_type, legacy, auto):
     """``(threshold_kwh, how)`` from the site's AlarmSetting, or (None, None).
 
     ``legacy()`` and ``auto()`` return ``(value, how)`` for "no setting" and Auto.
+
+    Origin: Ashu
     """
     mode = alarm_policy.mode(site.id, alarm_type)
     if mode == AlarmSetting.OFF:
@@ -110,12 +119,19 @@ def _threshold(site, alarm_type, legacy, auto):
 
 
 def _bypass_auto(baseline):
+    """Automatic Bypassed limit: ALARM_BYPASS_DEFAULT_PERCENT (100) % of the baseline, with its label.
+
+    Origin: Ashu
+    """
     percent = getattr(settings, "ALARM_BYPASS_DEFAULT_PERCENT", 100)
     return (baseline * percent / 100, f"{percent:g} % of baseline") if baseline else (None, None)
 
 
 def bypass_threshold_for(site, baseline):
-    """``(threshold_kwh, how)`` of the Bypassed alarm (setting, site field or baseline)."""
+    """``(threshold_kwh, how)`` of the Bypassed alarm (setting, site field or baseline).
+
+    Origin: Ashu
+    """
     return _threshold(
         site, BYPASSED, lambda: _bypass_threshold(site, baseline), lambda: _bypass_auto(baseline)
     )
@@ -132,6 +148,10 @@ EVERY_DAY_TYPES = frozenset({HIGH_CONSUMPTION, LOW_CONSUMPTION, BYPASSED})
 
 
 def priority_of(alarm_type):
+    """Alarm priority of a consumption alarm type: high or medium.
+
+    Origin: Ashu
+    """
     if alarm_type in HIGH_PRIORITY_TYPES:
         return AlarmNotifications.PRIORITY_HIGH
     return AlarmNotifications.PRIORITY_MEDIUM
@@ -150,13 +170,18 @@ def spike_hours(site, aisle_group, day, daily_baseline):
       other hours and more than 2 x the aisle's normal hour (daily baseline /
       24; 1 kWh without a baseline) - it carries the gap's consumption. A
       normal-sized hour after a gap (e.g. our own server was down) still counts.
+
+    Origin: Ashu
     """
     return verified_day_total(site, aisle_group, day, daily_baseline)[1]
 
 
 def _hour_rows(site, aisle_group, day):
     """``(reading_from, kWh)`` of the aisle from two days before ``day`` to its end:
-    yesterday's hours show whether ``day`` starts after a data gap."""
+    yesterday's hours show whether ``day`` starts after a data gap.
+
+    Origin: Ashu
+    """
     start = datetime.combine(day, time.min)
     return list(HourlySiteReading.objects.filter(
         associated_Site=site, leg_id=aisle_group.attached_leg_id,
@@ -173,6 +198,8 @@ def verified_day_total(site, aisle_group, day, daily_baseline, stored_total=None
     hour (a jump, or a catch-up after a gap found by looking back into
     yesterday's hours) is left out. A day without any hourly row (e.g. stored
     by a daily recovery packet) cannot be verified: ``stored_total`` is used.
+
+    Origin: Ashu
     """
     start = datetime.combine(day, time.min)
     rows = _hour_rows(site, aisle_group, day)
@@ -185,11 +212,18 @@ def verified_day_total(site, aisle_group, day, daily_baseline, stored_total=None
 
 
 class Spike:
-    """One spike hour: ``kind`` "jump" or "catch_up"; ``previous`` = last reading before it."""
+    """One spike hour: ``kind`` "jump" or "catch_up"; ``previous`` = last reading before it.
+
+    Origin: Ashu
+    """
 
     __slots__ = ("at", "kwh", "kind", "previous")
 
     def __init__(self, at, kwh, kind, previous):
+        """One spike hour: time, kWh, kind (spike or meter jump) and the previous hour's kWh.
+
+        Origin: Ashu
+        """
         self.at, self.kwh, self.kind, self.previous = at, kwh, kind, previous
 
 
@@ -198,6 +232,8 @@ def find_spikes(rows, day_start, daily_baseline):
 
     ``rows``: ``(reading_from, kWh)`` of one aisle in time order, from before
     the day (to see a gap at its start) to its end.
+
+    Origin: Ashu
     """
     today = [kwh or 0.0 for at, kwh in rows if at >= day_start]
     spikes, previous = [], None
@@ -221,6 +257,10 @@ def find_spikes(rows, day_start, daily_baseline):
 
 def meter_issue_on(site, aisle_group, day):
     # By aisle only: the alarm may be stored under the aisle's display site (alarm_sites).
+    """True when a Meter Reading Issue alarm was raised for the aisle on that day.
+
+    Origin: Ashu
+    """
     start = datetime.combine(day, time.min)
     return AlarmNotifications.objects.filter(
         aisle_group=aisle_group, Alarm_type=METER_READING_ISSUE,
@@ -229,15 +269,26 @@ def meter_issue_on(site, aisle_group, day):
 
 
 def _spike_note(spikes):
+    """Spike hours as short text, e.g. '14:00 820.50 kWh'.
+
+    Origin: Ashu
+    """
     return ", ".join(f"{at:%H:%M} {kwh:.2f} kWh" for at, kwh in spikes)
 
 
 def _activity_threshold():
+    """kWh above which an hour counts as activity (ALARM_ACTIVITY_THRESHOLD_KWH, 0.01).
+
+    Origin: Ashu
+    """
     return getattr(settings, "ALARM_ACTIVITY_THRESHOLD_KWH", 0.01)
 
 
 def _in_window(hour, start, end):
-    """Hour start ``hour`` lies in [start, end); the window may cross midnight."""
+    """Hour start ``hour`` lies in [start, end); the window may cross midnight.
+
+    Origin: Ashu
+    """
     if start.hour == end.hour:
         return True
     if start.hour < end.hour:
@@ -246,7 +297,10 @@ def _in_window(hour, start, end):
 
 
 def operation_hours_check(site, aisle_group, day):
-    """Return ``(active_hours, extra_hours)`` for an NL aisle, or None when not evaluated."""
+    """Return ``(active_hours, extra_hours)`` for an NL aisle, or None when not evaluated.
+
+    Origin: Ashu
+    """
     if is_emergency_supply(getattr(aisle_group, "aisleGroupName", "")):
         return None
     nl_hours = getattr(site, "nl_operation_hours", None)
@@ -273,6 +327,11 @@ def operation_hours_check(site, aisle_group, day):
 
 def _record(site, aisle_group, day, alarm_type, title, to_do, details,
             value=None, worse_when_higher=True):
+    """Stores (or repeats) a daily consumption alarm under the aisle's display site and e-mails it
+    according to the site's alarm settings.
+
+    Origin: Ashu
+    """
     day_start = datetime.combine(day, datetime.min.time())
     # Stored and e-mailed under the aisle's display site (merged sites,
     # alarm_sites); looked up by aisle, which belongs to one site only.
@@ -352,6 +411,8 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
     """Evaluate all daily alarms of one aisle for ``daily_reading.reading_for``.
 
     Returns the titles of the alarms stored by this call.
+
+    Origin: Ashu
     """
     day = daily_reading.reading_for
     consumption = daily_reading.unit_consumption or 0.0
@@ -413,9 +474,17 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
             stored.append("Operation Hours Increased")
 
     def high_auto():
+        """Automatic High Consumption limit: baseline x the site's high %.
+
+        Origin: Ashu
+        """
         return (baseline * _high_percent(site) / 100, "baseline") if baseline else (None, None)
 
     def high_legacy():
+        """High Consumption limit from the site's fixed units when set, else the automatic one.
+
+        Origin: Ashu
+        """
         units = getattr(site, "high_consumption_units", None)
         return (units, "site setting") if units is not None else high_auto()
 
@@ -433,11 +502,20 @@ def evaluate_daily_alarms(site, aisle_group, daily_reading):
         return stored
 
     def low_from(percent):
+        """Low Consumption limit: baseline less the given %.
+
+        Origin: Ashu
+        """
         if percent is None or not baseline:
             return None, None
         return baseline * (1 - percent / 100), f"baseline less {percent:g}%"
 
     def low_auto():
+        """Automatic Low Consumption limit from the site's minimum % or
+        ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT (90).
+
+        Origin: Ashu
+        """
         percent = getattr(site, "min_threshold_value", None)
         if percent is None:
             percent = getattr(settings, "ALARM_LOW_CONSUMPTION_DEFAULT_PERCENT", 90)
@@ -464,6 +542,8 @@ def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
 
     Called by the live consumption path for today's daily row. Returns True
     when the alarm was stored now. A cache flag skips aisles already done today.
+
+    Origin: Ashu
     """
     done_key = f"bypass-intraday:{site.id}:{aisle_group.id}:{day:%Y%m%d}"
     if cache.get(done_key):
@@ -511,7 +591,10 @@ def check_intraday_bypass(site, aisle_group, day, consumption, now=None):
 
 
 def evaluate_days(site, aisle_group, days):
-    """Re-evaluate complete past days after recovery rewrote them; returns stored titles."""
+    """Re-evaluate complete past days after recovery rewrote them; returns stored titles.
+
+    Origin: Ashu
+    """
     from wareApp.models import DailySiteReading
 
     today = datetime.now().date()

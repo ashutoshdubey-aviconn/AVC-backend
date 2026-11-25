@@ -24,19 +24,34 @@ _MISSING = "__missing__"
 
 
 def _site_key(site_id):
+    """Cache key of a site's settings.
+
+    Origin: Ashu
+    """
     return f"cfg:site:{int(site_id)}"
 
 
 def _baseline_key(site_id, leg_id):
+    """Cache key of an aisle's current baseline.
+
+    Origin: Ashu
+    """
     return f"cfg:baseline:{int(site_id)}:{leg_id}"
 
 
 def _baselines_key(site_id, leg_id):
+    """Cache key of all baseline periods of an aisle.
+
+    Origin: Ashu
+    """
     return f"cfg:baselines:{int(site_id)}:{leg_id}"
 
 
 def site(site_id):
-    """Return the Site (with its customer) or raise ``Site.DoesNotExist``."""
+    """Return the Site (with its customer) or raise ``Site.DoesNotExist``.
+
+    Origin: Ashu
+    """
     key = _site_key(site_id)
     cached = cache.get(key)
     if cached == _MISSING:
@@ -59,6 +74,8 @@ def latest_baseline(site_id, leg_id):
 
     Matches the consumption handler's selection: the row with the latest
     ``baseline_to`` (then highest id) for the site and leg.
+
+    Origin: Ashu
     """
     key = _baseline_key(site_id, leg_id)
     cached = cache.get(key)
@@ -83,6 +100,8 @@ def baselines(site_id, leg_id):
 
     Ordered newest first (latest ``baseline_to``, then highest id), so the
     first row covering a day is the one ``services/baseline.py`` uses.
+
+    Origin: Ashu
     """
     key = _baselines_key(site_id, leg_id)
     cached = cache.get(key)
@@ -102,11 +121,19 @@ def baselines(site_id, leg_id):
 
 @receiver([post_save, post_delete], sender=Site)
 def _drop_site(sender, instance, **kwargs):
+    """Signal handler: a site was saved or deleted, so its cached settings are dropped.
+
+    Origin: Ashu
+    """
     cache.delete(_site_key(instance.pk))
 
 
 @receiver([post_save, post_delete], sender=SiteBaseline)
 def _drop_baseline(sender, instance, **kwargs):
+    """Signal handler: a baseline was saved or deleted, so the aisle's cached baselines are dropped.
+
+    Origin: Ashu
+    """
     if instance.associated_site_id_id is not None and instance.leg_id is not None:
         cache.delete(_baseline_key(instance.associated_site_id_id, instance.leg_id))
         cache.delete(_baselines_key(instance.associated_site_id_id, instance.leg_id))

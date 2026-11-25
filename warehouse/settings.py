@@ -20,7 +20,10 @@ IS_PROD = env == "PROD"
 
 
 def _host_list(value):
-    """Accept ``a,b`` as well as the ``["a", "b"]`` form used in the server .env files."""
+    """Accept ``a,b`` as well as the ``["a", "b"]`` form used in the server .env files.
+
+    Origin: Ashu
+    """
     return [item.strip().strip("'\"") for item in value.strip("[] ").split(",") if item.strip()]
 
 

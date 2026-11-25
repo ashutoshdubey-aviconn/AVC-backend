@@ -44,11 +44,18 @@ DAILY = (A.FUEL_DRAIN, A.DG_RUNNING_WITHOUT_LOAD, A.OPERATION_HOURS_INCREASED, A
 
 
 def _setting(name, default):
+    """A setting from settings.py (.env), or the default.
+
+    Origin: Ashu
+    """
     return getattr(settings, name, default)
 
 
 def rules(now):
-    """``[(label, queryset, off_time expression)]`` of alarms to close now."""
+    """``[(label, queryset, off_time expression)]`` of alarms to close now.
+
+    Origin: Ashu
+    """
     active = A.objects.filter(is_active=True)
     seen = lambda: F("last_seen")  # noqa: E731
     today_start = datetime.combine(now.date(), time.min)
@@ -108,7 +115,10 @@ def rules(now):
 
 
 def close_resolved(now=None, dry_run=False):
-    """Close resolved alarms; returns ``{label: count}``."""
+    """Close resolved alarms; returns ``{label: count}``.
+
+    Origin: Ashu
+    """
     now = now or datetime.now()
     counts = {}
     for label, queryset, off_time in rules(now):

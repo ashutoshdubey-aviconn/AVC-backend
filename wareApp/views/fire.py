@@ -17,8 +17,17 @@ from wareApp.utility import entryExit, logger
 
 
 class FireAlarm(APIView):
+    """API view for /api/fireAlarm/ (POST; Login required (default)). Reads AisleGroup, FirePumpAlarm,
+    Site. Takes site_id. Returns data, status.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/fireAlarm/. Request fields: site_id. Response keys: data, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data : ", data)
         site_id = data.get("site_id", "")
@@ -55,8 +64,17 @@ class FireAlarm(APIView):
 
 class EmailHistory(APIView):
 
+    """API view for /api/emailhistory/ (POST; Login required (default)). Reads Email_History, Site.
+    Takes site_id. Returns data, message, status.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/emailhistory/. Request fields: site_id. Response keys: data, message, status.
+
+        Origin: Ashu (changed from main)
+        """
         site_id = request.data.get("site_id")
 
         try:
@@ -84,8 +102,20 @@ class EmailHistory(APIView):
 
 
 class FireEquipmentSystemAdd(APIView):
+    """API view for /api/saveInventoryData/ (POST; Login required (default)). Saves to
+    FireEquipmentsSystem. Reads FireEquipmentsSystemType. Takes assetNo, deviceName, id,
+    last_service, location, modelNo, next_service, row_id, updated_by, warrenty. Returns msg,
+    status.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/saveInventoryData/. Request fields: assetNo, deviceName, id, last_service,
+        location, modelNo, next_service, row_id, updated_by, warrenty. Response keys: msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data", data)
         device_id = data.get("id", "")
@@ -130,8 +160,17 @@ class FireEquipmentSystemAdd(APIView):
 
 
 class FireEquipmentSystemFetch(APIView):
+    """API view for /api/fireDevicefetchdata/ (POST; Login required (default)). Reads
+    FireEquipmentsSystem, FireEquipmentsSystemType. Takes row_id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/fireDevicefetchdata/. Request fields: row_id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data : ", data)
         row_id = data.get("row_id", "")
@@ -158,8 +197,17 @@ class FireEquipmentSystemFetch(APIView):
 
 
 class FireEquiSystemTypefetch(APIView):
+    """API view for /api/fireDeviceTypefetch/ (POST; Login required (default)). Reads
+    FireEquipmentsSystemType, Site. Takes site_id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/fireDeviceTypefetch/. Request fields: site_id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data :", data)
         site_id = data.get("site_id", "")
@@ -176,8 +224,18 @@ class FireEquiSystemTypefetch(APIView):
 
 
 class FireEquiSystemTypeAdd(APIView):
+    """API view for /api/fireDeviceTypeAdd/ (POST; Login required (default)). Saves to
+    FireEquipmentsSystemType. Reads Site. Takes category, deviceName.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/fireDeviceTypeAdd/. Request fields: category, deviceName. Response keys: built in
+        code (not a fixed dict).
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data:", data)
         devicename = data.get("deviceName", "")
@@ -191,8 +249,18 @@ class FireEquiSystemTypeAdd(APIView):
 
 
 class SnapshotApi(APIView):
+    """API view for /api/snapShotApi/ (POST; Login required (default)). Reads FireEquipmentsSystem.
+    Takes site_id. Returns data, expiredDevice, status, totalDevices, warrenty.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/snapShotApi/. Request fields: site_id. Response keys: data, expiredDevice, status,
+        totalDevices, warrenty.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         current_date = datetime.now()
@@ -234,7 +302,16 @@ class SnapshotApi(APIView):
 
 
 class ExpiredDevicesListApi(APIView):
+    """API view for /api/expireddevicesList/ (POST; Login required (default)). Reads
+    FireEquipmentsSystem. Takes site_id. Returns data, status.
+
+    Origin: main (unchanged)
+    """
     def post(self, request):
+        """POST /api/expireddevicesList/. Request fields: site_id. Response keys: data, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         current_date = datetime.now()
@@ -258,8 +335,17 @@ class ExpiredDevicesListApi(APIView):
 
 
 class fireEquiSystemDelete(APIView):
+    """API view for /api/deleteInventoryData/ (POST; Login required (default)). Saves to
+    FireEquipmentsSystem. Takes id. Returns msg, status.
+
+    Origin: main (unchanged)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/deleteInventoryData/. Request fields: id. Response keys: msg, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         row = data.get("id")
         FireEquipmentsSystem.objects.filter(id=int(row)).delete()

@@ -20,18 +20,36 @@ from wareApp.mqtt.services import gateway_health
 
 
 class _Rollback(Exception):
+    """Raised on purpose to roll back a dry run of the gateway health check.
+
+    Origin: Ashu
+    """
     pass
 
 
 class Command(BaseCommand):
+    """manage.py gateway_health: Read gateway pings from the Mosquitto log and raise / clear alarms 14,
+    15, 16.
+
+    Origin: Ashu
+    """
     help = "Read gateway pings from the Mosquitto log and raise / clear alarms 14, 15, 16."
 
     def add_arguments(self, parser):
+        """Command-line options: --broker-log, --from-start, --dry-run.
+
+        Origin: Ashu
+        """
         parser.add_argument("--broker-log", help="Mosquitto log to read ping lines from")
         parser.add_argument("--from-start", action="store_true", help="Read the whole log file")
         parser.add_argument("--dry-run", action="store_true", help="Show the result, store nothing, send no e-mail")
 
     def handle(self, *args, broker_log=None, from_start=False, dry_run=False, **options):
+        """Runs manage.py gateway_health: Read gateway pings from the Mosquitto log and raise / clear
+        alarms 14, 15, 16.
+
+        Origin: Ashu
+        """
         mails = []
         ping_marker = gateway_health.marker(gateway_health.PING_READ_MARKER)
         try:
@@ -60,8 +78,20 @@ class Command(BaseCommand):
 
 
 class _nothing:
+    """Empty context manager used in place of a transaction when --apply is given.
+
+    Origin: Ashu
+    """
     def __enter__(self):
+        """Enters the empty context (does nothing).
+
+        Origin: Ashu
+        """
         return None
 
     def __exit__(self, *exc):
+        """Leaves the empty context without hiding errors.
+
+        Origin: Ashu
+        """
         return False

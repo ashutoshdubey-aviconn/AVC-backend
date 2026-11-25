@@ -39,6 +39,8 @@ def notify(send_function, *args):
     queue is unavailable (RabbitMQ down or still starting) the e-mail is sent
     directly instead of being lost. Inside an open transaction the hand-off
     happens after commit and None is returned (outcome not known yet).
+
+    Origin: Ashu
     """
     name = getattr(send_function, "__name__", None)
     if not getattr(settings, "MQTT_ASYNC_NOTIFICATIONS", False) or (
@@ -51,6 +53,11 @@ def notify(send_function, *args):
     outcome = {}
 
     def enqueue():
+        """Puts the e-mail on the notifications queue; on a broker error the e-mail is kept as a
+        PendingEmail for retry.
+
+        Origin: Ashu
+        """
         from wareApp.tasks import send_notification
 
         try:
@@ -79,6 +86,10 @@ RETRY_BATCH = 20
 
 
 def _summary(function_name, args):
+    """Short text of an e-mail for logs and the pending e-mail list.
+
+    Origin: Ashu
+    """
     if function_name == "send_alarm_email" and args:
         return f"{args[0]} - site {args[1] if len(args) > 1 else '?'}"[:200]
     return function_name
@@ -89,7 +100,10 @@ def remember_failed(function_name, args, result, now=None):
 
     Only for a passing failure (``sendmail.EmailFailure.transient``) of an
     allowed notification, and only while retries are on
-    (NOTIFICATION_RETRY_HOURS > 0)."""
+    (NOTIFICATION_RETRY_HOURS > 0).
+
+    Origin: Ashu
+    """
     from wareApp.models import PendingEmail
 
     if (
@@ -116,6 +130,8 @@ def retry_pending(now=None):
     Stops at the first failure of a run (the mail server is still refusing;
     no need to try the others now). Gives an e-mail up after
     NOTIFICATION_RETRY_HOURS from its first failure.
+
+    Origin: Ashu
     """
     from wareApp import sendmail
     from wareApp.models import PendingEmail

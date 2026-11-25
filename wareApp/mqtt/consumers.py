@@ -26,6 +26,8 @@ def _publish_options(queue):
     packet to disk. Packets still queued when RabbitMQ itself restarts are
     lost; missed hours are re-requested by recovery. Alarm e-mails
     (notifications queue) stay persistent.
+
+    Origin: Ashu
     """
     options = {"queue": queue}
     if getattr(settings, "MQTT_TRANSIENT_MESSAGES", True):
@@ -34,7 +36,10 @@ def _publish_options(queue):
 
 
 def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
-    """``topic`` is anything with ``message_type`` / ``message_subtype`` (an envelope)."""
+    """``topic`` is anything with ``message_type`` / ``message_subtype`` (an envelope).
+
+    Origin: Ashu
+    """
     if not is_handled(topic.message_type, topic.message_subtype):
         logger.info(
             "Ignoring queue1 message without a processing handler: type=%s subtype=%s "
@@ -68,7 +73,16 @@ def _queue_one_message_for_processing(site_id, gateway_id, message, topic):
 
 
 def _run_isolated_mqtt_client(client_id, subscriptions, description, on_message):
+    """Runs one MQTT client with its own client id and subscriptions (clean_session=False) until it
+    stops; calls on_message for each packet.
+
+    Origin: Ashu
+    """
     def on_connect(client, userdata, flags, rc):
+        """On (re)connect: subscribes again, or logs when the broker refused the connection.
+
+        Origin: Ashu
+        """
         if rc:
             logger.error("%s MQTT connection rejected: rc=%s", description, rc)
             return
@@ -99,9 +113,17 @@ def _run_isolated_mqtt_client(client_id, subscriptions, description, on_message)
 
 
 def run_mqtt_client1():
-    """Run the isolated queue1 MQTT consumer."""
+    """Run the isolated queue1 MQTT consumer.
+
+    Origin: Ashu
+    """
 
     def on_message(client, userdata, msg):
+        """Queue 1 listener: parses the topic, notes gateway activity and hands the packet to the
+        consumption batch or the processing queue.
+
+        Origin: Ashu
+        """
         try:
             envelope = MqttEnvelope.from_mqtt(msg.topic, msg.payload)
             if envelope.message_type not in QUEUE_ONE_MESSAGE_TYPES:
@@ -126,9 +148,17 @@ def run_mqtt_client1():
 
 
 def run_mqtt_client2():
-    """Run the isolated LoadData MQTT consumer for queue2."""
+    """Run the isolated LoadData MQTT consumer for queue2.
+
+    Origin: Ashu
+    """
 
     def on_message(client, userdata, msg):
+        """Queue 2 listener: accepts only LoadData packets and hands them to the queue 2 processing
+        task.
+
+        Origin: Ashu
+        """
         envelope = None
         try:
             envelope = MqttEnvelope.from_mqtt(msg.topic, msg.payload)

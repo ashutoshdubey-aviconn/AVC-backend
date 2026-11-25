@@ -16,13 +16,24 @@ class AlarmsList(APIView):
     Response keys unchanged; counts are occurrences of the alarms that are
     still happening (closed alarms are not shown, see alarm_closer), except
     active_alarms: the number of open alarms.
+
+    Origin: Ashu (changed from main)
     """
 
     def post(self, request):
+        """POST /api/alarmList/. Request fields: siteId. Response keys: active_alarms, data,
+        high_priority, medium_priority, status, total_alarm.
+
+        Origin: Ashu (changed from main)
+        """
         site = int(request.data.get("siteId"))
         alarms = AlarmNotifications.objects.filter(site_id=site, is_active=True)
 
         def total(queryset):
+            """Total alarm occurrences of a queryset (repeats counted).
+
+            Origin: Ashu
+            """
             return queryset.aggregate(n=Sum("occurrences"))["n"] or 0
 
         data = []
@@ -57,9 +68,17 @@ class AlarmsList(APIView):
 
 
 class AlarmsListDetail(APIView):
-    """Active alarms of one site and type, newest first (same JSON keys as before)."""
+    """Active alarms of one site and type, newest first (same JSON keys as before).
+
+    Origin: Ashu (changed from main)
+    """
 
     def post(self, request):
+        """POST /api/alarmListDetail/. Request fields: alarm_type, siteId. Response keys: data, msg,
+        status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             alarms = AlarmNotifications.objects.filter(
@@ -72,7 +91,17 @@ class AlarmsListDetail(APIView):
 
 
 class ConsumptionAlarmsAPI(APIView):
+    """API view for /api/consumptionAlarms/ (POST; Login required (default)). Reads AlarmNotifications.
+    Takes end_date, site_id, start_date. Returns data, msg, status.
+
+    Origin: Ashu
+    """
     def post(self, request):
+        """POST /api/consumptionAlarms/. Request fields: end_date, site_id, start_date. Response keys:
+        data, msg, status.
+
+        Origin: Ashu
+        """
         data = request.data
         try:
             site_id = int(data.get("site_id", 0))

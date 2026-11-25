@@ -38,6 +38,11 @@ GATEWAY_ALARMS = (AlarmNotifications.GATEWAY_DISCONNECTED, AlarmNotifications.GA
 
 def _gap_reason(site_ids, gap_from, gap_to, restarts):
     # A restart up to the end of the spike hour also ended the gap.
+    """Why an aisle had no data before a spike: our server was restarted, a gateway alarm was open, or
+    unknown.
+
+    Origin: Ashu
+    """
     if any(gap_from <= at < gap_to + timedelta(hours=2) for at in restarts):
         return "our server / listener was down (restarted in the gap)"
     # Gateway alarms of the aisle's site or its display site (alarm_sites).
@@ -58,7 +63,10 @@ def _gap_reason(site_ids, gap_from, gap_to, restarts):
 
 
 def cause(site, aisle, day, spike, baseline, restarts):
-    """Plain-text cause of one spike hour."""
+    """Plain-text cause of one spike hour.
+
+    Origin: Ashu
+    """
     if spike.kind == "jump":
         if meter_issue_on(site, aisle, day):
             return "meter reset or replaced: the gateway reported a lower meter reading (ERROR!!!) the same day"
@@ -75,7 +83,10 @@ def cause(site, aisle, day, spike, baseline, restarts):
 
 
 def short_cause(spike, reason):
-    """Cause as kept in the alarm text (the e-mail has the full one)."""
+    """Cause as kept in the alarm text (the e-mail has the full one).
+
+    Origin: Ashu
+    """
     if spike.kind == "catch_up" and spike.previous is not None:
         missing = int((spike.at - spike.previous).total_seconds() // 3600) - 1
         return f"catch-up, {missing} h gap from {spike.previous + timedelta(hours=1):%d %b %H:%M}"
@@ -85,7 +96,10 @@ def short_cause(spike, reason):
 
 
 def scan(now=None):
-    """Raise / update Consumption Spike alarms for today and yesterday; returns a summary."""
+    """Raise / update Consumption Spike alarms for today and yesterday; returns a summary.
+
+    Origin: Ashu
+    """
     now = now or datetime.now()
     today = now.date()
     days = (today - timedelta(days=1), today)

@@ -20,7 +20,17 @@ from wareApp.utility import entryExit, logger
 
 
 class PowerSourceDistributionMonthlyBarChartTime(APIView):
+    """API view for /api/getDailyPowerSrcDistDataTime/ (POST; Login required (default)). Reads
+    SupplyLoadTimeShare. Takes from_date, site_id, till_date. Returns Data, Dates.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/getDailyPowerSrcDistDataTime/. Request fields: from_date, site_id, till_date.
+        Response keys: Data, Dates.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "request data :", data)
         site_id = data.get("site_id", "")
@@ -129,7 +139,17 @@ class PowerSourceDistributionMonthlyBarChartTime(APIView):
 
 
 class PowerDistributionHourlyBarChartTime(APIView):
+    """API view for /api/getHourlyPowerSrcDistDataTime/ (POST; Login required (default)). Reads
+    SupplyLoadTimeShare. Takes date, site_id. Returns Data, Hours.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/getHourlyPowerSrcDistDataTime/. Request fields: date, site_id. Response keys:
+        Data, Hours.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         date = data.get("date", "")
@@ -187,8 +207,18 @@ class PowerDistributionHourlyBarChartTime(APIView):
 
 
 class PowerSourceDistributionMonthlyBarChart(APIView):
+    """API view for /api/getDailyPowerSrcDistData/ (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, Site. Takes from_date, site_id, till_date. Returns Data, Dates, error.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/getDailyPowerSrcDistData/. Request fields: from_date, site_id, till_date. Response
+        keys: Data, Dates, error.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         till_date = data.get("till_date", "")
         logger.debug("%s %s", "till_date", till_date)
@@ -272,8 +302,18 @@ class PowerSourceDistributionMonthlyBarChart(APIView):
 
 
 class PowerDistributionHourlyBarChart(APIView):
+    """API view for /api/getHourlyPowerSrcDistData/ (POST; Login required (default)). Reads AisleGroup,
+    HourlySiteReading, Site. Takes date, site_id. Returns Data, Hours, error.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/getHourlyPowerSrcDistData/. Request fields: date, site_id. Response keys: Data,
+        Hours, error.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         date = data.get("date", "")
         logger.debug("%s %s", "input date: ", date)
@@ -350,10 +390,21 @@ class PowerDistributionHourlyBarChart(APIView):
 
 
 class PowerDistributionPieChartV2(APIView):
+    """API view for /api/getPowerSrcDistData/, /api/power-distribution/test/ (POST; Open: no login
+    (AllowAny)). Reads AisleGroup, DailySiteReading. Takes month, selected_month, selected_year,
+    siteId, site_id, year. Returns error, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @staticmethod
     def _parse_month_year(data):
+        """Month and year from the request (month / selected_month, year / selected_year); this month
+        when missing.
+
+        Origin: Ashu
+        """
         current_date = datetime.now()
         month = data.get("month") or data.get("selected_month")
         year = data.get("year") or data.get("selected_year")
@@ -372,6 +423,11 @@ class PowerDistributionPieChartV2(APIView):
         return month, year, None
 
     def post(self, request):
+        """POST /api/getPowerSrcDistData/, /api/power-distribution/test/. Request fields: month,
+        selected_month, selected_year, siteId, site_id, year. Response keys: error, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             site_id = request.data.get("siteId") or request.data.get("site_id")
             if not site_id:
@@ -468,9 +524,19 @@ class PowerDistributionPieChartV2(APIView):
 
 
 class PowerSource(APIView):
+    """API view for /api/listPowerSource/test/ (POST; Open: no login (AllowAny)). Reads AisleGroup.
+    Takes site_id. Returns data, error, message, result.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/listPowerSource/test/. Request fields: site_id. Response keys: data, error,
+        message, result.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         try:
             site = data.get("site_id")

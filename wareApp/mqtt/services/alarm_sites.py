@@ -27,14 +27,20 @@ from wareApp.models import AisleGroup, AisleSyncRecoveryStatus, Site
 
 
 def display_site_id(aisle_group, site_id):
-    """Site id an aisle's alarms are stored under (its display site)."""
+    """Site id an aisle's alarms are stored under (its display site).
+
+    Origin: Ashu
+    """
     if aisle_group is None:
         return site_id
     return getattr(aisle_group, "virtual_siteID_id", None) or getattr(aisle_group, "site_id", None) or site_id
 
 
 def display_site(aisle_group, site):
-    """Site object an aisle's alarms are stored under."""
+    """Site object an aisle's alarms are stored under.
+
+    Origin: Ashu
+    """
     target = display_site_id(aisle_group, site.id)
     if target == site.id:
         return site
@@ -42,11 +48,18 @@ def display_site(aisle_group, site):
 
 
 def live_site_ids():
+    """Ids of the sites marked live.
+
+    Origin: Ashu
+    """
     return set(Site.objects.filter(is_live=True).values_list("id", flat=True))
 
 
 def monitored_site_ids(live=None):
-    """Live sites plus sites whose active aisles show under a live display site."""
+    """Live sites plus sites whose active aisles show under a live display site.
+
+    Origin: Ashu
+    """
     live = live_site_ids() if live is None else live
     merged = set(
         AisleGroup.objects.filter(is_active=True, virtual_siteID_id__in=live)
@@ -57,7 +70,10 @@ def monitored_site_ids(live=None):
 
 
 def site_targets(site_id, aisles, live):
-    """Live sites that get an alarm about ``aisles`` of physical site ``site_id``."""
+    """Live sites that get an alarm about ``aisles`` of physical site ``site_id``.
+
+    Origin: Ashu
+    """
     targets = sorted({display_site_id(aisle, site_id) for aisle in aisles} & live)
     if not targets and site_id in live:
         targets = [site_id]
@@ -65,7 +81,10 @@ def site_targets(site_id, aisles, live):
 
 
 def gateway_aisles(hgw):
-    """Active aisles a gateway feeds (all active aisles of its site when unknown)."""
+    """Active aisles a gateway feeds (all active aisles of its site when unknown).
+
+    Origin: Ashu
+    """
     site_aisles = AisleGroup.objects.filter(site_id=hgw.connected_to_id, is_active=True)
     fed = set(
         AisleSyncRecoveryStatus.objects.filter(home_gateway_id=hgw.hgw_id, aisle_group__isnull=False)
@@ -79,5 +98,8 @@ def gateway_aisles(hgw):
 
 
 def candidate_sites(site_id, aisles):
-    """Every site an alarm about these aisles could have been stored under (for clearing)."""
+    """Every site an alarm about these aisles could have been stored under (for clearing).
+
+    Origin: Ashu
+    """
     return {site_id} | {display_site_id(aisle, site_id) for aisle in aisles}

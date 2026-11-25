@@ -11,9 +11,18 @@ TOPIC_PATTERN = re.compile(r"(/Acclivate/iOmniControl/[^\s]+?/in/[^\s]+)")
 
 
 class Command(BaseCommand):
+    """manage.py simulate_mqtt_queue_routing: Dry-run MQTT queue routing against topic records in
+    Celery logs.
+
+    Origin: Ashu
+    """
     help = "Dry-run MQTT queue routing against topic records in Celery logs."
 
     def add_arguments(self, parser):
+        """Command-line options: logs, --limit.
+
+        Origin: Ashu
+        """
         parser.add_argument("logs", nargs="+", help="Celery log files to inspect.")
         parser.add_argument(
             "--limit",
@@ -23,10 +32,19 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Runs manage.py simulate_mqtt_queue_routing: Dry-run MQTT queue routing against topic records
+        in Celery logs.
+
+        Origin: Ashu
+        """
         for log_name in options["logs"]:
             self._simulate(Path(log_name), options["limit"])
 
     def _simulate(self, log_path: Path, limit: int) -> None:
+        """Reads topics from a log file and counts which queue each would be routed to.
+
+        Origin: Ashu
+        """
         if not log_path.is_file():
             raise CommandError(f"Log file does not exist: {log_path}")
 

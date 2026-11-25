@@ -13,8 +13,17 @@ from wareApp.utility import entryExit, logger
 
 
 class BaselineHistory(APIView):
+    """API view for /api/baselineHistory/ (POST; Login required (default)). Reads AisleGroup,
+    SiteBaseline. Takes site_id. Returns Data, Dates, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/baselineHistory/. Request fields: site_id. Response keys: Data, Dates, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "baseline history data", data)
         site_id = data.get("site_id", "")
@@ -47,8 +56,17 @@ class BaselineHistory(APIView):
 
 
 class BaselineData(APIView):
+    """API view for /api/fetchBaseline/ (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading. Takes date, site_id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/fetchBaseline/. Request fields: date, site_id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data", data)
         site_id = data.get("site_id", "")
@@ -83,8 +101,19 @@ class BaselineData(APIView):
 
 
 class SavingBaselineData(APIView):
+    """API view for /api/saveBaseline/ (POST; Login required (default)). Saves to DailySiteReading,
+    SiteBaseline. Reads AisleGroup, Site. Takes baselineValue, date, legId, siteId. Returns msg,
+    result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/saveBaseline/. Request fields: baselineValue, date, legId, siteId. Response keys:
+        msg, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data of saving baseline", data)
         site_id = data.get("siteId", "")
@@ -187,8 +216,18 @@ class SavingBaselineData(APIView):
 
 
 class AisleLevelBaseline(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads DailySiteReading, Site.
+    Takes from_date, site_id, till_date. Returns Data, Dates, result.
+
+    Origin: main (unchanged)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date. Response
+        keys: Data, Dates, result.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         site = Site.objects.get(id=site_id)
@@ -257,11 +296,18 @@ class BaselineSetup(APIView):
      "apply": false}                                # false = preview (default)
 
     See wareApp/baseline_setup.py and docs/consumption/BASELINE_SETUP.md.
+
+    Origin: Ashu
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """POST /api/baselineSetup/. Request fields: apply, effective_from, legs, overrides,
+        sample_from, sample_to, site_id, site_manager. Response keys: error, status.
+
+        Origin: Ashu
+        """
         if request.user.UserType != 1:
             raise PermissionDenied("Only Super_Admin users can set baselines.")
         data = request.data

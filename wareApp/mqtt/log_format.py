@@ -8,11 +8,18 @@ MAX_RANGES = 6
 
 
 def _hour(value):
+    """Datetime as YYYY-MM-DD HH:MM for logs.
+
+    Origin: Ashu
+    """
     return value.strftime("%Y-%m-%d %H:%M")
 
 
 def hour_span(first_hour, last_hour):
-    """``first_hour`` .. ``last_hour`` inclusive, both hour starts."""
+    """``first_hour`` .. ``last_hour`` inclusive, both hour starts.
+
+    Origin: Ashu
+    """
     hours = int((last_hour - first_hour) / HOUR) + 1
     if first_hour.date() == last_hour.date():
         end = last_hour.strftime("%H:%M")
@@ -24,13 +31,20 @@ def hour_span(first_hour, last_hour):
 
 
 def missing_hours(missing_from, missing_to):
-    """Gap ``[missing_from, missing_to)`` as hours, e.g. ``09:00→18:00 (10 h)``."""
+    """Gap ``[missing_from, missing_to)`` as hours, e.g. ``09:00→18:00 (10 h)``.
+
+    Origin: Ashu
+    """
     if missing_to <= missing_from:
         return hour_span(missing_from, missing_from)
     return hour_span(missing_from, missing_to - HOUR)
 
 
 def _runs(values, step):
+    """Joins sorted values into runs of consecutive steps (e.g. hours 1-5) for short log lines.
+
+    Origin: Ashu
+    """
     values = sorted(set(values))
     runs = []
     for value in values:
@@ -42,7 +56,10 @@ def _runs(values, step):
 
 
 def hour_ranges(hours):
-    """Consecutive hours merged: ``2026-10-01 00:00→23:00 (24 h), 2026-10-02 05:00 (1 h)``."""
+    """Consecutive hours merged: ``2026-10-01 00:00→23:00 (24 h), 2026-10-02 05:00 (1 h)``.
+
+    Origin: Ashu
+    """
     if not hours:
         return "-"
     runs = _runs(hours, HOUR)
@@ -53,7 +70,10 @@ def hour_ranges(hours):
 
 
 def day_ranges(days):
-    """Consecutive dates merged: ``2026-09-30→2026-10-19 (20 d)``."""
+    """Consecutive dates merged: ``2026-09-30→2026-10-19 (20 d)``.
+
+    Origin: Ashu
+    """
     if not days:
         return "-"
     days = [day.date() if isinstance(day, datetime) else day for day in days]
@@ -82,6 +102,8 @@ def log_bulk_write(
     """One BULK CREATE and/or BULK UPDATE line for an ``upsert_slots`` result.
 
     ``describe(keys)`` renders the slot keys as a period, e.g. ``hour_ranges``.
+
+    Origin: Ashu
     """
     for action, keys, ms in (
         ("BULK CREATE", written.created, written.create_ms),

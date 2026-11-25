@@ -34,11 +34,18 @@ QUEUE_TWO_SUBSCRIPTIONS = tuple(
 
 
 def queue_for_gateway_topic(topic: str) -> str | None:
-    """Return the one consumer queue responsible for a valid gateway topic."""
+    """Return the one consumer queue responsible for a valid gateway topic.
+
+    Origin: Ashu
+    """
     return queue_for_parsed_topic(parse_gateway_topic(topic))
 
 
 def queue_for_parsed_topic(topic: GatewayTopic) -> str | None:
+    """Queue a parsed topic goes to: queue 1 (business types), queue 2 (LoadData) or None.
+
+    Origin: Ashu
+    """
     if topic.message_type in QUEUE_ONE_MESSAGE_TYPES:
         return QUEUE_ONE
     if topic.message_type in QUEUE_TWO_MESSAGE_TYPES:
@@ -53,6 +60,8 @@ def processing_queue_for_site(site_id: int) -> str:
     ``queue1_processing`` queue (legacy behaviour). With N partitions a site
     always maps to ``mqtt.site.<site_id % N>``, so each site stays strictly
     ordered while different sites are processed in parallel.
+
+    Origin: Ashu
     """
     from django.conf import settings
 
@@ -67,6 +76,8 @@ def subscribe(client, topics: Iterable[str], qos: int = 1) -> None:
 
     QoS 1 together with the listener's persistent session lets Mosquitto keep
     messages while the listener restarts (see deploy/mosquitto/).
+
+    Origin: Ashu
     """
     for topic in topics:
         client.subscribe(topic, qos=qos)

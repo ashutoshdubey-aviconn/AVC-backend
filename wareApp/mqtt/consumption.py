@@ -51,6 +51,11 @@ METER_READING_ISSUE_PATTERN = re.compile(
 
 
 def _parse_consumption_message(message):
+    """Parses a consumption packet (time, meter, cumulative and hourly kWh ...); ValueError on a bad
+    timestamp or field.
+
+    Origin: Ashu
+    """
     value_for = KeyValuePayload.parse(message, "consumption").get
 
     message_time = value_for("time", "messagetime").split()
@@ -84,7 +89,10 @@ WAREHOUSE_SAVING_MAX_UNITS = MAX_READING_KWH
 
 def _cap_warehouse_saving_values(site, values):
     """Guard against meter glitches: values above MAX_READING_KWH become 0 on
-    saving and submetering sites, never on WH-metering (see reading_capped)."""
+    saving and submetering sites, never on WH-metering (see reading_capped).
+
+    Origin: Ashu
+    """
     if not reading_capped(site):
         return values
     for key in (
@@ -105,6 +113,11 @@ def _cap_warehouse_saving_values(site, values):
 
 
 def _notify_meter_reading_issue(site, location_id, gateway_id, message):
+    """Raises the Meter Reading Issue alarm (type 10) when the gateway reports a meter it couldn't
+    read, unless the alarm is off for the site.
+
+    Origin: Ashu
+    """
     match = METER_READING_ISSUE_PATTERN.search(str(message))
     if not match or alarm_policy.is_off(site.id, 10):
         return
@@ -188,7 +201,10 @@ def _notify_meter_reading_issue(site, location_id, gateway_id, message):
 
 
 def _consumption_alarms(site, aisle_group, daily_reading):
-    """Day-end alarms (see services/consumption_alarms.py)."""
+    """Day-end alarms (see services/consumption_alarms.py).
+
+    Origin: Ashu
+    """
     return evaluate_daily_alarms(site, aisle_group, daily_reading)
 
 
@@ -199,6 +215,8 @@ def stale_history(location_id, home_gateway_id, aisle_group, last_hourly_entry, 
     sync, so the packet is dropped without a recovery request (the gateway no
     longer holds that history) and nothing is stored that would overwrite the
     synced total. Logged once per aisle per day.
+
+    Origin: Ashu
     """
     stale_days = getattr(settings, "MQTT_RECOVERY_STALE_DAYS", 30)
     if not stale_days or observed_at - last_hourly_entry.reading_from <= timedelta(days=stale_days):
@@ -221,7 +239,10 @@ def stale_history(location_id, home_gateway_id, aisle_group, last_hourly_entry, 
 def _consumption_recovery_request(
     location_id, gateway_id, aisle_group_id, last_hourly_entry
 ):
-    """Build the gateway sync command for a consumption gap, or None."""
+    """Build the gateway sync command for a consumption gap, or None.
+
+    Origin: Ashu
+    """
     if not last_hourly_entry.reading_to:
         logger.warning(
             "Skipping consumption recovery with incomplete prior reading: site=%s homegateway_id=%s aisle_group=%s reading_id=%s",
@@ -246,20 +267,35 @@ def _consumption_recovery_request(
 
 
 class _BaselineMemo:
-    """Baseline of the packet's aisle and day (see services/baseline.py)."""
+    """Baseline of the packet's aisle and day (see services/baseline.py).
+
+    Origin: Ashu
+    """
 
     def __init__(self, site, aisle_group, day, home_gateway_id=None):
+        """Baseline lookup for one aisle and day, read once and reused for every packet of that day.
+
+        Origin: Ashu
+        """
         self._memo = BaselineMemo(site, aisle_group)
         self._day = day
         self._home_gateway_id = home_gateway_id
 
     def _values(self):
+        """Hourly and daily baseline for the day; logs a warning when the baseline is missing.
+
+        Origin: Ashu
+        """
         values = self._memo.for_day(self._day)
         if self._memo.missing_days:
             self._warn_missing()
         return values
 
     def _warn_missing(self):
+        """Logs a missing baseline at most once per aisle per hour.
+
+        Origin: Ashu
+        """
         site, aisle = self._memo.site, self._memo.aisle_group
         # Once per aisle per hour instead of on every packet.
         if cache.add(
@@ -276,17 +312,28 @@ class _BaselineMemo:
 
     @property
     def hourly(self):
+        """Hourly baseline of the day.
+
+        Origin: Ashu
+        """
         return self._values()[0]
 
     @property
     def daily(self):
+        """Daily baseline of the day.
+
+        Origin: Ashu
+        """
         return self._values()[1]
 
 
 def _counted_hours(site, leg_id, day, daily_baseline):
     """The day's hourly rows that count in its total: spike hours (above the
     whole daily baseline on saving / submetering sites, see
-    models.hour_counts_in_day) are left out; the rows themselves are kept."""
+    models.hour_counts_in_day) are left out; the rows themselves are kept.
+
+    Origin: Ashu
+    """
     day_start = datetime.combine(day, datetime.min.time())
     hours = HourlySiteReading.objects.filter(
         associated_Site=site,
@@ -306,6 +353,8 @@ def _daily_total_from_hourly(site, leg_id, day, daily_baseline=None):
     packet added its new units to the day and the day was re-summed only at
     the hour change, so the two drifted apart whenever a packet's units did
     not match the hour total.) Spike hours are not counted (_counted_hours).
+
+    Origin: Ashu
     """
     hourly_total = (
         _counted_hours(site, leg_id, day, daily_baseline)
@@ -318,6 +367,11 @@ def _daily_total_from_hourly(site, leg_id, day, daily_baseline=None):
 
 
 def _daily_updates(site, leg_id, day, daily_baseline):
+    """Field updates for a daily row: total = sum of the hours (10,000 kWh cap on capped sites) and
+    saving = daily baseline - total.
+
+    Origin: Ashu
+    """
     total = _daily_total_from_hourly(site, leg_id, day, daily_baseline)
     saved = Value(float(daily_baseline)) - total
     if reading_capped(site):
@@ -338,7 +392,10 @@ def _daily_updates(site, leg_id, day, daily_baseline):
 def handle_consumption_message(
     site, location_id, gateway_id, message, publish_recovery
 ):
-    """Persist a gateway consumption packet outside the Paho callback."""
+    """Persist a gateway consumption packet outside the Paho callback.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         if str(message).strip().startswith("ERROR!!!"):

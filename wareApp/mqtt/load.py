@@ -30,6 +30,10 @@ ALARM_REPEAT = timedelta(minutes=30)
 
 
 def _site_phase_thresholds(site, names):
+    """The site's R / Y / B limits of one kind (e.g. high voltage), or None when any is missing.
+
+    Origin: Ashu
+    """
     values = tuple(getattr(site, f"{phase}_phase_{names}", None) for phase in "ryb")
     return None if any(value is None for value in values) else values
 
@@ -40,6 +44,8 @@ def _voltage_thresholds(site, parameter_type):
     AlarmSetting Off: not checked; Auto: ALARM_VOLTAGE_AUTO_HIGH / _LOW on every
     phase; Manual: its threshold on every phase, else the site's phase fields.
     Without a setting: the site's fields when show_voltage_alarms is on.
+
+    Origin: Ashu
     """
     mode = alarm_policy.mode(site.id, parameter_type)
     if mode == AlarmSetting.OFF:
@@ -59,7 +65,10 @@ def _voltage_thresholds(site, parameter_type):
 
 
 def _pf_thresholds(site, values):
-    """R/Y/B power-factor thresholds, or None (not checked); same modes as voltage."""
+    """R/Y/B power-factor thresholds, or None (not checked); same modes as voltage.
+
+    Origin: Ashu
+    """
     mode = alarm_policy.mode(site.id, AlarmNotifications.PF_BAD_VALUE)
     if mode == AlarmSetting.OFF:
         return None
@@ -86,6 +95,10 @@ def _pf_thresholds(site, values):
 
 
 def _parse_load_message(message):
+    """Parses a load packet: load power, R / Y / B voltages and power factors, power source and status.
+
+    Origin: Ashu
+    """
     fields = KeyValuePayload.parse(message, "load", strip_value_quotes=True)
     value_for = fields.get
 
@@ -116,6 +129,10 @@ def _parse_load_message(message):
 
 
 def _voltage_alarm_data(site, values, thresholds):
+    """Values and limits shown in a voltage alarm.
+
+    Origin: Ashu
+    """
     return {
         "r_volts": round(values["r_volt"], 2),
         "y_volts": round(values["y_volt"], 2),
@@ -128,6 +145,10 @@ def _voltage_alarm_data(site, values, thresholds):
 
 
 def _record_voltage_alarm(site, values, parameter_type, thresholds):
+    """Saves a voltage reading that crossed a limit to SiteLoadParameters.
+
+    Origin: Ashu
+    """
     SiteLoadParameters.objects.create(
         site_id=site,
         power_source=values["power_source"],
@@ -183,6 +204,10 @@ def _record_voltage_alarm(site, values, parameter_type, thresholds):
 
 
 def _record_power_factor_alarm(site, values):
+    """Saves and alarms a power factor outside the site's limits while the source is ON.
+
+    Origin: Ashu
+    """
     factors = values.get("power_factors")
     if not factors or values["status"] != "ON":
         return
@@ -226,7 +251,10 @@ def _record_power_factor_alarm(site, values):
 
 
 def handle_load_message(site, location_id, gateway_id, message):
-    """Persist real-time load parameters and evaluate legacy voltage/PF alarms."""
+    """Persist real-time load parameters and evaluate legacy voltage/PF alarms.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         values = _parse_load_message(message)

@@ -73,11 +73,18 @@ BATCH_QUEUE = Queue(
 
 
 def batching_enabled():
+    """True when consumption packets are written in batches (MQTT_CONSUMPTION_BATCH_SECONDS > 0).
+
+    Origin: Ashu
+    """
     return getattr(settings, "MQTT_CONSUMPTION_BATCH_SECONDS", 0) > 0
 
 
 def enqueue(site_id, gateway_id, payload):
-    """Park one consumption packet until the next flush (called by the listener)."""
+    """Park one consumption packet until the next flush (called by the listener).
+
+    Origin: Ashu
+    """
     from warehouse.celery import app
 
     with app.producer_or_acquire() as producer:
@@ -97,6 +104,8 @@ def flush(publish_recovery, limit=MAX_PACKETS_PER_FLUSH):
 
     On an exception nothing is acknowledged: the packets go back to the
     queue (in order) and are processed by the next flush.
+
+    Origin: Ashu
     """
     from queue import Empty
 
@@ -134,6 +143,10 @@ def flush(publish_recovery, limit=MAX_PACKETS_PER_FLUSH):
 
 @dataclass
 class Packet:
+    """One queued consumption packet: site, gateway and raw payload.
+
+    Origin: Ashu
+    """
     site_id: int
     gateway_id: str
     payload: str
@@ -141,6 +154,10 @@ class Packet:
 
 @dataclass
 class _Parsed:
+    """A parsed packet of a batch with its site, values, observed time and hour end.
+
+    Origin: Ashu
+    """
     packet: Packet
     site: object
     values: dict
@@ -150,7 +167,10 @@ class _Parsed:
 
 @dataclass
 class _AisleState:
-    """Hourly/daily rows of one aisle, changed in memory before the bulk write."""
+    """Hourly/daily rows of one aisle, changed in memory before the bulk write.
+
+    Origin: Ashu
+    """
 
     site: object
     aisle: object
@@ -169,11 +189,18 @@ class _AisleState:
 
 
 def _hour(value):
+    """Start of the hour for a datetime.
+
+    Origin: Ashu
+    """
     return value.replace(minute=0, second=0, microsecond=0)
 
 
 def _first(rows):
-    """``QuerySet.first()`` on an unordered queryset orders by primary key."""
+    """``QuerySet.first()`` on an unordered queryset orders by primary key.
+
+    Origin: Ashu
+    """
     saved = [r for r in rows if r.pk is not None]
     if saved:
         return min(saved, key=lambda r: r.pk)
@@ -181,7 +208,10 @@ def _first(rows):
 
 
 def _parse(packets):
-    """Parse packets; diagnostics and bad payloads are handled one by one."""
+    """Parse packets; diagnostics and bad payloads are handled one by one.
+
+    Origin: Ashu
+    """
     parsed, outcomes = [], []
     for packet in packets:
         home_gateway_id = home_gateway_id_for(packet.site_id, packet.gateway_id)
@@ -232,7 +262,10 @@ def _parse(packets):
 
 
 def _load_states(parsed):
-    """One query each for aisle groups, hourly rows and daily rows of the batch."""
+    """One query each for aisle groups, hourly rows and daily rows of the batch.
+
+    Origin: Ashu
+    """
     keys = {(p.site.id, str(p.values["aisle_group_id"])) for p in parsed}
     by_site = defaultdict(set)
     for site_id, leg in keys:
@@ -279,7 +312,10 @@ def _load_states(parsed):
 
 
 def _last_hourly_entry(state):
-    """Newest hourly row of the aisle (database or created in this batch)."""
+    """Newest hourly row of the aisle (database or created in this batch).
+
+    Origin: Ashu
+    """
     stored = (
         HourlySiteReading.objects.filter(associated_Site=state.site, leg_id=state.leg_id)
         .order_by("-reading_from", "-id")
@@ -298,6 +334,8 @@ def _as_saved(row):
 
     bulk_create skips save(); the per-packet path creates rows with
     objects.create(), so new rows get the same cleaning here.
+
+    Origin: Ashu
     """
     row.clean_reading_values()
     return row
@@ -305,7 +343,10 @@ def _as_saved(row):
 
 def _day_total(state, day, daily_baseline=None):
     """Sum of the aisle's counted hourly rows of ``day`` (stored or new in this
-    batch); spike hours are left out (models.hour_counts_in_day)."""
+    batch); spike hours are left out (models.hour_counts_in_day).
+
+    Origin: Ashu
+    """
     day_start = datetime.combine(day, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     return sum(
@@ -318,12 +359,19 @@ def _day_total(state, day, daily_baseline=None):
 
 
 def _stored(state, observed_at):
+    """Remembers the latest packet time stored for an aisle in this batch.
+
+    Origin: Ashu
+    """
     if state.last_stored is None or observed_at > state.last_stored:
         state.last_stored = observed_at
 
 
 def _apply(state, p, publish_recovery):
-    """One packet, same branches as handle_consumption_message, rows in memory."""
+    """One packet, same branches as handle_consumption_message, rows in memory.
+
+    Origin: Ashu
+    """
     site, aisle, values = state.site, state.aisle, p.values
     location_id, gateway_id = p.packet.site_id, p.packet.gateway_id
     leg_id = values["aisle_group_id"]
@@ -502,7 +550,10 @@ def _apply(state, p, publish_recovery):
 
 
 def _bulk(model_name, action, rows, states, run):
-    """Run one bulk statement and log it with the sites/aisles it covers."""
+    """Run one bulk statement and log it with the sites/aisles it covers.
+
+    Origin: Ashu
+    """
     if not rows:
         return
     started = time.perf_counter()
@@ -526,7 +577,10 @@ def _bulk(model_name, action, rows, states, run):
 
 
 def process_consumption_batch(packets, publish_recovery):
-    """Process ``packets`` (list of Packet) in bulk. Returns an outcome summary."""
+    """Process ``packets`` (list of Packet) in bulk. Returns an outcome summary.
+
+    Origin: Ashu
+    """
     started = time.perf_counter()
     claimed, fresh = [], []
     for packet in packets:

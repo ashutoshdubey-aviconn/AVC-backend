@@ -6,7 +6,10 @@ from typing import Any, Optional
 
 
 def as_float(value: Any) -> Optional[float]:
-    """Return a numeric provider value as float, or None when unavailable."""
+    """Return a numeric provider value as float, or None when unavailable.
+
+    Origin: Ashu
+    """
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -16,7 +19,10 @@ def as_float(value: Any) -> Optional[float]:
 
 
 def epoch_milliseconds(value: Any) -> Optional[int]:
-    """Normalize epoch seconds, epoch milliseconds, or ISO timestamps to ms."""
+    """Normalize epoch seconds, epoch milliseconds, or ISO timestamps to ms.
+
+    Origin: Ashu
+    """
     if value is None or isinstance(value, bool):
         return None
 

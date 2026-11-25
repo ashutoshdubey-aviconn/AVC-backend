@@ -25,10 +25,18 @@ from wareApp.utility import entryExit, logger
 
 
 class CustomerView(APIView):
+    """API view for /api/customer/ (GET; Open: no login (AllowAny)). Reads CustomerInfo. Returns data.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def get(self, request, *args):
+        """GET /api/customer/. No request fields. Response keys: data.
+
+        Origin: main (unchanged)
+        """
         customer = CustomerInfo.objects.all()
         logger.debug(customer)
         customer_serializer = CustomerInfoSerializer(customer, many=True)
@@ -37,8 +45,18 @@ class CustomerView(APIView):
 
 
 class CustomerTotalConsumption(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads HourlySiteReading, Site.
+    Takes id. Returns alarms, totalConsumption, totalEnergySavings, totalPercentageSavings.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request, *args):
+        """POST (view not wired to any URL). Request fields: id. Response keys: alarms,
+        totalConsumption, totalEnergySavings, totalPercentageSavings.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data", data)
         customer_id = data["id"]
@@ -87,8 +105,17 @@ class CustomerTotalConsumption(APIView):
 
 
 class CustomerMonthlyGraphicalData(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads HourlySiteReading, Site.
+    Takes id. Returns data, date.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: id. Response keys: data, date.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s", data)
         customerId = data.get("id", "")
@@ -127,8 +154,17 @@ class CustomerMonthlyGraphicalData(APIView):
 
 
 class CustomerAllSiteInfo(APIView):
+    """API view for /api/getCustomerSites/ (POST; Login required (default)). Reads CustomerSiteManager,
+    Site, Token, User. Takes id. Returns msg, result, site, status.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/getCustomerSites/. Request fields: id. Response keys: msg, result, site, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         user_id = data.get("id")
         if user_id is None:
@@ -156,8 +192,19 @@ class CustomerAllSiteInfo(APIView):
 
 
 class CustomerSnapshotApiOld(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    AlarmNotifications, DailySiteReading, Site. Takes id, user_type. Returns alarms,
+    energy_consumed, percentage_saved, result, saved_energy.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: id, user_type. Response keys: alarms,
+        energy_consumed, percentage_saved, result, saved_energy.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data%%%%%%%%%%% :", data)
         customer_id = data.get("id", "")
@@ -230,8 +277,20 @@ class CustomerSnapshotApiOld(APIView):
 
 
 class CustomerSnapshotApi(APIView):
+    """API view for /api/customerSnapShotEnergySavingApi/ (POST; Login required (default)). Reads
+    AisleGroup, AlarmNotifications, CustomerSiteManager, DailySiteReading, Site. Takes id,
+    user_type. Returns alarms, carbon_saved, energy_consumed, percentage_saved, result,
+    saved_energy.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/customerSnapShotEnergySavingApi/. Request fields: id, user_type. Response keys:
+        alarms, carbon_saved, energy_consumed, percentage_saved, result, saved_energy.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data%%%%%%%%%%% :", data)
         customer_id = data.get("id", "")
@@ -337,8 +396,17 @@ class CustomerSnapshotApi(APIView):
 
 
 class ParticularCustomerInfo(APIView):
+    """API view for /api/customer-details (POST; Login required (default)). Reads CustomerInfo, User.
+    Takes id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/customer-details. Request fields: id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data in particular customer :", data)
         user_id = data.get("id", "")
@@ -353,10 +421,17 @@ class TotalAlarmsOnCustomerPageTabularForm(APIView):
 
     Counted from the open alarms (is_active) of the customer's sites; it used
     to read user_level=4 rows that nothing writes any more, so it was always
-    empty (fixed 2026-11-06)."""
+    empty (fixed 2026-11-06).
+
+    Origin: Ashu (changed from main)
+    """
 
     @entryExit
     def post(self, request):
+        """POST /api/alarmListOnCustomerPage/. Request fields: id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         user = User.objects.get(id=request.data.get("id", ""))
         counts = defaultdict(lambda: defaultdict(int))
         for site_id, alarm_type in AlarmNotifications.objects.filter(
@@ -382,10 +457,18 @@ class TotalAlarmsOnCustomerPageTabularForm(APIView):
 class TotalAlarmsTypeCountOnCustomerPage(APIView):
     """Customer page bar chart: open alarms per type over the customer's sites
     (same keys as before; it used to read rows that nothing writes, fixed
-    2026-11-06)."""
+    2026-11-06).
+
+    Origin: Ashu (changed from main)
+    """
 
     @entryExit
     def post(self, request):
+        """POST /api/getCustAlarmGraph/. Request fields: id. Response keys: Data, alarm_name_list,
+        result.
+
+        Origin: Ashu (changed from main)
+        """
         user = User.objects.get(id=request.data.get("id", ""))
         names = dict(AlarmNotifications.alarm_type)
         per_type = (

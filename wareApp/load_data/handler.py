@@ -26,6 +26,8 @@ def handle_load_data_message(client, site, location_id, gw_id, message, msg_type
     (``message_type="LoadData"``) that ``manage.py replay_dead_letters`` can
     process again; unexpected errors keep every packet, configuration/payload
     errors one per gateway and error every DEAD_LETTER_DEDUPE_SECONDS.
+
+    Origin: Ashu
     """
     if "LoadData" not in msg_type:
         logger.warning("Ignoring unexpected LoadData message type: %s", msg_type)

@@ -25,6 +25,8 @@ from wareApp.utility import entryExit, logger
 class UserViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows users to be viewed or edited.
+
+    Origin: main (unchanged)
     """
 
     User = get_user_model()
@@ -34,18 +36,29 @@ class UserViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows groups to be viewed or edited.
+
+    Origin: main (unchanged)
     """
 
     queryset = Group.objects.all()
 
 
 class LoginApi(APIView):
+    """API view for /api/login/ (POST; Open: no login (AllowAny); rate limit [AnonRateThrottle]). Saves
+    to Token. Reads User. Returns token, user.
+
+    Origin: Ashu (changed from main)
+    """
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [AnonRateThrottle]
 
     @entryExit
     def post(self, request):
+        """POST /api/login/. No request fields. Response keys: token, user.
+
+        Origin: Ashu (changed from main)
+        """
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
@@ -56,10 +69,19 @@ class LoginApi(APIView):
 
 
 class ValidatedToken(APIView):
+    """API view for /api/validateToken/ (POST; Open: no login (AllowAny)). Reads Token. Takes token.
+    Returns error, result.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/validateToken/. Request fields: token. Response keys: error, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         token = data.get("token", "")
         if token:
@@ -75,10 +97,20 @@ class ValidatedToken(APIView):
 
 
 class TokenViewSet(viewsets.ModelViewSet):
+    """API view, not wired to any URL ((viewset / function); Login required (default)). Forwards the
+    request to viewsets.ModelViewSet.
+
+    Origin: main (unchanged)
+    """
     pass
 
 
 class ForgetPassword(APIView):
+    """API view for /api/forgot/ (POST; Open: no login (AllowAny); rate limit [AnonRateThrottle,
+    ScopedRateThrottle]). Reads User. Takes Username, email, mobile. Returns error, msg, result.
+
+    Origin: Ashu (changed from main)
+    """
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [AnonRateThrottle, ScopedRateThrottle]
@@ -86,6 +118,11 @@ class ForgetPassword(APIView):
 
     @entryExit
     def post(self, request):
+        """POST /api/forgot/. Request fields: Username, email, mobile. Response keys: error, msg,
+        result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         username = data.get("Username", "")
         logger.debug("%s %s", "username : ", username)
@@ -130,6 +167,8 @@ class ResetPasswordApi(APIView):
     The OTP is valid for PASSWORD_RESET_OTP_MINUTES, works once, and must
     match exactly one user (optionally the given ``username``). Attempts are
     rate limited per client (``password_reset`` throttle scope).
+
+    Origin: Ashu (changed from main)
     """
 
     authentication_classes = []
@@ -139,6 +178,11 @@ class ResetPasswordApi(APIView):
 
     @entryExit
     def post(self, request):
+        """POST /api/reset/. Request fields: Username, newpassword, otp, username. Response keys: msg,
+        result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         otp = str(data.get("otp", "")).strip()
         new_password = data.get("newpassword", "")
@@ -178,10 +222,20 @@ class ResetPasswordApi(APIView):
 
 
 class ChangePassword(APIView):
+    """API view for /api/change-pwd/ (POST; Login required). Reads Token. Takes new_password,
+    old_password. Returns msg, result.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [IsAuthenticated]
 
     @entryExit
     def post(self, request):
+        """POST /api/change-pwd/. Request fields: new_password, old_password. Response keys: msg,
+        result.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         old_password = base64.b64decode(data.get("old_password", ""))  # Need to ask
         new_password = base64.b64decode(data.get("new_password", ""))  # Need to ask

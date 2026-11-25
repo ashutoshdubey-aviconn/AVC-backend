@@ -4,6 +4,10 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class LoadReading:
+    """One parsed LoadData packet: load value, leg, meter number, time and epoch.
+
+    Origin: Ashu
+    """
     load_value: float
     leg_id: str
     meter_number: str
@@ -12,6 +16,11 @@ class LoadReading:
 
 
 def parse_load_data_message(message: str) -> LoadReading:
+    """Parses a LoadData MQTT payload (key:value pairs separated by commas) into a LoadReading; raises
+    ValueError for a missing field.
+
+    Origin: Ashu
+    """
     payload = message.strip()
     if payload.startswith("b'") and payload.endswith("'"):
         payload = payload[2:-1]
@@ -24,6 +33,10 @@ def parse_load_data_message(message: str) -> LoadReading:
         fields[key.strip().lower().replace("_", "")] = value.strip()
 
     def value_for(*keys):
+        """First of the given keys that is present in the packet; ValueError when none is.
+
+        Origin: Ashu
+        """
         for key in keys:
             value = fields.get(key)
             if value is not None:

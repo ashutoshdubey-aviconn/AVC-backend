@@ -16,11 +16,17 @@ class RecoveryService:
     HTTP
         ↓
     RecoveryService
+
+    Origin: Ashu
     """
 
     @staticmethod
     def process(site, location_id, msg_subtype, message):
 
+        """Sends an HTTP recovery upload to the hourly, daily or run-time handler by its subtype.
+
+        Origin: Ashu
+        """
         if "hourlyConsumption" in msg_subtype:
             return RecoveryService.process_hourly(site, location_id, message)
 
@@ -38,6 +44,8 @@ class RecoveryService:
         Hourly Recovery
 
         (Implementation will be moved from tasks.py)
+
+        Origin: Ashu
         """
 
         pass
@@ -45,9 +53,17 @@ class RecoveryService:
     @staticmethod
     def process_daily(site, location_id, message):
 
+        """Daily recovery over HTTP: not built yet (does nothing).
+
+        Origin: Ashu
+        """
         pass
 
     @staticmethod
     def process_runtime(site, location_id, message):
 
+        """Run-time recovery over HTTP: not built yet (does nothing).
+
+        Origin: Ashu
+        """
         pass

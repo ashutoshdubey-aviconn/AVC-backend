@@ -15,6 +15,11 @@ try:
 except ImportError:
 
     def epoch_milliseconds(value):
+        """Epoch in milliseconds from a datetime, date, seconds or milliseconds value; None when it
+        can't be read.
+
+        Origin: Ashu
+        """
         if value is None or isinstance(value, bool):
             return None
 
@@ -42,17 +47,33 @@ except ImportError:
         return int(parsed.timestamp() * 1000)
 
     def extract_loconav_subscription_expired_errors(payload):
+        """Fallback when the DG fuel module can't be imported: no expired-subscription errors.
+
+        Origin: Ashu
+        """
         return []
 
     def extract_roadcast_subscription_expired_errors(
         payload, *, site=None, vehicle_imei=None
     ):
+        """Fallback when the DG fuel module can't be imported: no expired-subscription errors.
+
+        Origin: Ashu
+        """
         return []
 
     def fetch_loconav_report(*args, **kwargs):
+        """Fallback when the fuel provider module can't be imported: empty report.
+
+        Origin: Ashu
+        """
         return {}
 
     def fetch_roadcast_pull_api(*args, **kwargs):
+        """Fallback when the fuel provider module can't be imported: empty response.
+
+        Origin: Ashu
+        """
         return {}
 
 
@@ -60,9 +81,17 @@ DG_FUEL_DB_ALIAS = "secondary"
 
 
 def _dg_fuel_db_alias():
+    """Database the DG fuel views read from: DG_FUEL_DB_ALIAS when configured, else default.
+
+    Origin: Ashu
+    """
     databases = getattr(settings, "DATABASES", {})
     return DG_FUEL_DB_ALIAS if DG_FUEL_DB_ALIAS in databases else "default"
 
 
 def _dg_fuel_queryset(model_manager):
+    """A model manager on the DG fuel database.
+
+    Origin: Ashu
+    """
     return model_manager.using(_dg_fuel_db_alias())

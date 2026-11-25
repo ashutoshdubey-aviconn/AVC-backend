@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_hourly_recovery_message(message):
+    """Parses an hourlyConsumption recovery packet (aisle, recovery hours, kWh per hour, gateway
+    cumulative); ValueError when it doesn't match.
+
+    Origin: Ashu
+    """
     match = re.search(
         r"Aisle_group_id : (.*); Recovery_Hours : (.*); Unit_consumptions : (.*);"
         r" GW_total_cumulative : (.*)",
@@ -39,7 +44,10 @@ def _parse_hourly_recovery_message(message):
 
 
 def handle_hourly_consumption_recovery_message(site, location_id, gateway_id, message):
-    """Persist recovered hourly consumption readings for one aisle group."""
+    """Persist recovered hourly consumption readings for one aisle group.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         aisle_group_id, recovery_hours, recovery_values = (

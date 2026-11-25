@@ -8,6 +8,8 @@ def split_paired_lists(slots_text, values_text, payload_kind):
     (trailing commas) are dropped. The two lists must line up one-to-one: a
     length mismatch means the payload is corrupt, and silently truncating it
     with ``zip`` would store values against the wrong hours.
+
+    Origin: Ashu
     """
     slots = [value for value in slots_text.split(",") if value]
     values = [value for value in values_text.split(",") if value]
@@ -20,7 +22,10 @@ def split_paired_lists(slots_text, values_text, payload_kind):
 
 
 def _payload_text(message):
-    """Return the payload as text, unwrapping a ``str(bytes)`` artefact (``b'...'``)."""
+    """Return the payload as text, unwrapping a ``str(bytes)`` artefact (``b'...'``).
+
+    Origin: Ashu
+    """
     payload = message.decode("utf-8") if isinstance(message, bytes) else str(message)
     payload = payload.strip()
     if payload.startswith("b'") and payload.endswith("'"):
@@ -29,6 +34,10 @@ def _payload_text(message):
 
 
 def _normalized_key(key):
+    """Payload key in lower case without spaces, _ or -, so 'R_Volt' and 'rvolt' match.
+
+    Origin: Ashu
+    """
     return key.strip().lower().replace("_", "").replace("-", "")
 
 
@@ -39,14 +48,25 @@ class KeyValuePayload:
     ``Meter_Number`` and ``meternumber`` are the same field. Errors are
     ``ValueError`` with ``Invalid <kind> field`` / ``Missing <kind> field``
     messages, which the handlers store as dead letters.
+
+    Origin: Ashu
     """
 
     def __init__(self, fields, kind):
+        """Keeps the parsed fields and the packet kind (for error messages).
+
+        Origin: Ashu
+        """
         self.fields = fields
         self.kind = kind
 
     @classmethod
     def parse(cls, message, kind, *, strip_value_quotes=False):
+        """Parses 'key:value,key:value' payload text into normalised fields; ValueError for a field
+        without ':'.
+
+        Origin: Ashu
+        """
         fields = {}
         for field in _payload_text(message).split(","):
             key, separator, value = field.partition(":")
@@ -57,10 +77,17 @@ class KeyValuePayload:
         return cls(fields, kind)
 
     def __contains__(self, key):
+        """True when the payload has the field.
+
+        Origin: Ashu
+        """
         return key in self.fields
 
     def get(self, *keys):
-        """Return the value of the first key present; ``keys`` are aliases."""
+        """Return the value of the first key present; ``keys`` are aliases.
+
+        Origin: Ashu
+        """
         for key in keys:
             if key in self.fields:
                 return self.fields[key]

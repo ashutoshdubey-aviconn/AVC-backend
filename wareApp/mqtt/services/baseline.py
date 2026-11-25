@@ -24,12 +24,18 @@ EL_TOKEN = re.compile(r"(?:^|[-_&\s])EL(?=$|[-_&\s])")
 
 
 def is_emergency_supply(aisle_group_name):
-    """True for EL (emergency/UPS) aisles; everything else is NL."""
+    """True for EL (emergency/UPS) aisles; everything else is NL.
+
+    Origin: Ashu
+    """
     return bool(aisle_group_name and EL_TOKEN.search(aisle_group_name))
 
 
 def baseline_info(site_id, leg_id, day):
-    """``(daily_value, working_hours, baseline_from)`` for ``day``, or None."""
+    """``(daily_value, working_hours, baseline_from)`` for ``day``, or None.
+
+    Origin: Ashu
+    """
     rows = site_cache.baselines(site_id, leg_id)
     for baseline_from, baseline_to, value, working_hours in rows:
         if baseline_from and baseline_from <= day and (baseline_to is None or day <= baseline_to):
@@ -40,13 +46,19 @@ def baseline_info(site_id, leg_id, day):
 
 
 def baseline_row(site_id, leg_id, day):
-    """``(daily_value, working_hours)`` for ``day``, or None when not configured."""
+    """``(daily_value, working_hours)`` for ``day``, or None when not configured.
+
+    Origin: Ashu
+    """
     info = baseline_info(site_id, leg_id, day)
     return None if info is None else info[:2]
 
 
 def effective_hours(site, aisle_group, legacy_working_hours):
-    """Hours the daily baseline is spread over (see module docstring)."""
+    """Hours the daily baseline is spread over (see module docstring).
+
+    Origin: Ashu
+    """
     if is_emergency_supply(getattr(aisle_group, "aisleGroupName", "")):
         return 24
     nl_hours = getattr(site, "nl_operation_hours", None)
@@ -56,7 +68,10 @@ def effective_hours(site, aisle_group, legacy_working_hours):
 
 
 def hourly_baseline(site, aisle_group, day):
-    """Return ``(hourly_baseline, daily_baseline)`` of an aisle for ``day``."""
+    """Return ``(hourly_baseline, daily_baseline)`` of an aisle for ``day``.
+
+    Origin: Ashu
+    """
     leg_id = aisle_group.attached_leg_id
     row = baseline_row(site.id, leg_id, day)
     if row is None:
@@ -74,15 +89,27 @@ def hourly_baseline(site, aisle_group, day):
 
 
 class BaselineMemo:
-    """Hourly/daily baseline of one aisle per day, looked up at most once."""
+    """Hourly/daily baseline of one aisle per day, looked up at most once.
+
+    Origin: Ashu
+    """
 
     def __init__(self, site, aisle_group):
+        """Baseline lookup for one aisle, kept per day.
+
+        Origin: Ashu
+        """
         self.site = site
         self.aisle_group = aisle_group
         self._days = {}
         self.missing_days = []
 
     def for_day(self, day):
+        """Hourly and daily baseline of the aisle for a day (0 when the aisle is not active); notes
+        days with no baseline row.
+
+        Origin: Ashu
+        """
         if not getattr(self.aisle_group, "is_active", False):
             return 0.0, 0.0
         if day not in self._days:

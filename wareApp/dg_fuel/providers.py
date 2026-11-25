@@ -11,6 +11,10 @@ from .normalization import as_float, epoch_milliseconds
 
 
 def _items(value: Any) -> Iterable[Any]:
+    """The value when it is a list, else an empty list.
+
+    Origin: Ashu
+    """
     return value if isinstance(value, list) else []
 
 
@@ -19,6 +23,11 @@ def _roadcast_telemetry_state(
     last_update_ms: Optional[int],
     reference_date: Optional[datetime] = None,
 ) -> str:
+    """Whether a Roadcast device is LIVE, STALE or UNAVAILABLE, from its last update time compared with
+    the reference day.
+
+    Origin: Ashu
+    """
     if last_update_ms is None:
         return "UNAVAILABLE"
 
@@ -42,6 +51,11 @@ def _roadcast_telemetry_state(
 def extract_roadcast_subscription_expired_errors(
     payload: Any, *, site: Any = None, vehicle_imei: Optional[str] = None
 ) -> List[Dict[str, Any]]:
+    """Finds 'subscription expired' errors in a Roadcast response, only for this site's devices when a
+    site is given.
+
+    Origin: Ashu
+    """
     if not isinstance(payload, dict):
         return []
 
@@ -58,6 +72,11 @@ def extract_roadcast_subscription_expired_errors(
         site_candidates.add(str(vehicle_imei).strip().lower())
 
     def _matches_site(item: Dict[str, Any]) -> bool:
+        """True when a response item belongs to one of the site's device ids / names (or no site filter
+        is set).
+
+        Origin: Ashu
+        """
         if not site_candidates:
             return True
         values = [
@@ -103,6 +122,10 @@ def extract_roadcast_subscription_expired_errors(
 
 
 def extract_loconav_subscription_expired_errors(payload: Any) -> List[Dict[str, Any]]:
+    """Finds 'subscription expired' messages anywhere in a Loconav response.
+
+    Origin: Ashu
+    """
     if not isinstance(payload, dict):
         return []
 
@@ -114,6 +137,11 @@ def extract_loconav_subscription_expired_errors(payload: Any) -> List[Dict[str, 
     expired_errors: List[Dict[str, Any]] = []
 
     def _walk(value: Any, field_path: str = "") -> None:
+        """Walks the response recursively and collects every text that mentions an expired
+        subscription, with its field path.
+
+        Origin: Ashu
+        """
         if isinstance(value, dict):
             for key, item in value.items():
                 next_path = f"{field_path}.{key}" if field_path else str(key)
@@ -148,7 +176,10 @@ def extract_loconav_subscription_expired_errors(payload: Any) -> List[Dict[str, 
 
 
 def parse_loconav_current_levels(payload: Any) -> List[Dict[str, Any]]:
-    """Normalize LocoNav `current_levels` response rows."""
+    """Normalize LocoNav `current_levels` response rows.
+
+    Origin: Ashu
+    """
     if not isinstance(payload, dict):
         return []
 
@@ -178,7 +209,10 @@ def parse_roadcast_current_levels(
     allowed_imeis: Optional[Iterable[str]] = None,
     reference_date: Optional[datetime] = None,
 ) -> List[Dict[str, Any]]:
-    """Normalize Roadcast `pull_api` rows into tank-level samples."""
+    """Normalize Roadcast `pull_api` rows into tank-level samples.
+
+    Origin: Ashu
+    """
     if not isinstance(payload, dict):
         return []
 
@@ -223,6 +257,11 @@ def parse_roadcast_current_levels(
 def _parallel_events(
     values: Any, timestamps: Any, value_key: str, timestamp_key: str
 ) -> List[Dict[str, Any]]:
+    """Pairs a list of values with a list of timestamps into events, skipping pairs that are not
+    numbers.
+
+    Origin: Ashu
+    """
     events = []
     for value, timestamp in zip(_items(values), _items(timestamps)):
         numeric_value = as_float(value)
@@ -234,6 +273,10 @@ def _parallel_events(
 
 
 def _refill_timestamp_ms(value: Any) -> Optional[int]:
+    """Timestamp (ms) of a refill item: end, start, timestamp or time field, whichever is set first.
+
+    Origin: Ashu
+    """
     if isinstance(value, dict):
         for candidate_key in ("end_time", "start_time", "timestamp", "time"):
             timestamp_ms = epoch_milliseconds(value.get(candidate_key))
@@ -250,6 +293,11 @@ def _should_drop_leading_zero_fuel_level(
     fuel_level_at_end: Optional[float],
     fuel_consumed: Optional[float],
 ) -> bool:
+    """True when the first fuel sample is a 0 reading followed by real levels (device start-up glitch),
+    so it is dropped.
+
+    Origin: Ashu
+    """
     if not fuel_levels:
         return False
 
@@ -276,7 +324,10 @@ def _should_drop_leading_zero_fuel_level(
 
 
 def parse_roadcast_report(payload: Any) -> Dict[str, Any]:
-    """Normalize a Roadcast `pull_fuel_report` response for a DG-run window."""
+    """Normalize a Roadcast `pull_fuel_report` response for a DG-run window.
+
+    Origin: Ashu
+    """
     if not isinstance(payload, dict):
         return {
             "fuel_consumed": None,

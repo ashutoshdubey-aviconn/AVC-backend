@@ -13,8 +13,17 @@ class LightsDataApi(APIView):
     # Merged from the colleague's code (54313d5, views/fire_views.py), 2026-11-21:
     # reads only the needed columns with .values(). Same response as before.
     # His AllowAny is not taken: this API keeps the default (login required).
+    """API view for /api/lightsDataApi/ (POST; Login required (default)). Reads LightsData. Returns
+    data, status.
+
+    Origin: Daksh (merged 2026-11-21 from 54313d5, views/fire_views.py)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/lightsDataApi/. No request fields. Response keys: data, status.
+
+        Origin: Daksh (merged 2026-11-21 from 54313d5, views/fire_views.py)
+        """
         lights_data = LightsData.objects.values(
             "areaName",
             "totalLights",
@@ -46,8 +55,17 @@ class LightsDataApi(APIView):
 class FansDataApi(APIView):
     # Merged from the colleague's code (54313d5, views/fire_views.py), 2026-11-21:
     # reads only the needed columns with .values(). Same response as before.
+    """API view for /api/FansDataApi/ (POST; Login required (default)). Reads FansData. Returns data,
+    status.
+
+    Origin: Daksh (merged 2026-11-21 from 54313d5, views/fire_views.py)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/FansDataApi/. No request fields. Response keys: data, status.
+
+        Origin: Daksh (merged 2026-11-21 from 54313d5, views/fire_views.py)
+        """
         fans = (
             FansData.objects.all()
             .order_by("id")
@@ -75,7 +93,18 @@ class FansDataApi(APIView):
 
 
 class avgDataApi(APIView):
+    """API view for /api/avgData/ (POST; Login required (default)). Reads AisleGroup, DailySiteReading,
+    Site. Takes from_date, siteId, site_id, till_date. Returns energyConsumed, error, status,
+    totalDays, value.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/avgData/. Request fields: from_date, siteId, site_id, till_date. Response keys:
+        energyConsumed, error, status, totalDays, value.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data%%%%%%", data)
 

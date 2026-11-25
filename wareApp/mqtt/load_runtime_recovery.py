@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_load_runtime_recovery_message(message):
+    """Parses a loadRuntime recovery packet (power source, hours, run time per hour); ValueError when
+    it doesn't match.
+
+    Origin: Ashu
+    """
     match = re.search(
         r"Power_source : (.*); Recovery_hours : (.*); Recovery_load_runtime : (.*)",
         message,
@@ -34,7 +39,10 @@ def _parse_load_runtime_recovery_message(message):
 
 
 def handle_load_runtime_recovery_message(site, location_id, gateway_id, message):
-    """Apply recovered runtime readings for one gateway power source."""
+    """Apply recovered runtime readings for one gateway power source.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         source, recovery_hours, recovery_values = _parse_load_runtime_recovery_message(

@@ -19,10 +19,21 @@ class SubmeteringMonthlyBarChart_new(APIView):
     # Merged from the colleague's code (54313d5, views/metering_views.py), 2026-11-21:
     # one query for all rooms instead of one per room. Same response keys; also
     # finds a room's rows by aisle_group_id or attached_leg_id when leg_id differs.
+    """API view for /api/submeterMonthlyTrend_test, /api/submeteringMonthlyBarChart/ (POST; Open: no
+    login (AllowAny)). Reads AisleGroup, DailySiteReading, Site. Takes from_date, site_id,
+    till_date. Returns Data, Dates, msg, status.
+
+    Origin: Daksh (merged 2026-11-21 from 54313d5, views/metering_views.py)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/submeterMonthlyTrend_test, /api/submeteringMonthlyBarChart/. Request fields:
+        from_date, site_id, till_date. Response keys: Data, Dates, msg, status.
+
+        Origin: Daksh (merged 2026-11-21 from 54313d5, views/metering_views.py)
+        """
         try:
             data = request.data
             site_id = data.get("site_id", "")
@@ -100,8 +111,19 @@ class SubmeteringMonthlyBarChart_new(APIView):
             return Response({"status": 500, "msg": str(err)}, status=500)
 
 class SubmeteringMonthlyBarChart(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site. Takes from_date, site_id, till_date, user_type.
+    Returns Data, Dates, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: from_date, site_id, till_date, user_type.
+        Response keys: Data, Dates, result.
+
+        Origin: Ashu (changed from main)
+        """
         t1 = time.time()
         # print("initial time : ", t1)
         data = request.data
@@ -259,10 +281,21 @@ class SubmeteringMonthlyBarChart(APIView):
 
 
 class SubMeteringMonthlyTrendApi(APIView):
+    """API view for /api/subMeteringMonthlyTrend/ (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site. Takes site_id. Returns months, msg, result, unit_consumed_avg_data,
+    unit_consumed_data.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/subMeteringMonthlyTrend/. Request fields: site_id. Response keys: months, msg,
+        result, unit_consumed_avg_data, unit_consumed_data.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         # user_type = data.get("user_type") # Not used
@@ -417,9 +450,21 @@ class SubmeteringSnapshotAPI(APIView):
     # Merged from the colleague's code (54313d5, views/site_views.py), 2026-11-21:
     # totals with one SUM query instead of a Python loop; a site without live_date
     # no longer fails. Same response keys.
+    """API view for /api/submeteringSnapshot/ (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DailySiteReading, Site. Takes site_id. Returns alarms, current_date, dailyAvg, energy_consumed,
+    error, firstmnthDate, live_date, monthlyAvg, msg, status.
+
+    Origin: Daksh (merged 2026-11-21 from 54313d5, views/site_views.py)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/submeteringSnapshot/. Request fields: site_id. Response keys: alarms,
+        current_date, dailyAvg, energy_consumed, error, firstmnthDate, live_date, monthlyAvg, msg,
+        status.
+
+        Origin: Daksh (merged 2026-11-21 from 54313d5, views/site_views.py)
+        """
         try:
             data = request.data
             site_id = data.get('site_id')
@@ -488,8 +533,18 @@ class SubmeteringSnapshotAPI(APIView):
             return Response({"error": str(e), "status": 0, 'msg': 'Data Not Present'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SubmeteringHourlyBarChart(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site. Takes date, site_id. Returns Data, Hours, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: Data, Hours,
+        result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         # return Response({"status":201, "msg":"testing","data":data})
         site_id = data.get("site_id", "")
@@ -587,8 +642,18 @@ class SubmeteringHourlyBarChart(APIView):
 
 class SubmeteringHourlyBarChartNew(APIView):
 
+    """API view for /api/submeteringHourlyData/ (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site. Takes date, site_id. Returns Data, Hours, result.
+
+    Origin: Ashu
+    """
     @entryExit
     def post(self, request):
+        """POST /api/submeteringHourlyData/. Request fields: date, site_id. Response keys: Data, Hours,
+        result.
+
+        Origin: Ashu
+        """
         start_time = datetime.now()
         from collections import defaultdict
 
@@ -677,10 +742,21 @@ class SubmeteringHourlyBarChartNew(APIView):
 
 
 class NewSubMeteringMonthlyTrendApi(APIView):
+    """API view for /api/newSubMeteringMonthlyTrend/ (POST; Open: no login (AllowAny)). Reads
+    AisleGroup, DailySiteReading, Site. Takes site_id, user_type. Returns months, result,
+    unit_consumed_avg_data, unit_consumed_data.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/newSubMeteringMonthlyTrend/. Request fields: site_id, user_type. Response keys:
+        months, result, unit_consumed_avg_data, unit_consumed_data.
+
+        Origin: Ashu (changed from main)
+        """
         import calendar
 
         data = request.data

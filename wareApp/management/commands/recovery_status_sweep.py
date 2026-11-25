@@ -20,6 +20,11 @@ from wareApp.models import AisleSyncRecoveryStatus, RecoveryMonitor
 
 
 def sweep(now=None):
+    """One sweep of recovery state: times out old requests, retries within the attempt limit, and marks
+    aisles late or missing after MQTT_SYNC_LATE_SECONDS.
+
+    Origin: Ashu
+    """
     now = now or timezone.now()
     cooldown = timedelta(
         seconds=getattr(settings, "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", 600)
@@ -64,9 +69,18 @@ def sweep(now=None):
 
 
 class Command(BaseCommand):
+    """manage.py recovery_status_sweep: Advance time-based recovery and sync status transitions.
+
+    Origin: Ashu
+    """
     help = "Advance time-based recovery and sync status transitions."
 
     def handle(self, *args, **options):
+        """Runs manage.py recovery_status_sweep: Advance time-based recovery and sync status
+        transitions.
+
+        Origin: Ashu
+        """
         result = sweep()
         self.stdout.write(
             "recovery_status_sweep "

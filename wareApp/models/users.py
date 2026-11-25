@@ -8,6 +8,11 @@ from django.db.models.signals import pre_save
 
 
 class User(AbstractUser):
+    """Login user with a user type (Super Admin, Aviconn Admin / Executive, Customer, Site Manager, AVC
+    Super Admin) and the customer it belongs to.
+
+    Origin: Ashu (changed from main)
+    """
     user_type = (
         (1, "Super_Admin"),
         (2, "Aviconn_Admin"),
@@ -25,7 +30,10 @@ class User(AbstractUser):
 
 def Create_Group(sender, instance, *args, **kwargs):
     """Make sure the group of a new user's type exists (it used to be created
-    only when it already existed, which raised IntegrityError)."""
+    only when it already existed, which raised IntegrityError).
+
+    Origin: Ashu (changed from main)
+    """
     if instance._state.adding:
         Group.objects.get_or_create(name=instance.get_UserType_display())
 
@@ -34,6 +42,8 @@ def Add_group_to_user(sender, instance, *args, update_fields=None, **kwargs):
     """Put the user in the group of its type; Super_Admin users get admin access.
 
     Skipped for saves that only touch last_login (every login).
+
+    Origin: Ashu (changed from main)
     """
     if update_fields is not None and set(update_fields) <= {"last_login"}:
         return
@@ -49,9 +59,17 @@ pre_save.connect(Create_Group, sender=User)
 
 
 class OTP(models.Model):
+    """Table wareApp_otp: o t p. Fields: otp, user_id, created.
+
+    Origin: Ashu (changed from main)
+    """
     otp = models.CharField(blank=True, null=True, max_length=5)
     user_id = models.PositiveIntegerField(default=0)
     created = models.DateTimeField(auto_now=False, auto_now_add=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: 'OTP {} on {}'.format(self.otp, self.created).
+
+        Origin: main (unchanged)
+        """
         return "OTP  {} on {}".format(self.otp, self.created)

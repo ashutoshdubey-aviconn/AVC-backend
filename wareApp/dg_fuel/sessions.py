@@ -37,7 +37,10 @@ logger = logging.getLogger(__name__)
 
 
 def fuel_configuration_for_aisle(site: Site, aisle_group: Any) -> dict[str, str | None]:
-    """Return the configured provider device for one DG aisle or the legacy site fallback."""
+    """Return the configured provider device for one DG aisle or the legacy site fallback.
+
+    Origin: Ashu
+    """
     provider = (getattr(aisle_group, "dg_fuel_provider", None) or "").strip().lower()
     vehicle_number = (
         getattr(aisle_group, "dg_fuel_vehicle_number", None) or ""
@@ -64,6 +67,11 @@ def fuel_configuration_for_aisle(site: Site, aisle_group: Any) -> dict[str, str 
 def _main_database_alias() -> str:
     # Django creates a separate default database during tests. The production
     # `main` connection is not part of that isolated test schema.
+    """Database alias for reading readings: 'main' when that connection exists, else 'default' (also
+    during tests).
+
+    Origin: Ashu
+    """
     default_database_name = str(connections["default"].settings_dict.get("NAME") or "")
     if default_database_name.startswith("test_"):
         return "default"
@@ -73,6 +81,10 @@ def _main_database_alias() -> str:
 
 
 def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
+    """kWh of the DG's aisle on the day a DG run ended, from the daily reading, or None.
+
+    Origin: Ashu
+    """
     if not unit or not unit.site or not unit.aisle_group:
         return None
 
@@ -102,6 +114,10 @@ def _daily_unit_consumption_for_unit(unit: DgUnitConsumption) -> float | None:
 
 
 def _daily_window(reading_date: date_type) -> tuple[datetime, datetime]:
+    """Start and end of a day as datetimes (time-zone aware when USE_TZ is on).
+
+    Origin: Ashu
+    """
     day_start = datetime.combine(reading_date, datetime_time.min)
     day_end = datetime.combine(reading_date, datetime_time.max.replace(microsecond=0))
     if settings.USE_TZ and dj_timezone.is_naive(day_start):
@@ -114,6 +130,10 @@ def _daily_window(reading_date: date_type) -> tuple[datetime, datetime]:
 def _best_dg_end_time_for_unit(
     site: Site, aisle_group_id: int, reading_date: date_type
 ) -> datetime | None:
+    """Best end time for a DG run from the hourly readings of its aisle on that day.
+
+    Origin: Ashu
+    """
     hourly_reading = (
         HourlySiteReading.objects.using(_main_database_alias())
         .filter(
@@ -135,7 +155,10 @@ def reconcile_daily_unit_consumption(
     reading_date: date_type | None = None,
     return_details: bool = False,
 ) -> dict:
-    """Materialize DG unit rows from MAIN DailySiteReading for one site/day."""
+    """Materialize DG unit rows from MAIN DailySiteReading for one site/day.
+
+    Origin: Ashu
+    """
     if site is None:
         return {"created": 0, "updated": 0, "skipped": 0}
 
@@ -324,7 +347,10 @@ def reconcile_daily_unit_consumption(
 
 
 def determine_provider(site: Site) -> str | None:
-    """Return the configured provider name for a site."""
+    """Return the configured provider name for a site.
+
+    Origin: Ashu
+    """
     provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
     if provider in {"loconav", "roadcast"}:
         return provider
@@ -334,6 +360,10 @@ def determine_provider(site: Site) -> str | None:
 def _fetch_roadcast_fuel(
     vehicle_imei: str, start_dt: datetime, end_dt: datetime
 ) -> float | None:
+    """Roadcast fuel data for a time range; None when the call fails.
+
+    Origin: Ashu
+    """
     try:
         return fetch_roadcast_fuel(vehicle_imei, start_dt, end_dt)
     except Exception:
@@ -343,6 +373,10 @@ def _fetch_roadcast_fuel(
 def _fetch_loconav_fuel(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> float | None:
+    """Loconav fuel data for a time range; None when the call fails.
+
+    Origin: Ashu
+    """
     try:
         return fetch_loconav_fuel(vehicle_number, start_dt, end_dt)
     except Exception:
@@ -352,6 +386,10 @@ def _fetch_loconav_fuel(
 def _fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> dict | None:
+    """Loconav fuel report for a time range; None when the call fails.
+
+    Origin: Ashu
+    """
     try:
         return fetch_loconav_report(vehicle_number, start_dt, end_dt)
     except Exception:
@@ -361,6 +399,11 @@ def _fetch_loconav_report(
 def _persist_provider_alerts(
     site: Site, unit: DgUnitConsumption, provider: str, vehicle_number: str
 ) -> None:
+    """Fetches the provider's refuel / theft alerts for a DG run and saves new ones to
+    DGFuelAlertsData.
+
+    Origin: Ashu
+    """
     if provider == "roadcast":
         try:
             report = fetch_roadcast_report(
@@ -424,7 +467,10 @@ def _persist_provider_alerts(
 def attempt_fetch_for_unit(
     unit: DgUnitConsumption, return_details: bool = False
 ) -> Any:
-    """Fetch consumed fuel for a closed DG run and persist the result."""
+    """Fetch consumed fuel for a closed DG run and persist the result.
+
+    Origin: Ashu
+    """
     result: dict[str, Any] = {
         "site_id": getattr(getattr(unit, "site", None), "id", None),
         "unit_id": getattr(unit, "id", None),

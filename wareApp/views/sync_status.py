@@ -53,10 +53,18 @@ OPEN_REQUESTS = {"requested", "response_received", "failed", "timeout"}
 
 
 def _iso(value):
+    """Datetime as ISO text, or None.
+
+    Origin: Ashu
+    """
     return value.isoformat() if value else None
 
 
 def _site(request):
+    """Site of the request (Super Admin only); None when site_id is missing or unknown.
+
+    Origin: Ashu
+    """
     if request.user.UserType != 1:
         raise PermissionDenied("Only Super_Admin users can see the sync and recovery status.")
     try:
@@ -66,6 +74,10 @@ def _site(request):
 
 
 def _page(request, default=50, most=500):
+    """limit / offset of the request (1-500, default 50); None when they are not numbers.
+
+    Origin: Ashu
+    """
     try:
         limit = int(request.query_params.get("limit", default))
         offset = int(request.query_params.get("offset", 0))
@@ -75,7 +87,10 @@ def _page(request, default=50, most=500):
 
 
 def _object(row):
-    """What the row is about: an aisle (consumption) or a power source (supply / load)."""
+    """What the row is about: an aisle (consumption) or a power source (supply / load).
+
+    Origin: Ashu
+    """
     if row.aisle_group_id:
         return "aisle", getattr(row.aisle_group, "aisleGroupName", "") or row.leg_id
     if row.power_source is not None:
@@ -84,9 +99,19 @@ def _object(row):
 
 
 class SyncStatusApi(APIView):
+    """API view for /api/syncStatus/ (GET; Login required). Reads AisleSyncRecoveryStatus. Returns
+    counts, data, msg, site_id, site_name, status, total.
+
+    Origin: Ashu
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """GET /api/syncStatus/. No request fields. Response keys: counts, data, msg, site_id,
+        site_name, status, total.
+
+        Origin: Ashu
+        """
         site = _site(request)
         if site is None:
             return Response({"status": 400, "msg": "Give a valid site_id."}, status=400)
@@ -135,9 +160,19 @@ class SyncStatusApi(APIView):
 
 
 class RecoveryHistoryApi(APIView):
+    """API view for /api/recoveryHistory/ (GET; Login required). Reads RecoveryMonitor. Takes
+    recovery_type, status. Returns count, limit, msg, offset, results, site_id, status.
+
+    Origin: Ashu
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        """GET /api/recoveryHistory/. Request fields: recovery_type, status. Response keys: count,
+        limit, msg, offset, results, site_id, status.
+
+        Origin: Ashu
+        """
         site = _site(request)
         if site is None:
             return Response({"status": 400, "msg": "Give a valid site_id."}, status=400)

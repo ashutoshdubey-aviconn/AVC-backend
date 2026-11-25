@@ -27,7 +27,10 @@ _last_flush = time.monotonic()
 
 
 def seen(site_id, gateway_id, message_type, now=None):
-    """Note one packet; writes the collected times at most once a minute."""
+    """Note one packet; writes the collected times at most once a minute.
+
+    Origin: Ashu
+    """
     if message_type not in DATA_TYPES or not gateway_id:
         return
     now = now or datetime.now()
@@ -42,7 +45,10 @@ def seen(site_id, gateway_id, message_type, now=None):
 
 
 def flush():
-    """Write the collected times; returns the number of gateways written."""
+    """Write the collected times; returns the number of gateways written.
+
+    Origin: Ashu
+    """
     global _last_flush
     with _lock:
         pending = dict(_pending)

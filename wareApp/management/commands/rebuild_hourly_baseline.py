@@ -22,9 +22,18 @@ BATCH = 2000
 
 
 class Command(BaseCommand):
+    """manage.py rebuild_hourly_baseline: Recompute hourly baseline and saving for hourly readings (dry
+    run unless --apply).
+
+    Origin: Ashu
+    """
     help = "Recompute hourly baseline and saving for hourly readings (dry run unless --apply)."
 
     def add_arguments(self, parser):
+        """Command-line options: --from, --to, --site, --all, --apply.
+
+        Origin: Ashu
+        """
         parser.add_argument("--from", dest="date_from", required=True, help="YYYY-MM-DD")
         parser.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD (inclusive)")
         parser.add_argument("--site", type=int, action="append", help="Site id (repeatable)")
@@ -34,6 +43,11 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true", help="Write the changes")
 
     def handle(self, *args, date_from, date_to, site=None, all=False, apply=False, **options):
+        """Runs manage.py rebuild_hourly_baseline: Recompute hourly baseline and saving for hourly
+        readings (dry run unless --apply).
+
+        Origin: Ashu
+        """
         try:
             start = datetime.strptime(date_from, "%Y-%m-%d")
             end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)

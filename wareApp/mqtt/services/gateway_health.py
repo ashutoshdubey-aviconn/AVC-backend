@@ -71,14 +71,27 @@ _ALIVE = re.compile(
 
 
 def mark(name, at=None):
+    """Saves the time of a monitoring marker (e.g. last ping read).
+
+    Origin: Ashu
+    """
     MonitoringMarker.objects.update_or_create(name=name, defaults={"at": at or datetime.now()})
 
 
 def marker(name):
+    """Time saved for a monitoring marker, or None.
+
+    Origin: Ashu
+    """
     return MonitoringMarker.objects.filter(name=name).values_list("at", flat=True).first()
 
 
 def _down_after(site_id, alarm_type):
+    """How long a gateway may be silent before its alarm: the site's manual hours, else
+    GATEWAY_HEALTH_DOWN_MINUTES (60).
+
+    Origin: Ashu
+    """
     hours = alarm_policy.manual_threshold(site_id, alarm_type)
     if hours:
         return timedelta(hours=hours)
@@ -86,12 +99,19 @@ def _down_after(site_id, alarm_type):
 
 
 def gateway_number(hgw_id):
-    """``avc_x_000145_2`` -> 2 (the alarm's object_id, as the alarm feed expects)."""
+    """``avc_x_000145_2`` -> 2 (the alarm's object_id, as the alarm feed expects).
+
+    Origin: Ashu
+    """
     tail = str(hgw_id).rsplit("_", 1)[-1]
     return int(tail) if tail.isdigit() else None
 
 
 def _hours(delta):
+    """A time span as hours with one decimal, e.g. '2.5 h'.
+
+    Origin: Ashu
+    """
     return f"{delta.total_seconds() / 3600:.1f} h"
 
 
@@ -101,6 +121,8 @@ def read_broker_log(path, from_start=False, remember=True):
 
     Remembers the read position (Django cache); after a rotation or on the
     first run it starts at the beginning (``from_start``) or the last 20 MB.
+
+    Origin: Ashu
     """
     stat = os.stat(path)
     key = LOG_OFFSET_KEY.format(path=path)
@@ -124,7 +146,10 @@ def read_broker_log(path, from_start=False, remember=True):
 
 
 def alive_from_lines(lines):
-    """``{home gateway id: last alive}`` from Mosquitto log lines."""
+    """``{home gateway id: last alive}`` from Mosquitto log lines.
+
+    Origin: Ashu
+    """
     alive = {}
     for line in lines:
         match = _ALIVE.match(line)
@@ -145,6 +170,8 @@ def fetch_remote_pings(now=None):
     few MB of the broker log (docs/mqtt-flows/GATEWAY_PINGS_FROM_MAIN.md).
     Returns the number of gateways updated, or None when not configured or
     the fetch failed (then ping data stays stale: 15 is not raised).
+
+    Origin: Ashu
     """
     target = getattr(settings, "GATEWAY_PINGS_SSH", "")
     if not target:
@@ -171,7 +198,10 @@ def fetch_remote_pings(now=None):
 
 
 def store_pings(alive, now=None):
-    """Write last_ping_at for known gateways; marks ping information as fresh."""
+    """Write last_ping_at for known gateways; marks ping information as fresh.
+
+    Origin: Ashu
+    """
     statuses = {
         status.home_gateway.hgw_id: status
         for status in HomeGatewayStatus.objects.select_related("home_gateway").filter(
@@ -190,6 +220,11 @@ def store_pings(alive, now=None):
 
 
 def ping_information_fresh(now):
+    """True when the gateway pings were read recently (GATEWAY_HEALTH_PING_FRESH_MINUTES), so Service
+    issue can be told from offline.
+
+    Origin: Ashu
+    """
     read_at = marker(PING_READ_MARKER)
     fresh = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_PING_FRESH_MINUTES", 15))
     return read_at is not None and now - read_at <= fresh
@@ -198,12 +233,21 @@ def ping_information_fresh(now):
 # ---------------------------------------------------------------- alarms
 @dataclass
 class Report:
+    """Result of one gateway health run: alarms raised, repeated, cleared, or why it was skipped.
+
+    Origin: Ashu
+    """
     raised: list = field(default_factory=list)
     repeated: list = field(default_factory=list)
     cleared: list = field(default_factory=list)
     skipped: str = ""
 
     def __str__(self):
+        """Text for this row in admin and logs: f'{text} (gateways skipped: {self.skipped})' if
+        self.skipped else text.
+
+        Origin: Ashu
+        """
         text = f"raised={len(self.raised)} still_active={len(self.repeated)} cleared={len(self.cleared)}"
         return f"{text} (gateways skipped: {self.skipped})" if self.skipped else text
 
@@ -215,7 +259,10 @@ def _raise(report, site_id, alarm_type, object_type, object_id, detail, details,
     While it stays open it is e-mailed again once a day
     (GATEWAY_HEALTH_REMINDER_HOURS, 24) until it is solved. ``site_id`` is
     the site it is stored under (alarm_sites); Off on it or on the physical
-    site means not raised."""
+    site means not raised.
+
+    Origin: Ashu
+    """
     if alarm_policy.is_off(site_id, alarm_type) or (
         physical_site_id not in (None, site_id) and alarm_policy.is_off(physical_site_id, alarm_type)
     ):
@@ -263,6 +310,10 @@ def _raise(report, site_id, alarm_type, object_type, object_id, detail, details,
 
 
 def _clear(report, site_id, alarm_type, object_type, object_id, now):
+    """Closes the open gateway / meter alarm of an object and notes it in the report.
+
+    Origin: Ashu
+    """
     closed = AlarmNotifications.objects.filter(
         site_id_id=site_id, Alarm_type=alarm_type, object_type=object_type,
         object_id=object_id, is_active=True,
@@ -274,7 +325,10 @@ def _clear(report, site_id, alarm_type, object_type, object_id, now):
 
 def skipped_sites():
     """GATEWAY_HEALTH_SKIP_SITES: site ids whose gateways are not checked, e.g. on
-    the test server a site whose data main does not forward (site 35)."""
+    the test server a site whose data main does not forward (site 35).
+
+    Origin: Ashu
+    """
     return list(getattr(settings, "GATEWAY_HEALTH_SKIP_SITES", []))
 
 
@@ -284,6 +338,8 @@ def _gateway_plan(statuses, live):
     Targets come from alarm_sites (display sites of the aisles the gateway
     feeds). object_id is the gateway number (..._<n>), unless that number is
     already used by another gateway under the same target site.
+
+    Origin: Ashu
     """
     targets, candidates, by_target = {}, {}, {}
     for status in statuses:
@@ -311,7 +367,10 @@ def _gateway_plan(statuses, live):
 
 def _reconnecting(site_id, number, now):
     """An open Gateway Disconnected whose last no-ping check is recent: the
-    gateway has just reconnected and its data is on the way."""
+    gateway has just reconnected and its data is on the way.
+
+    Origin: Ashu
+    """
     grace = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_RECONNECT_MINUTES", 10))
     open_alarm = (
         AlarmNotifications.objects.filter(
@@ -325,6 +384,10 @@ def _reconnecting(site_id, number, now):
 
 
 def _gateway_details(hgw, target, aisles_text):
+    """Extra e-mail rows when the gateway belongs to another (merged) site: its site and aisles.
+
+    Origin: Ashu
+    """
     if hgw.connected_to_id == target:
         return []
     site = hgw.connected_to
@@ -335,6 +398,11 @@ def _gateway_details(hgw, target, aisles_text):
 def evaluate_gateways(report, now):
     # No gateway at all has sent data lately: our side (listeners, broker,
     # network) is down, not the gateways. Judge nothing until data flows again.
+    """Checks every monitored gateway: raises Gateway Disconnected or Service issue when silent too
+    long, closes it when data is back; skips when no gateway sent anything (our side is down).
+
+    Origin: Ashu
+    """
     newest = HomeGatewayStatus.objects.aggregate(newest=Max("last_data_at"))["newest"]
     silent_limit = timedelta(minutes=getattr(settings, "GATEWAY_HEALTH_ALL_SILENT_MINUTES", 15))
     if newest is None or now - newest > silent_limit:
@@ -423,6 +491,11 @@ def evaluate_gateways(report, now):
 
 
 def evaluate_meters(report, now):
+    """Checks the meter disconnection events: raises Meter Disconnected for meters still out, closes it
+    when they are back.
+
+    Origin: Ashu
+    """
     latest = (
         MeterDisconnectionEvent.objects.values("meter_id")
         .annotate(last_end=Max("detection_window_end"))
@@ -449,7 +522,10 @@ def evaluate_meters(report, now):
 
 
 def _evaluate_meter(report, now, event, site_id, target, meter):
-    """Raise or clear Meter Disconnected for one meter under one target site."""
+    """Raise or clear Meter Disconnected for one meter under one target site.
+
+    Origin: Ashu
+    """
     if event.status == "disconnected":
         if now - event.detection_window_start >= _down_after(site_id, AlarmNotifications.METER_DISCONNECTED):
             _raise(
@@ -469,7 +545,10 @@ def _evaluate_meter(report, now, event, site_id, target, meter):
 
 
 def evaluate(now=None):
-    """Raise, keep or clear alarms 14 / 15 / 16; returns a Report."""
+    """Raise, keep or clear alarms 14 / 15 / 16; returns a Report.
+
+    Origin: Ashu
+    """
     now = now or datetime.now()
     report = Report()
     evaluate_gateways(report, now)

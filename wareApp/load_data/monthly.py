@@ -16,10 +16,19 @@ BOUNDS_CACHE_SECONDS = 60 * 60
 
 
 def _bounds_key(site, aisle_group, month_start):
+    """Cache key of the month's min / max load for one site, aisle group and month.
+
+    Origin: Ashu
+    """
     return f"load:monthly-bounds:{site.id}:{aisle_group.id}:{month_start:%Y%m}"
 
 
 def update_monthly_min_max_load(site, aisle_group, reading: LoadReading):
+    """Updates this month's minimum and maximum load of a power source when the new reading goes beyond
+    them.
+
+    Origin: Ashu
+    """
     power_source = aisle_group.aisleGroupName
     try:
         today_date = datetime.now()

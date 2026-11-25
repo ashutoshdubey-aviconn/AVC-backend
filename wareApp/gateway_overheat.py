@@ -35,11 +35,18 @@ DEFAULT_THRESHOLD_C = 85.0
 
 
 class InvalidOverheatAlert(ValueError):
-    """The request body is not a usable overheat alert."""
+    """The request body is not a usable overheat alert.
+
+    Origin: Ashu
+    """
 
 
 @dataclass(frozen=True)
 class OverheatAlert:
+    """One gateway overheat report: site, gateway number, temperature, CPU status and fan speed.
+
+    Origin: Ashu
+    """
     site_id: int
     gateway_no: str
     temperature: float
@@ -48,6 +55,10 @@ class OverheatAlert:
 
 
 def _text(value, limit=60):
+    """Short text for an e-mail field: dicts and lists joined, cut to a length limit.
+
+    Origin: Ashu
+    """
     if isinstance(value, dict):
         value = ", ".join(f"{k}: {v}" for k, v in value.items())
     elif isinstance(value, (list, tuple)):
@@ -56,7 +67,10 @@ def _text(value, limit=60):
 
 
 def parse_alert(data):
-    """Validate the gateway's JSON body; raise InvalidOverheatAlert."""
+    """Validate the gateway's JSON body; raise InvalidOverheatAlert.
+
+    Origin: Ashu
+    """
     if not isinstance(data, dict):
         raise InvalidOverheatAlert("body must be a JSON object")
     try:
@@ -84,6 +98,8 @@ def record_overheat(alert):
     """Store (or count) the alarm and e-mail it at most once per window.
 
     Returns a short outcome text. Raises Site.DoesNotExist for unknown sites.
+
+    Origin: Ashu
     """
     site = Site.objects.get(id=alert.site_id)
     if alarm_policy.is_off(site.id, GATEWAY_OVERHEAT_ALARM_TYPE):
@@ -174,4 +190,8 @@ def record_overheat(alert):
 
 
 def _gateway_number(gateway_no):
+    """Gateway number as an int when it is all digits, else None.
+
+    Origin: Ashu
+    """
     return int(gateway_no) if gateway_no.isdigit() else None

@@ -14,7 +14,10 @@ def request_remote_access(
     retry_count=0,
     publish_command=mqtt_publish.single,
 ):
-    """Publish a remote-access command for the gateway agent to execute."""
+    """Publish a remote-access command for the gateway agent to execute.
+
+    Origin: Ashu
+    """
     if isinstance(site_id, bool) or not isinstance(site_id, int) or site_id <= 0:
         raise ValueError("Remote access site_id must be a positive integer")
     if (

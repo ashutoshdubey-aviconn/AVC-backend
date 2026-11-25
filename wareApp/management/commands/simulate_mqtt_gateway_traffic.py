@@ -9,11 +9,21 @@ from wareApp.models import AisleGroup, Site
 
 
 class Command(BaseCommand):
+    """manage.py simulate_mqtt_gateway_traffic: Publish randomized gateway MQTT traffic to exercise
+    queue1 and queue2 workers.
+
+    Origin: Ashu
+    """
     help = (
         "Publish randomized gateway MQTT traffic to exercise queue1 and queue2 workers."
     )
 
     def add_arguments(self, parser):
+        """Command-line options: --site-id, --leg-id, --gateway-id, --cycles, --interval,
+        --load-data-only, --all-topics, --write.
+
+        Origin: Ashu
+        """
         parser.add_argument("--site-id", type=int, required=True)
         parser.add_argument("--leg-id", type=str)
         parser.add_argument("--gateway-id", default="simulation-gateway-01")
@@ -36,6 +46,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Runs manage.py simulate_mqtt_gateway_traffic: Publish randomized gateway MQTT traffic to
+        exercise queue1 and queue2 workers.
+
+        Origin: Ashu
+        """
         site = Site.objects.filter(id=options["site_id"]).first()
         if site is None:
             raise CommandError(f"Unknown site ID: {options['site_id']}")
@@ -80,6 +95,11 @@ class Command(BaseCommand):
             client.disconnect()
 
     def _find_leg(self, site, leg_id):
+        """The aisle group to simulate: the given leg id, or the site's first one; CommandError when
+        none exists.
+
+        Origin: Ashu
+        """
         legs = AisleGroup.objects.filter(site=site)
         if leg_id:
             leg = legs.filter(attached_leg_id=leg_id).first()
@@ -90,6 +110,11 @@ class Command(BaseCommand):
         return leg
 
     def _messages(self, site_id, leg_id, gateway_id, all_topics, load_data_only=False):
+        """Builds realistic test packets (consumption, SupplyTime, load, LoadData ...) with topics for
+        one site, leg and gateway.
+
+        Origin: Ashu
+        """
         now = datetime.now()
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S.%f")
         epoch_millis = int(now.timestamp() * 1000)

@@ -42,9 +42,18 @@ GLITCH_FACTOR = 100
 
 
 class Command(BaseCommand):
+    """manage.py resync_daily_totals: Set daily readings to the sum of their hourly readings (dry run
+    unless --apply).
+
+    Origin: Ashu
+    """
     help = "Set daily readings to the sum of their hourly readings (dry run unless --apply)."
 
     def add_arguments(self, parser):
+        """Command-line options: --from, --to, --site, --include-incomplete, --apply.
+
+        Origin: Ashu
+        """
         parser.add_argument("--from", dest="date_from", required=True, help="YYYY-MM-DD")
         parser.add_argument("--to", dest="date_to", required=True, help="YYYY-MM-DD (inclusive)")
         parser.add_argument("--site", type=int, action="append", help="Site id (repeatable)")
@@ -59,6 +68,11 @@ class Command(BaseCommand):
         self, *args, date_from, date_to, site=None, apply=False,
         include_incomplete=False, **options,
     ):
+        """Runs manage.py resync_daily_totals: Set daily readings to the sum of their hourly readings
+        (dry run unless --apply).
+
+        Origin: Ashu
+        """
         try:
             first = datetime.strptime(date_from, "%Y-%m-%d").date()
             last = datetime.strptime(date_to, "%Y-%m-%d").date()
@@ -70,6 +84,10 @@ class Command(BaseCommand):
         now = datetime.now()
 
         def complete(day, hours):
+            """True when a day has all its hours: 24 for past days, up to the current hour for today.
+
+            Origin: Ashu
+            """
             if day < now.date():
                 return hours >= 24
             return hours >= now.hour  # the current hour may still be open

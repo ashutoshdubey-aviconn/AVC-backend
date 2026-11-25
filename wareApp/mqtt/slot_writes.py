@@ -19,7 +19,10 @@ BULK_BATCH_SIZE = 500
 
 
 class SlotWriteResult(NamedTuple):
-    """Slot keys per outcome (used for counts and for the log line)."""
+    """Slot keys per outcome (used for counts and for the log line).
+
+    Origin: Ashu
+    """
 
     updated: list
     created: list
@@ -30,7 +33,10 @@ class SlotWriteResult(NamedTuple):
 
     @property
     def changed(self):
-        """Keys of slots that were created or updated."""
+        """Keys of slots that were created or updated.
+
+        Origin: Ashu
+        """
         return [*self.created, *self.updated]
 
 
@@ -47,6 +53,8 @@ def upsert_slots(queryset, key_of, slots, update_fields, build_row, should_updat
 
     Returns a ``SlotWriteResult`` with the slot keys that were updated,
     created, skipped (guard) and unchanged (values already stored).
+
+    Origin: Ashu
     """
     model = queryset.model
     existing = defaultdict(list)

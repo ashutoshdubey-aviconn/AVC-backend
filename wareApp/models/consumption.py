@@ -8,6 +8,11 @@ from .setup import AisleGroup, Site
 
 
 class SupplyLoadTimeShare(models.Model):
+    """Table wareApp_supplyloadtimeshare: supply load time share. Fields: site, power_source,
+    hourly_run_time, reading_from, reading_to.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, related_name="supply", on_delete=models.CASCADE)
     sources = (
         (0, "MAINS SUPPLY"),
@@ -23,6 +28,10 @@ class SupplyLoadTimeShare(models.Model):
     reading_to = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.get_power_source_display().
+
+        Origin: main (unchanged)
+        """
         return self.get_power_source_display()
 
     class Meta:
@@ -35,6 +44,12 @@ class SupplyLoadTimeShare(models.Model):
 
 
 class HourlySiteReading(CleanReadingMixin, models.Model):
+    """Table wareApp_hourlysitereading: hourly site reading. Fields: associated_Site, aisle_group,
+    leg_id, unit_consumption, hourly_baseline_value, energy_saved, reading_from, reading_to,
+    is_visible, is_estimated.
+
+    Origin: Ashu (changed from main)
+    """
     baseline_field = "hourly_baseline_value"
 
     # No own index: (associated_Site, leg_id, reading_from) covers site lookups (migration 0111).
@@ -72,10 +87,19 @@ class HourlySiteReading(CleanReadingMixin, models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.leg_id).
+
+        Origin: main (unchanged)
+        """
         return str(self.leg_id)
 
 
 class DailySiteReading(CleanReadingMixin, models.Model):
+    """Table wareApp_dailysitereading: daily site reading. Fields: associated_Site, aisle_group,
+    leg_id, unit_consumption, daily_baseline_value, energy_saved, reading_for, is_visible.
+
+    Origin: Ashu (changed from main)
+    """
     baseline_field = "daily_baseline_value"
 
     associated_Site = models.ForeignKey(
@@ -100,10 +124,20 @@ class DailySiteReading(CleanReadingMixin, models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.leg_id).
+
+        Origin: main (unchanged)
+        """
         return str(self.leg_id)
 
 
 class SensorAisleUnitConsumption(models.Model):
+    """Table wareApp_sensoraisleunitconsumption: sensor aisle unit consumption. Fields:
+    associated_Site, aisle_group, leg_id, unit_consumption, daily_baseline_value, energy_saved,
+    reading_for, is_visible.
+
+    Origin: main (unchanged)
+    """
     associated_Site = models.ForeignKey(
         Site, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -118,10 +152,20 @@ class SensorAisleUnitConsumption(models.Model):
     is_visible = models.BooleanField(default=False)
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.unit_consumption).
+
+        Origin: main (unchanged)
+        """
         return str(self.unit_consumption)
 
 
 class MonthlyLoadSharePercentage(models.Model):
+    """Table wareApp_monthlyloadsharepercentage: monthly load share percentage. Fields: site,
+    power_source, monthly_time_based_percentage, monthly_energy_based_percentage, for_month,
+    created_on.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     sources = (
         (0, "MAINS SUPPLY"),
@@ -138,10 +182,19 @@ class MonthlyLoadSharePercentage(models.Model):
     created_on = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.time_based_percentage).
+
+        Origin: main (unchanged)
+        """
         return str(self.time_based_percentage)
 
 
 class MeterReadings(models.Model):
+    """Table wareApp_meterreadings: meter readings. Fields: local_meterId, reading_for, reading_of,
+    previous_reading_value, updated_on.
+
+    Origin: Ashu (changed from main)
+    """
     local_meterId = models.PositiveIntegerField(null=True, blank=True)
     reading_type = ((0, "Energy"), (1, "Load_time"), (2, "Sensor"))
     reading_for = models.PositiveIntegerField(
@@ -152,4 +205,8 @@ class MeterReadings(models.Model):
     updated_on = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.reading_of.
+
+        Origin: main (unchanged)
+        """
         return self.reading_of

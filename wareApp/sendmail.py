@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def _smtp_config():
+    """SMTP host, port, user, password and TLS setting from settings.py (.env).
+
+    Origin: Ashu
+    """
     user = settings.EMAIL_HOST_USER
     return {
         "host": settings.EMAIL_HOST,
@@ -34,28 +38,50 @@ def _smtp_config():
 
 
 def _alarm_override_recipients():
-    """Addresses that replace every alarm email's recipients (test servers), or []."""
+    """Addresses that replace every alarm email's recipients (test servers), or [].
+
+    Origin: Ashu
+    """
     return list(getattr(settings, "ALARM_EMAIL_OVERRIDE_TO", []) or [])
 
 
 class EmailFailure:
     """Result of a failed send: false like ``False``, plus whether trying again
     later can help (``transient``: mail server down / refused the login) or not
-    (no recipients, mail not configured, address refused)."""
+    (no recipients, mail not configured, address refused).
+
+    Origin: Ashu
+    """
 
     def __init__(self, error, transient):
+        """A failed e-mail: the error text and whether a retry may work (transient).
+
+        Origin: Ashu
+        """
         self.error = str(error)[:300]
         self.transient = transient
 
     def __bool__(self):
+        """A failure counts as False, so old 'if sent:' checks still work.
+
+        Origin: Ashu
+        """
         return False
 
     def __eq__(self, other):
+        """Equal to False, and to another failure with the same error.
+
+        Origin: Ashu
+        """
         return other is False or (isinstance(other, EmailFailure) and other.error == self.error)
 
     __hash__ = None
 
     def __repr__(self):
+        """Failure text for logs.
+
+        Origin: Ashu
+        """
         return f"EmailFailure({self.error!r}, transient={self.transient})"
 
 
@@ -73,6 +99,8 @@ def _send_smtp_email(
         from_email (str | None): From address (defaults to settings.DEFAULT_FROM_EMAIL or EMAIL_HOST_USER)
     Returns:
         bool: True on success, False otherwise
+
+    Origin: Ashu (changed from main)
     """
     if isinstance(to, str):
         to = [to]
@@ -147,17 +175,28 @@ def _send_smtp_email(
 # ---------------- Helpers ---------------- #
 
 def line(size, li=range(10)):
-    """Random digit string (cryptographically secure: used for OTPs)."""
+    """Random digit string (cryptographically secure: used for OTPs).
+
+    Origin: Ashu (changed from main)
+    """
     return "".join(str(secrets.choice(li)) for _ in range(size))
 
 
 def _now_str():
+    """Current time as e-mail text, e.g. 'Nov 25,2026 10:30:00'.
+
+    Origin: main (unchanged)
+    """
     return timezone.now().strftime("%b %d,%Y %H:%M:%S")
 
 
 # ---------------- Clean HTML templates (kept close to originals) ---------------- #
 
 def _tpl_header(title_text=None):
+    """HTML header of every e-mail: logo, company name and an optional title.
+
+    Origin: Ashu (changed from main)
+    """
     title = f"<h1 style=\"color:#ff6600;\">{title_text}</h1>" if title_text else ""
     return f"""
     <div class=\"header\" style=\"background:#fff;color:#333;padding:10px 0;text-align:center\">
@@ -169,6 +208,10 @@ def _tpl_header(title_text=None):
 
 
 def _tpl_footer():
+    """HTML footer of every e-mail (signature of the SEM team).
+
+    Origin: main (unchanged)
+    """
     return """
     <br><br>
     Sincerely,<br>
@@ -184,6 +227,10 @@ def _tpl_footer():
 # ---------------- Original function names (SMTP-based) ---------------- #
 
 def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
+    """E-mails the sensor bypass / sensor fault alert of an aisle to the site's recipients.
+
+    Origin: Ashu (changed from main)
+    """
     site = Site.objects.get(id=site_id)
     site_name = site.site_name
     location = getattr(site, "location", "-")
@@ -235,6 +282,10 @@ def send_mail_for_sensor_by_pass(site_id, aisle_id, options):
 
 
 def send_mail_fire_alarm_aviconn_user(alarm_type):
+    """E-mails Aviconn that the fire system is running in the given alarm mode.
+
+    Origin: Ashu (changed from main)
+    """
     date_str = timezone.now().strftime("%b %d,%Y")
     html_message = f"""
         <html><head></head><body>
@@ -261,23 +312,39 @@ _FEMS_RECIPIENTS = [
 
 
 def _send_fems_email(devices, subject, extra_to=()):
+    """Sends a fire equipment (FEMS) device list e-mail to the FEMS recipients (plus extra addresses).
+
+    Origin: Ashu
+    """
     html_message = render_to_string("femDeviceEmail.html", {"allDevicesData": devices})
     return _send_smtp_email(subject, html_message, [*_FEMS_RECIPIENTS, *extra_to])
 
 
 def send_mail_fire_equipments_system_8days_before(devices, userEmail):
+    """FEMS e-mail: devices whose next service is due in 8 days.
+
+    Origin: Ashu (changed from main)
+    """
     return _send_fems_email(
         devices, "FEMS Device next service date information alert Before 8 Days"
     )
 
 
 def send_mail_fire_equipments_system_after4days(devices, userEmail):
+    """FEMS e-mail: devices whose service was due 4 days ago.
+
+    Origin: Ashu (changed from main)
+    """
     return _send_fems_email(
         devices, "FEMS device service due information alert After 4 days"
     )
 
 
 def send_mail_fire_equipments_system_45days_before(devices, userEmail):
+    """FEMS e-mail: devices whose warranty ends in 45 days (also to the site's security team).
+
+    Origin: Ashu (changed from main)
+    """
     return _send_fems_email(
         devices,
         "Before 45 Days device Warranty expired information alert.",
@@ -286,6 +353,10 @@ def send_mail_fire_equipments_system_45days_before(devices, userEmail):
 
 
 def send_mail_fire_equipments_system_30days_before(devices, userEmail):
+    """FEMS e-mail: devices whose warranty ends in 30 days.
+
+    Origin: Ashu (changed from main)
+    """
     return _send_fems_email(
         devices, "Before 30 Days device Warranty expired information alert."
     )
@@ -293,6 +364,10 @@ def send_mail_fire_equipments_system_30days_before(devices, userEmail):
 
 def send_mail_fire_alarm_user(email, alarm_type, device_type, motor_status=0):
 
+    """E-mails a user the fire pump alarm (alarm type, device, motor on / off).
+
+    Origin: Ashu (changed from main)
+    """
     if motor_status == 1:
         motor_mode = "Yes"
         current_status = "On"
@@ -376,6 +451,10 @@ def send_mail_fire_alarm_user(email, alarm_type, device_type, motor_status=0):
 
 
 def send_mail_for_motor_aviconn_user(motor):
+    """E-mails Aviconn that the fire pump motor was turned on or off.
+
+    Origin: Ashu (changed from main)
+    """
     date_str = timezone.now().strftime("%b %d,%Y")
     html_message = f"""
     <html><head></head><body>
@@ -392,6 +471,11 @@ def send_mail_for_motor_aviconn_user(motor):
 
 
 def emailcheck(id, username, email):
+    """Password reset: creates a one-time code for the user (valid PASSWORD_RESET_OTP_MINUTES, one per
+    user) and e-mails it.
+
+    Origin: Ashu (changed from main)
+    """
     userId = User.objects.get(username=username).id
     otp = line(5)
     # One valid code per user; expired codes of everyone are dropped.
@@ -426,6 +510,10 @@ def emailcheck(id, username, email):
 
 
 def send_mail_fire_equipments_system(device):
+    """E-mails the fire equipment device list.
+
+    Origin: Ashu (changed from main)
+    """
     html_message = f"""
         <html><head></head><body>
         Dear Customer,
@@ -443,7 +531,15 @@ def send_mail_fire_equipments_system(device):
 
 
 def send_mail_for_pf_fluctuation(data):
+    """E-mails the Power Factor alarm with each phase's PF and limit (phases below the limit marked).
+
+    Origin: Ashu (changed from main)
+    """
     def row(phase):
+        """One e-mail row for a phase: PF, limit and whether it is below the limit.
+
+        Origin: Ashu
+        """
         value = data[f"{phase}_pf"]
         threshold = data[f"{phase}_pf_threshold"]
         return (
@@ -466,6 +562,8 @@ def send_alarm_email(alarm_name, site_id, details, alarm_type=None):
     Recipients: the software team and the site's ground team as set for
     ``alarm_type`` (wareApp/mqtt/services/alarm_policy.py); ALARM_EMAIL_OVERRIDE_TO replaces
     them on test servers. With nobody configured nothing is sent.
+
+    Origin: Ashu
     """
 
     site = Site.objects.filter(id=site_id).first()
@@ -501,7 +599,10 @@ def send_software_team_email(subject, site_id, details):
     """Notice for the software team only (not the site's ground team), same layout as the alarm
     e-mails: e.g. catch-up hours that need a manual spread (wareApp/catch_up_spread.py).
     Recipients: alarm_recipients.SOFTWARE_TEAM, else ALARM_EMAIL_DEFAULT_TO; ALARM_EMAIL_OVERRIDE_TO
-    replaces them on test servers."""
+    replaces them on test servers.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services import alarm_recipients
 
     site = Site.objects.filter(id=site_id).first()
@@ -529,6 +630,10 @@ def send_software_team_email(subject, site_id, details):
 
 
 def send_alarm_for_high_voltage(data):
+    """E-mails the High Voltage alarm with each phase's voltage and limit.
+
+    Origin: Ashu (changed from main)
+    """
     site = Site.objects.get(id=data['site_id'])
     site_name = site.site_name
     r_max_volt = data['r_volt_threshold']
@@ -566,6 +671,10 @@ def send_alarm_for_high_voltage(data):
 
 
 def send_alarm_for_low_voltage(data):
+    """E-mails the Low Voltage alarm with each phase's voltage and limit.
+
+    Origin: Ashu (changed from main)
+    """
     site = Site.objects.get(id=data['site_id'])
     site_name = site.site_name
     r_min_volt = data['r_volt_threshold']
@@ -603,6 +712,10 @@ def send_alarm_for_low_voltage(data):
 
 
 def send_mail_for_dg_fuel_under_level(data):
+    """E-mails the DG Fuel Under Level alarm of a site.
+
+    Origin: Ashu (changed from main)
+    """
     site = Site.objects.get(id=data['site_id'])
     site_name = site.site_name
 
@@ -632,6 +745,10 @@ def send_mail_for_dg_fuel_under_level(data):
 
 def send_alarm_for_dg_overtime(data):
     # Not implemented yet (no email is sent for DG overtime).
+    """DG Overtime e-mail: not built yet (returns None).
+
+    Origin: Ashu (changed from main)
+    """
     return None
 
 

@@ -15,11 +15,21 @@ from wareApp.utility import logger
 
 
 class FetchAllCustomersForSuperAdmin(APIView):
+    """API view for /api/customerDetails/ (POST; Login required (default); no rate limit). Reads
+    DailySiteReading, Site, User. Takes end_date, start_date, user_id. Returns data.
+
+    Origin: Ashu (changed from main)
+    """
     throttle_classes = []
     # authentication_classes = [TokenAuthentication]
     # permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """POST /api/customerDetails/. Request fields: end_date, start_date, user_id. Response keys:
+        data.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         user_id = data.get("user_id")
         start_date = data.get("start_date")
@@ -131,7 +141,18 @@ class FetchAllCustomersForSuperAdmin(APIView):
 
 
 class SuperAdminSnapShot(APIView):
+    """API view for /api/snapshot/ (POST; Login required (default)). Reads DailySiteReading, Site,
+    User. Takes end_date, start_date, user_id. Returns alarms, current_date, total_energy_saved,
+    total_saved_percentage, total_unit_consumed.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request, *args):
+        """POST /api/snapshot/. Request fields: end_date, start_date, user_id. Response keys: alarms,
+        current_date, total_energy_saved, total_saved_percentage, total_unit_consumed.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data : ", data)
         user_id = data.get("user_id")
@@ -193,9 +214,16 @@ class SuperAdminSnapShot(APIView):
 
 
 class SuperUserAllAlarmsPriorityBasedOnCustomersList(APIView):
-    """Active-issue counts per customer, priority and site (one per issue, not per row)."""
+    """Active-issue counts per customer, priority and site (one per issue, not per row).
+
+    Origin: Ashu (changed from main)
+    """
 
     def post(self, request):
+        """POST /api/alarmapi/. No request fields. Response keys: data.
+
+        Origin: Ashu (changed from main)
+        """
         customers = list(User.objects.filter(UserType=4).order_by("id"))
         live_sites = Site.objects.filter(customer__in=customers, is_live=True)
         counts = defaultdict(lambda: defaultdict(int))
@@ -221,11 +249,18 @@ class SuperUserAllAlarmsPriorityBasedOnCustomersList(APIView):
 
 
 class SuperUserAllAlarmsTypeBasedOnCustomersList(APIView):
-    """Active alarms of every live site, one row per issue (see wareApp/alarm_feed.py)."""
+    """Active alarms of every live site, one row per issue (see wareApp/alarm_feed.py).
+
+    Origin: Ashu (changed from main)
+    """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """POST /api/alarmTypeApi/. No request fields. Response keys: data.
+
+        Origin: Ashu (changed from main)
+        """
         if request.user.UserType != 1:
             raise PermissionDenied("Only Super_Admin users can view alarms.")
 

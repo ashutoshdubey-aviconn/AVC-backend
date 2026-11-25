@@ -37,18 +37,28 @@ from .common import (
 class DgFuelConsumptionDataApi_new(APIView):
     """
     This API is used to get the DG fuel consumption data for a site on a given date. Uses the Loconav Push API for the process.
+
+    Origin: Ashu (changed from main)
     """
 
     permission_classes = [AllowAny]
 
     @staticmethod
     def _row_value(row, key, default=None):
+        """A field of a row that is either a dict or a model instance.
+
+        Origin: Ashu
+        """
         if isinstance(row, dict):
             return row.get(key, default)
         return getattr(row, key, default)
 
     @staticmethod
     def _graph_epoch_ms(value, offset_minutes=0):
+        """Graph time in ms of a value, shifted by some minutes.
+
+        Origin: Ashu
+        """
         epoch_ms = epoch_milliseconds(value)
         if epoch_ms is None:
             return None
@@ -56,11 +66,19 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _dg_graph_base_time(row):
+        """Graph time of a DG run (its end time).
+
+        Origin: Ashu
+        """
         value = DgFuelConsumptionDataApi_new._row_value(row, "dg_end_date")
         return epoch_milliseconds(value)
 
     @staticmethod
     def _day_bounds(selected_date):
+        """Start and end of the selected day (time-zone aware).
+
+        Origin: Ashu
+        """
         day_start = datetime.combine(selected_date, datetime.min.time())
         day_end = datetime.combine(
             selected_date, datetime.max.time().replace(microsecond=0)
@@ -73,6 +91,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _fuel_point_from_row(row):
+        """One fuel level graph point [time ms, litres] from a row, or None.
+
+        Origin: Ashu
+        """
         fuel_value = DgFuelConsumptionDataApi_new._row_value(row, "fuel_consumption")
         epoch_value = DgFuelConsumptionDataApi_new._row_value(row, "epoch_time")
         if fuel_value is None or epoch_value is None:
@@ -88,6 +110,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _latest_known_fuel_before(site_id, selected_date):
+        """Last fuel level stored before the selected day (start of the day's line).
+
+        Origin: Ashu
+        """
         previous = (
             _dg_fuel_queryset(DgFuelConsumptionData.objects)
             .filter(site=site_id, created__date__lt=selected_date)
@@ -108,6 +134,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _roadcast_subscription_expired(site, selected_date):
+        """True when the site uses Roadcast and its device reports an expired subscription.
+
+        Origin: Ashu
+        """
         provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
         if provider != "roadcast":
             return False
@@ -129,6 +159,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _loconav_subscription_expired(site, selected_date):
+        """True when the site uses Loconav and its vehicle reports an expired subscription.
+
+        Origin: Ashu
+        """
         provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
         if provider != "loconav":
             return False
@@ -147,6 +181,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _get_provider_status(site, selected_date):
+        """Provider status of the site for the day: SUBSCRIPTION_EXPIRED or the telemetry state.
+
+        Origin: Ashu
+        """
         provider = (getattr(site, "partner_dg_provider", None) or "").strip().lower()
         if provider == "roadcast":
             return (
@@ -168,6 +206,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _expired_graph_response():
+        """Graph response with empty series and the 'subscription expired' message.
+
+        Origin: Ashu
+        """
         return {
             "status": 200,
             "provider_status": "SUBSCRIPTION_EXPIRED",
@@ -218,6 +260,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _fuel_level_series_for_day(site, selected_date, provider_status=None):
+        """Fuel level graph points of one day (from the stored rows, starting at the last known level).
+
+        Origin: Ashu
+        """
         today = timezone.now().date()
         day_start, day_end = DgFuelConsumptionDataApi_new._day_bounds(selected_date)
         day_start_ms = epoch_milliseconds(day_start)
@@ -287,6 +333,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _fuel_level_series_for_range(site, from_date, end_date):
+        """Fuel level graph points for every day of a range.
+
+        Origin: Ashu
+        """
         points = []
         current_date = from_date
         while current_date <= end_date:
@@ -309,6 +359,10 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @staticmethod
     def _normalized_alert_series(site_id, start_date, end_date):
+        """Refuel and theft alert points of a site in a date range, for the graph.
+
+        Origin: Ashu
+        """
         refuel_data = []
         theft_data = []
         alerts = (
@@ -350,6 +404,12 @@ class DgFuelConsumptionDataApi_new(APIView):
 
     @entryExit
     def post(self, request):
+        """POST /api/dgFuelConsumptionData_test/. Request fields: date, site_id. Response keys: data,
+        dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data,
+        error, fuel_level, name, provider_status, refuel_alert, sample, status, theft_alert, type.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data: ", data)
         try:
@@ -473,10 +533,19 @@ class DgFuelConsumptionDataApi_new(APIView):
 
 
 class FetchDGAlertData(APIView):
+    """API view for /api/dgFuelAlerts/ (POST; Open: no login (AllowAny)). Saves to DGAlertsData.
+    Returns msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/dgFuelAlerts/. No request fields. Response keys: msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             DGAlertsData.objects.create(alert_data=data)
@@ -489,10 +558,23 @@ class FetchDGAlertData(APIView):
 
 
 class DgFuelConsumptionDataApi(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads DGFuelAlertsData,
+    DgUnitConsumption, Site. Takes date, site_id. Returns data, dg_fuel_consumed, dg_fuel_data,
+    dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data, error, fuel_level, name,
+    provider_status, refuel_alert, status....
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: data,
+        dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data,
+        error, fuel_level, name, provider_status, refuel_alert, status, theft_alert, type.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -611,10 +693,23 @@ class DgFuelConsumptionDataApi(APIView):
 
 
 class DgFuelConsumptionDataCustomRangeApi(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads DGFuelAlertsData,
+    DgUnitConsumption, Site. Takes end_date, from_date, site_id. Returns data, dg_fuel_consumed,
+    dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data, error, refuel_alert,
+    status, theft_alert.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: end_date, from_date, site_id. Response
+        keys: data, dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre,
+        dg_unit_per_litre_data, error, refuel_alert, status, theft_alert.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -735,6 +830,10 @@ class DgFuelConsumptionDataCustomRangeApi(APIView):
 
 
 def DGfuelMonthlyTrendMultipleAisles(site_id):
+    """Monthly DG fuel trend of a site, mains and DG aisles separately.
+
+    Origin: Ashu (changed from main)
+    """
     try:
         # data = request.data
         # site_id = data.get("site_id")
@@ -845,9 +944,21 @@ def DGfuelMonthlyTrendMultipleAisles(site_id):
 
 
 class DgFuelMonthlyTrend(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    DGFuelAlertsData, DailySiteReading, DgFuelConsumptionData, DgUnitConsumption. Takes site_id.
+    Returns dg_fuel_monthly, dg_unit_consumption_monthly, mains_unit_consumption_monthly, months,
+    msg, status, test_Args.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: site_id. Response keys: dg_fuel_monthly,
+        dg_unit_consumption_monthly, mains_unit_consumption_monthly, months, msg, status, test_Args.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             site_id = data.get("site_id")
@@ -974,12 +1085,19 @@ class DgFuelMonthlyTrend(APIView):
 class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
     """
     This API is used to get the DG fuel consumption data for a site on a given date. Uses the Loconav Push API for the process.
+
+    Origin: Ashu (changed from main)
     """
 
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/dgFuelConsumptionData/. Request fields: date, download_excel, site_id. Response
+        keys: data, error, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -1189,16 +1307,34 @@ class DgFuelConsumptionDataApiUsingLoconavAPI_new(APIView):
 
 
 class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
+    """API view for /api/fetchDGFuelDataCustomeRange/ (POST; Open: no login (AllowAny)). Reads
+    DgUnitConsumption, Site. Takes end_date, from_date, site_id. Returns data, dg_fuel_consumed,
+    dg_fuel_data, dg_unit_data, dg_unit_per_litre, dg_unit_per_litre_data, error, fuel_level, name,
+    provider_status, refuel_alert, status....
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @staticmethod
     def _normalized_alert_series(site_id, start_date, end_date):
+        """Refuel and theft alert points (same as the daily graph view).
+
+        Origin: Ashu
+        """
         return DgFuelConsumptionDataApi_new._normalized_alert_series(
             site_id, start_date, end_date
         )
 
     @entryExit
     def post(self, request):
+        """POST /api/fetchDGFuelDataCustomeRange/. Request fields: end_date, from_date, site_id.
+        Response keys: data, dg_fuel_consumed, dg_fuel_data, dg_unit_data, dg_unit_per_litre,
+        dg_unit_per_litre_data, error, fuel_level, name, provider_status, refuel_alert, status,
+        theft_alert, type.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -1325,9 +1461,18 @@ class DgFuelConsumptionDataCustomRangeApiUsingPushAPIs(APIView):
 
 
 class DgAlertsPushInterface(APIView):
+    """API view for /api/dgFuelPushInterface/ (POST; Open: no login (AllowAny)). Saves to DGAlertsData.
+    Returns message, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/dgFuelPushInterface/. No request fields. Response keys: message, status.
+
+        Origin: main (unchanged)
+        """
         try:
             interface_id = request.headers.get("X-Interface-Id")
             map_of_interfaces = {
@@ -1348,9 +1493,20 @@ class DgAlertsPushInterface(APIView):
 
 
 class DGFuelDataExcelExport(APIView):
+    """API view for /api/dgFuelDataExcelExport/ (POST; Open: no login (AllowAny)). Builds an Excel /
+    file download. Reads DGAlertsData, DgFuelConsumptionData, DgUnitConsumption, Site. Takes
+    end_date, site_id, start_date. Returns msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/dgFuelDataExcelExport/. Request fields: end_date, site_id, start_date. Response
+        keys: msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             site_id = data.get("site_id")
@@ -1473,9 +1629,22 @@ class DGFuelDataExcelExport(APIView):
 
 
 class DgFuelMonthlyTrend_test(APIView):
+    """API view for /api/dgFuelMonthlyTrend/, /api/fuel-data-trend-test (POST; Open: no login
+    (AllowAny)). Reads AisleGroup, DailySiteReading, DgUnitConsumption. Takes site_id. Returns
+    dg_fuel_monthly, dg_unit_consumption_monthly, mains_unit_consumption_monthly, months, msg,
+    status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/dgFuelMonthlyTrend/, /api/fuel-data-trend-test. Request fields: site_id. Response
+        keys: dg_fuel_monthly, dg_unit_consumption_monthly, mains_unit_consumption_monthly, months,
+        msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             site_id = data.get("site_id")

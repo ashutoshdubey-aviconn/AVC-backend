@@ -25,10 +25,18 @@ STATUS_CACHE_TTL = 2 * 60 * 60
 
 
 def _pk(value):
+    """Primary key of a row, or the value itself.
+
+    Origin: Ashu
+    """
     return getattr(value, "pk", None) or getattr(value, "id", None)
 
 
 def status_lookup(site, home_gateway_id, aisle_group=None, power_source=None):
+    """Fields that find the sync status row of an aisle or power source of a gateway.
+
+    Origin: Ashu
+    """
     lookup = {"site": site, "home_gateway_id": str(home_gateway_id)}
     if aisle_group is not None:
         lookup["aisle_group"] = aisle_group
@@ -39,12 +47,19 @@ def status_lookup(site, home_gateway_id, aisle_group=None, power_source=None):
 
 
 def _cache_key(site, home_gateway_id, aisle_group=None, power_source=None):
+    """Cache key of a sync status row.
+
+    Origin: Ashu
+    """
     scope = f"a{_pk(aisle_group)}" if aisle_group is not None else f"s{power_source}"
     return f"sync-status:{_pk(site)}:{home_gateway_id}:{scope}"
 
 
 def upsert_status(site, home_gateway_id, defaults, aisle_group=None, power_source=None):
-    """Write the status row for the scope; create it if it does not exist yet."""
+    """Write the status row for the scope; create it if it does not exist yet.
+
+    Origin: Ashu
+    """
     defaults = {"updated_at": timezone.now(), **defaults}
     lookup = status_lookup(site, home_gateway_id, aisle_group, power_source)
     if aisle_group is not None:
@@ -62,6 +77,10 @@ def upsert_status(site, home_gateway_id, defaults, aisle_group=None, power_sourc
 
 
 def _mark_healthy(site, home_gateway_id, observed_at, aisle_group=None, power_source=None):
+    """Marks an aisle / source healthy for the hour; writes to the database only once per hour (cache).
+
+    Origin: Ashu
+    """
     key = _cache_key(site, home_gateway_id, aisle_group, power_source)
     marker = (
         "healthy",
@@ -88,12 +107,18 @@ def _mark_healthy(site, home_gateway_id, observed_at, aisle_group=None, power_so
 
 
 def mark_sync_healthy(site, home_gateway_id, aisle_group, observed_at):
-    """A live consumption packet for the aisle was stored."""
+    """A live consumption packet for the aisle was stored.
+
+    Origin: Ashu
+    """
     return _mark_healthy(site, home_gateway_id, observed_at, aisle_group=aisle_group)
 
 
 def mark_source_healthy(site, home_gateway_id, power_source, observed_at):
-    """A live SupplyTime packet for the power source was stored."""
+    """A live SupplyTime packet for the power source was stored.
+
+    Origin: Ashu
+    """
     return _mark_healthy(
         site, home_gateway_id, observed_at, power_source=int(power_source)
     )

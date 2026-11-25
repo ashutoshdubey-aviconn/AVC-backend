@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def _lookback_minutes():
+    """How many minutes back the roll-ups re-read raw rows (LOAD_DATA_ROLLUP_LOOKBACK_MINUTES, default
+    360).
+
+    Origin: Ashu
+    """
     try:
         return max(1, int(os.getenv("LOAD_DATA_ROLLUP_LOOKBACK_MINUTES", "360")))
     except ValueError:
@@ -22,7 +27,10 @@ def _lookback_minutes():
 
 
 def _recheck_minutes():
-    """Minutes before the last rolled minute that are checked again (late packets)."""
+    """Minutes before the last rolled minute that are checked again (late packets).
+
+    Origin: Ashu
+    """
     try:
         return max(1, int(os.getenv("LOAD_DATA_ROLLUP_RECHECK_MINUTES", "15")))
     except ValueError:
@@ -30,14 +38,26 @@ def _recheck_minutes():
 
 
 def _minute_bucket(value):
+    """Start of the minute for a datetime.
+
+    Origin: Ashu
+    """
     return value.replace(second=0, microsecond=0)
 
 
 def _hour_bucket(value):
+    """Start of the hour for a datetime.
+
+    Origin: Ashu
+    """
     return value.replace(minute=0, second=0, microsecond=0)
 
 
 def _epoch_sort_key(reading):
+    """Sort key of a raw reading: its epoch time, or its created time when the epoch is not a number.
+
+    Origin: Ashu
+    """
     try:
         return int(reading.epoch_time)
     except (TypeError, ValueError):
@@ -45,6 +65,10 @@ def _epoch_sort_key(reading):
 
 
 def _extrema(readings):
+    """Lowest and highest load reading of a list (readings without a value are skipped).
+
+    Origin: Ashu
+    """
     minimum = None
     maximum = None
     for reading in readings:
@@ -62,6 +86,11 @@ def _extrema(readings):
 
 
 def _materialized_buckets(model, site, window_start, window_end, bucket_function):
+    """Minute / hour buckets of a site that already have roll-up rows in a time window, so they are not
+    written twice.
+
+    Origin: Ashu
+    """
     rows = (
         model.objects.filter(
             site=site,
@@ -79,6 +108,10 @@ def _materialized_buckets(model, site, window_start, window_end, bucket_function
 
 
 def _records_for_extrema(model, site, aisle_group, readings):
+    """Unsaved roll-up rows (the minimum and the maximum reading) for one aisle group.
+
+    Origin: Ashu
+    """
     extrema = _extrema(readings)
     if not extrema:
         return []
@@ -96,12 +129,20 @@ def _records_for_extrema(model, site, aisle_group, readings):
 
 
 def _save_extrema(model, site, aisle_group, readings):
+    """Writes the minimum and maximum reading of one aisle group with one bulk_create.
+
+    Origin: Ashu
+    """
     records = _records_for_extrema(model, site, aisle_group, readings)
     if records:
         model.objects.bulk_create(records)
 
 
 def _save_batched_extrema(model, site, bucket_extrema, home_gateway_id=None):
+    """Writes the min / max rows of many aisle groups of a site with one bulk_create.
+
+    Origin: Ashu
+    """
     records = []
     for aisle_group, minimum, maximum in bucket_extrema:
         records.extend(
@@ -134,6 +175,11 @@ def _save_batched_extrema(model, site, bucket_extrema, home_gateway_id=None):
 
 
 def _extrema_by_bucket(readings, bucket_function):
+    """Groups raw readings by aisle group and minute / hour bucket and keeps the lowest and highest of
+    each.
+
+    Origin: Ashu
+    """
     grouped = {}
     for reading in readings:
         if (
@@ -168,6 +214,8 @@ def roll_up_completed_load_data(
     reporting interval. ``since`` is the site's last rolled-up minute: the window then
     starts LOAD_DATA_ROLLUP_RECHECK_MINUTES before it (late packets) instead of the
     full LOAD_DATA_ROLLUP_LOOKBACK_MINUTES, which is used only after a restart.
+
+    Origin: Ashu
     """
     completed_minute = _minute_bucket(observed_at)
     raw_window_start = completed_minute - timedelta(minutes=_lookback_minutes())
@@ -245,7 +293,10 @@ def roll_up_completed_load_data(
 
 
 def roll_up_load_data_if_due(site, observed_at, home_gateway_id=None):
-    """Run a site's catch-up rollup only once for each observed minute."""
+    """Run a site's catch-up rollup only once for each observed minute.
+
+    Origin: Ashu
+    """
     observed_minute = _minute_bucket(observed_at)
     site_key = getattr(site, "pk", None) or site.id
 

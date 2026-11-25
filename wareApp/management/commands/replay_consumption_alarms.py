@@ -30,9 +30,17 @@ from wareApp.mqtt.services import consumption_alarms
 
 
 class _MailGate:
-    """Wraps notify(): only the chosen sites e-mail, up to a limit."""
+    """Wraps notify(): only the chosen sites e-mail, up to a limit.
+
+    Origin: Ashu
+    """
 
     def __init__(self, real_notify, email_sites, max_emails, apply):
+        """Sets which sites may get e-mails during the replay, the e-mail limit and whether this is a
+        real run.
+
+        Origin: Ashu
+        """
         self.real_notify = real_notify
         self.email_sites = set(email_sites)
         self.max_emails = max_emails
@@ -42,6 +50,11 @@ class _MailGate:
         self.decisions = []  # one entry per notify() call, in order
 
     def __call__(self, send_function, title, site_id, details, *rest):
+        """Used in place of notify(): sends the e-mail only for allowed sites, on a real run and under
+        the limit; otherwise counts it as suppressed.
+
+        Origin: Ashu
+        """
         wanted = site_id in self.email_sites
         if self.apply and wanted and self.sent < self.max_emails:
             self.sent += 1
@@ -56,6 +69,10 @@ class _MailGate:
 
 
 def _date(value, name):
+    """Parses a YYYY-MM-DD command option; CommandError when the format is wrong.
+
+    Origin: Ashu
+    """
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
@@ -63,9 +80,18 @@ def _date(value, name):
 
 
 class Command(BaseCommand):
+    """manage.py replay_consumption_alarms: Replay daily consumption alarms day by day (dry run unless
+    --apply).
+
+    Origin: Ashu
+    """
     help = "Replay daily consumption alarms day by day (dry run unless --apply)."
 
     def add_arguments(self, parser):
+        """Command-line options: --from, --to, --site, --email-site, --max-emails, --report, --apply.
+
+        Origin: Ashu
+        """
         parser.add_argument("--from", dest="date_from", required=True)
         parser.add_argument("--to", dest="date_to", required=True, help="inclusive")
         parser.add_argument("--site", type=int, action="append",
@@ -78,6 +104,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, date_from, date_to, site=None, email_site=(), max_emails=50,
                report=None, apply=False, **options):
+        """Runs manage.py replay_consumption_alarms: Replay daily consumption alarms day by day (dry
+        run unless --apply).
+
+        Origin: Ashu
+        """
         first, last = _date(date_from, "from"), _date(date_to, "to")
         if last < first:
             raise CommandError("--to is before --from")

@@ -10,11 +10,16 @@ def recovery_request_allowed(site_id, scope, scope_id):
     ``scope`` is ``"aisle"`` (consumption) or ``"source"`` (SupplyTime). The
     first packet of a gap claims the key with an atomic add; packets for the
     same gap inside the cooldown get False and publish nothing.
+
+    Origin: Ashu
     """
     timeout = getattr(settings, "MQTT_RECOVERY_REQUEST_COOLDOWN_SECONDS", 600)
     return cache.add(f"mqtt:recovery-req:{site_id}:{scope}:{scope_id}", 1, timeout)
 
 
 def release_recovery_request(site_id, scope, scope_id):
-    """Give back a cooldown slot that turned out not to be needed."""
+    """Give back a cooldown slot that turned out not to be needed.
+
+    Origin: Ashu
+    """
     cache.delete(f"mqtt:recovery-req:{site_id}:{scope}:{scope_id}")

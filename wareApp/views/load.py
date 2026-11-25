@@ -25,7 +25,17 @@ from wareApp.utility import logger
 
 
 class LoadGrapghAPI(APIView):
+    """API view for /api/liveDataLoadGraph/, /api/liveLoadTesting/ (POST; Login required (default)).
+    Reads RawLoadData. Takes site_id. Returns data, msg, status.
+
+    Origin: main (unchanged)
+    """
     def post(self, request):
+        """POST /api/liveDataLoadGraph/, /api/liveLoadTesting/. Request fields: site_id. Response keys:
+        data, msg, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         try:
             site_id = data.get("site_id", 37)
@@ -53,7 +63,16 @@ class LoadGrapghAPI(APIView):
 
 
 class LoadGrapghAPITestingPurpose(APIView):
+    """API view, not wired to any URL (POST; Login required (default)). Reads RawLoadData. Takes
+    site_id. Returns data, msg, status.
+
+    Origin: main (unchanged)
+    """
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: site_id. Response keys: data, msg, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         try:
             site_id = data.get("site_id", 37)
@@ -81,7 +100,17 @@ class LoadGrapghAPITestingPurpose(APIView):
 
 
 class LoadGraphApiForEverySecond(APIView):
+    """API view for /api/liveDataEverySecond/ (POST; Login required (default)). Reads RawLoadData.
+    Takes epoch_time, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/liveDataEverySecond/. Request fields: epoch_time, site_id. Response keys: data,
+        msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -107,7 +136,16 @@ class LoadGraphApiForEverySecond(APIView):
 
 
 class LoadGraphApiForHourlyData(APIView):
+    """API view for /api/hourlyLoadGraph/ (POST; Login required (default)). Reads HourlyLoadData. Takes
+    date, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/hourlyLoadGraph/. Request fields: date, site_id. Response keys: data, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
 
@@ -138,9 +176,18 @@ class LoadGraphApiForHourlyData(APIView):
 
 
 class LoadGraphApiForDailyData(APIView):
+    """API view for /api/dailyLoadGraph/ (POST; Open: no login (AllowAny)). Reads DailyLoadData. Takes
+    date, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/dailyLoadGraph/. Request fields: date, site_id. Response keys: data, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id", 37)
@@ -175,7 +222,18 @@ class LoadGraphApiForDailyData(APIView):
 
 
 class LoadDataExcelDownload(APIView):
+    """API view for /api/downloadExcelLoadData/ (POST; Login required (default)). Builds an Excel /
+    file download. Reads DailyLoadData, HourlyLoadData, MainsDgLoadData, RawLoadData. Takes date,
+    graph_type, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/downloadExcelLoadData/. Request fields: date, graph_type, site_id. Response keys:
+        data, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -256,7 +314,17 @@ class LoadDataExcelDownload(APIView):
 
 
 class FetchFluctuatedPowerFactor(APIView):
+    """API view for /api/fluctuatedPowerFactorData/ (POST; Login required (default)). Reads
+    PowerFactorData. Takes site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/fluctuatedPowerFactorData/. Request fields: site_id. Response keys: data, msg,
+        status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -295,7 +363,18 @@ class FetchFluctuatedPowerFactor(APIView):
 
 
 class FetchMinMaxMonthlyLoadData(APIView):
+    """API view for /api/monthlyMinMaxLoadData/ (POST; Login required (default)). Reads
+    MonthlyMinMaxLoadData. Takes id. Returns data, max_date, max_value, min_date, min_value, msg,
+    status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/monthlyMinMaxLoadData/. Request fields: id. Response keys: data, max_date,
+        max_value, min_date, min_value, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("id")
@@ -349,7 +428,17 @@ class FetchMinMaxMonthlyLoadData(APIView):
 
 
 class DownloadMinMaxMonthlyLoadData(APIView):
+    """API view for /api/downloadExcelMonthlyMinMaxData/ (POST; Login required (default)). Builds an
+    Excel / file download. Reads MonthlyMinMaxLoadData. Takes site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/downloadExcelMonthlyMinMaxData/. Request fields: site_id. Response keys: data,
+        msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -403,7 +492,16 @@ class DownloadMinMaxMonthlyLoadData(APIView):
 
 
 class DownloadFluctuatedPowerFactor(APIView):
+    """API view for /api/downloadExcelPFData/ (POST; Login required (default)). Builds an Excel / file
+    download. Reads PowerFactorData. Takes site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/downloadExcelPFData/. Request fields: site_id. Response keys: data, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")
@@ -461,8 +559,17 @@ class DownloadFluctuatedPowerFactor(APIView):
 
 
 class LoadGraphApiForMainsDgDailyData(APIView):
+    """API view for /api/loadDataMainsDgDaily/ (POST; Login required (default)). Reads AisleGroup,
+    MainsDgLoadData. Takes date, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     @staticmethod
     def _series_color(series_name):
+        """Colour of a graph series: one palette for DG, one for mains, by its number.
+
+        Origin: Ashu
+        """
         normalized_name = str(series_name or "").strip().lower()
         match = re.search(r"(\d+)$", normalized_name)
         series_index = int(match.group(1)) if match else 1
@@ -482,6 +589,11 @@ class LoadGraphApiForMainsDgDailyData(APIView):
         return palette.get(series_index, "#90EE90")
 
     def post(self, request):
+        """POST /api/loadDataMainsDgDaily/. Request fields: date, site_id. Response keys: data, msg,
+        status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id", 37)
@@ -521,9 +633,19 @@ class LoadGraphApiForMainsDgDailyData(APIView):
 
 
 class LoadDataApi(APIView):
+    """API view for /api/loadData/test/ (POST; Open: no login (AllowAny)). Reads HourlyLoadData. Takes
+    aisle_id, date. Returns data, error, message, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/loadData/test/. Request fields: aisle_id, date. Response keys: data, error,
+        message, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         try:
             selected_date = datetime.strptime(data.get("date"), "%Y/%m/%d")
@@ -556,9 +678,19 @@ class LoadDataApi(APIView):
 
 
 class LoadDataApiMultipleSource(APIView):
+    """API view, not wired to any URL (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    HourlyLoadData. Takes date, site_id. Returns data, error, message, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: data, error,
+        message, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         date_str = data.get("date")
         site_id = data.get("site_id")
@@ -617,9 +749,19 @@ class LoadDataApiMultipleSource(APIView):
 
 
 class LoadDataApiMultipleSourceV2(APIView):
+    """API view for /api/loadDataPowerSource/test (POST; Open: no login (AllowAny)). Reads AisleGroup,
+    HourlyLoadData. Takes date, site_id. Returns data, error, message, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/loadDataPowerSource/test. Request fields: date, site_id. Response keys: data,
+        error, message, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         date_str = data.get("date")
         site_id = data.get("site_id")
@@ -708,9 +850,18 @@ class LoadDataApiMultipleSourceV2(APIView):
 
 
 class LiveDataApi(APIView):
+    """API view for /api/liveLoadData/test (POST; Open: no login (AllowAny)). Reads RawLoadData. Takes
+    epoch_time, site_id. Returns message.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/liveLoadData/test. Request fields: epoch_time, site_id. Response keys: message.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         site_id = data.get("site_id", 0)
         epoch_time = data.get("epoch_time", 0)
@@ -730,9 +881,20 @@ class LiveDataApi(APIView):
 
 
 class LoadDataExcelDownloadMonthlyRange(APIView):
+    """API view for /api/loadDataExcel/test (POST; Open: no login (AllowAny)). Builds an Excel / file
+    download. Reads DailyLoadData, HourlyLoadData, MainsDgLoadData, MonthlyLoadSharePercentage,
+    RawLoadData, Site. Takes end_date, from_date, graph_type, site_id. Returns data, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
+        """POST /api/loadDataExcel/test. Request fields: end_date, from_date, graph_type, site_id.
+        Response keys: data, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             site_id = data.get("site_id")

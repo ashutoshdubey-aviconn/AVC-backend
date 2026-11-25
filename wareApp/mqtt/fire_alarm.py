@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_fire_alarm_message(message):
+    """Parses a FIREALARM packet: meter number, R / Y / B voltages and pump status fields.
+
+    Origin: Ashu
+    """
     value_for = KeyValuePayload.parse(message, "fire alarm").get
 
     return (
@@ -26,6 +30,10 @@ def _parse_fire_alarm_message(message):
 def _send_fire_alarm_email(
     site, user_email, device_name, alarm_type, power_status, email_for
 ):
+    """Queues the fire alarm e-mail to one user (alarm type, device, power status).
+
+    Origin: Ashu
+    """
     notify(
         send_mail_fire_alarm_user,
         user_email,
@@ -44,6 +52,11 @@ def _send_fire_alarm_email(
 def _send_throttled_motor_on_email(
     site, user_email, device_name, alarm_type, power_status
 ):
+    """Sends the 'motor on' e-mail only when the last one for this device is older than the throttle
+    time.
+
+    Origin: Ashu
+    """
     previous_created = (
         Email_History.objects.filter(
             fire_site=site, deviceName=device_name, email_for=5
@@ -60,7 +73,10 @@ def _send_throttled_motor_on_email(
 
 
 def handle_fire_alarm_message(site, location_id, gateway_id, message):
-    """Update a fire-pump reading and emit the legacy state-change notifications."""
+    """Update a fire-pump reading and emit the legacy state-change notifications.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         meter_number, r_volt, y_volt, b_volt, power_status = _parse_fire_alarm_message(

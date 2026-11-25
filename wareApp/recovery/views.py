@@ -11,11 +11,21 @@ logger = logging.getLogger(__name__)
 
 class RecoveryUploadAPIView(APIView):
 
+    """API view for /api/v1/recovery/upload/ (POST; Open: no permission check ([]); no rate limit).
+    Reads Site. Takes Recovery Payload. Returns message, status.
+
+    Origin: Ashu
+    """
     authentication_classes = []
     permission_classes = []
     throttle_classes = []
 
     def post(self, request):
+        """POST /api/v1/recovery/upload/. Request fields: Recovery Payload. Response keys: message,
+        status.
+
+        Origin: Ashu
+        """
         recovery_payload = request.data.get("Recovery Payload")
 
         if not recovery_payload:

@@ -13,16 +13,29 @@ logger = logging.getLogger("wareApp.dg_fuel.collection")
 
 
 def target_site(target: Any) -> Any:
+    """Site of a DG fuel target (an aisle group or a site).
+
+    Origin: Ashu
+    """
     return getattr(target, "site", None) or target
 
 
 def target_provider(target: Any) -> str:
+    """Fuel provider name (loconav / roadcast) of a target, from the aisle's DG fuel fields or the
+    site's partner fields.
+
+    Origin: Ashu
+    """
     if getattr(target, "dg_fuel_enabled", False):
         return (getattr(target, "dg_fuel_provider", None) or "").strip().lower()
     return (getattr(target, "partner_dg_provider", None) or "").strip().lower()
 
 
 def target_vehicle_number(target: Any) -> str:
+    """Vehicle number / IMEI of a target at its fuel provider.
+
+    Origin: Ashu
+    """
     if getattr(target, "dg_fuel_enabled", False):
         return (getattr(target, "dg_fuel_vehicle_number", None) or "").strip()
     return (getattr(target, "partner_dg_fuel_id", None) or "").strip()
@@ -31,7 +44,10 @@ def target_vehicle_number(target: Any) -> str:
 def collect_loconav_levels(
     targets: Iterable[Any], fetch_current_levels: Callable[[str], Any]
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """Fetch and normalize one current-level payload for each configured target."""
+    """Fetch and normalize one current-level payload for each configured target.
+
+    Origin: Ashu
+    """
     samples = []
     failed_site_ids = []
     expired_site_ids = []
@@ -96,7 +112,10 @@ def collect_roadcast_levels(
     fetch_pull_api: Callable[[], Any],
     reference_date=None,
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """Fetch Roadcast once, map its samples to configured targets, and report gaps."""
+    """Fetch Roadcast once, map its samples to configured targets, and report gaps.
+
+    Origin: Ashu
+    """
     target_by_imei = {
         target_vehicle_number(target): target
         for target in targets

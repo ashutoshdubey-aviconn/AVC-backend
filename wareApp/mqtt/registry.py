@@ -33,24 +33,38 @@ LEGACY_TASK_NAMES = {
 
 
 def _handler_name(message_type, message_subtype):
+    """Name of the handler class for a message type (and recovery subtype).
+
+    Origin: Ashu
+    """
     if message_type == "recovery":
         return RECOVERY_HANDLER_NAMES.get(message_subtype)
     return QUEUE_ONE_HANDLER_NAMES.get(message_type)
 
 
 def is_handled(message_type, message_subtype):
-    """True when a queue-1 handler exists for this type/subtype."""
+    """True when a queue-1 handler exists for this type/subtype.
+
+    Origin: Ashu
+    """
     return _handler_name(message_type, message_subtype) is not None
 
 
 @lru_cache(maxsize=None)
 def _handler(name):
+    """New instance of the handler class with that name.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt import handlers
 
     return getattr(handlers, name)()
 
 
 def handler_for(message_type, message_subtype):
-    """Return the handler instance for a message, or ``None``."""
+    """Return the handler instance for a message, or ``None``.
+
+    Origin: Ashu
+    """
     name = _handler_name(message_type, message_subtype)
     return _handler(name) if name else None

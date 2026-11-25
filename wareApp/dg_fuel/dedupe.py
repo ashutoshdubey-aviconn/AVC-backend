@@ -4,7 +4,10 @@ from wareApp.models import DgFuelConsumptionData, Site
 
 
 def dedupe_dg_consumption(site: Site, vehicle_number: str, epoch_time: str) -> int:
-    """Remove duplicate DG fuel rows for the same site/vehicle/epoch key."""
+    """Remove duplicate DG fuel rows for the same site/vehicle/epoch key.
+
+    Origin: Ashu
+    """
     qs = DgFuelConsumptionData.objects.filter(
         site=site, vehicle_number=vehicle_number, epoch_time=epoch_time
     ).order_by("id")

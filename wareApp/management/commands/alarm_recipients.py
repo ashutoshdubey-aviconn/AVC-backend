@@ -16,13 +16,25 @@ from wareApp.mqtt.services import alarm_policy
 
 
 class Command(BaseCommand):
+    """manage.py alarm_recipients: Show each site's location team and alarm e-mail recipients.
+
+    Origin: Ashu
+    """
     help = "Show each site's location team and alarm e-mail recipients."
 
     def add_arguments(self, parser):
+        """Command-line options: --site, --unmatched.
+
+        Origin: Ashu
+        """
         parser.add_argument("--site", type=int, action="append", help="Site id (repeatable)")
         parser.add_argument("--unmatched", action="store_true", help="Only sites without a location team")
 
     def handle(self, *args, site=None, unmatched=False, **options):
+        """Runs manage.py alarm_recipients: Show each site's location team and alarm e-mail recipients.
+
+        Origin: Ashu
+        """
         alarm_policy.clear_cache()
         sites = Site.objects.order_by("id")
         if site:

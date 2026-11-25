@@ -61,6 +61,8 @@ def process_http_recovery(
     Returns
     -------
     dict
+
+    Origin: Ashu
     """
 
     try:
@@ -130,6 +132,8 @@ def update_daily_from_hourly(
 ):
     """
     Aggregate HourlySiteReading into DailySiteReading
+
+    Origin: Ashu
     """
 
     baseline = SiteBaseline.objects.filter(
@@ -386,6 +390,10 @@ def process_hourly(
     message,
 ):
 
+    """HTTP recovery: writes the hours a gateway uploaded and logs the result.
+
+    Origin: Ashu
+    """
     logger.info(
         "Starting HTTP Hourly Recovery | Site=%s Gateway=%s",
         location_id,
@@ -571,6 +579,8 @@ def process_runtime(
     TODO:
         Move existing MQTT runtime recovery block here
         WITHOUT changing any business logic.
+
+    Origin: Ashu
     """
 
     logger.info(

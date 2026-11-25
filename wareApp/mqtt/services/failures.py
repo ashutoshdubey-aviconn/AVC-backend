@@ -34,6 +34,8 @@ def record_dead_letter(message_type, site_id, gateway_id, payload, error, dedupe
     stored once per ``DEAD_LETTER_DEDUPE_SECONDS``. ``dedupe=False`` keeps
     every packet, for failures that should be replayed in full
     (``manage.py replay_dead_letters``).
+
+    Origin: Ashu
     """
     from django.core.cache import cache
 
@@ -66,7 +68,10 @@ def record_dead_letter(message_type, site_id, gateway_id, payload, error, dedupe
 
 
 def run_with_db_retry(function, *args, delays=DB_RETRY_DELAYS, sleep=None, **kwargs):
-    """Run ``function``; on a transient DB error reconnect and retry in place."""
+    """Run ``function``; on a transient DB error reconnect and retry in place.
+
+    Origin: Ashu
+    """
     sleep = sleep or time.sleep
     for attempt, delay in enumerate((*delays, None)):
         try:

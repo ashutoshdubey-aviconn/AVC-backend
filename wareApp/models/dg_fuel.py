@@ -6,10 +6,18 @@ from .setup import AisleGroup, Site
 
 
 class DGAlertsData(models.Model):
+    """Table wareApp_dgalertsdata: d g alerts data. Fields: created.
+
+    Origin: Ashu (changed from main)
+    """
     alert_data = JSONField(default=dict)
     created = models.DateTimeField(auto_now=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.alert_data).
+
+        Origin: main (unchanged)
+        """
         return str(self.alert_data)
 
 
@@ -18,6 +26,11 @@ class DgFuelConsumptionData(models.Model):
     # Telemetry table: no database-level foreign keys (2026-11-06, migration 0113):
     # saves the per-row FK lookup and lock on Site / AisleGroup. Writers look both
     # up first; Django still cascades deletes itself.
+    """Table wareApp_dgfuelconsumptiondata: dg fuel consumption data. Fields: site, aisle_group,
+    vehicle_number, fuel_consumption, fuel_data_source, epoch_time, created.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True, db_constraint=False, db_index=False)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.SET_NULL, null=True, blank=True, db_constraint=False
@@ -41,11 +54,25 @@ class DgFuelConsumptionData(models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: self.vehicle_number.
+
+        Origin: main (unchanged)
+        """
         return self.vehicle_number
 
 
 class DgUnitConsumption(models.Model):
+    """Table wareApp_dgunitconsumption: dg unit consumption. Fields: site, aisle_group,
+    unit_consumption, dg_fuel_consumption, dg_start_date, dg_end_date, created, updated_on,
+    epoch_time, is_dg_on, fetch_fuel_data, fuel_provider....
+
+    Origin: Ashu (changed from main)
+    """
     class DailyDataStatus(models.TextChoices):
+        """Status of a DG run's daily data: open, pending, completed or failed.
+
+        Origin: Ashu
+        """
         OPEN = "OPEN", "Open"
         PENDING = "PENDING", "Pending"
         COMPLETED = "COMPLETED", "Completed"
@@ -76,10 +103,19 @@ class DgUnitConsumption(models.Model):
     daily_data_retry_deadline = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.unit_consumption).
+
+        Origin: main (unchanged)
+        """
         return str(self.unit_consumption)
 
 
 class DGFuelAlertsData(models.Model):
+    """Table wareApp_dgfuelalertsdata: d g fuel alerts data. Fields: site, aisle_group, alert_name,
+    vehicle_number, fuel_consumption, epoch_time, created.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.SET_NULL, null=True, blank=True
@@ -91,6 +127,10 @@ class DGFuelAlertsData(models.Model):
     created = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.alert_name.
+
+        Origin: main (unchanged)
+        """
         return self.alert_name
 
     class Meta:

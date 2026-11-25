@@ -43,6 +43,10 @@ MODE_VALUES = {name: value for value, name in MODE_NAMES.items()}
 
 
 def _group(alarm_type):
+    """Group shown in alarm settings: Gateway, Consumption or Power.
+
+    Origin: Ashu
+    """
     if alarm_type in AlarmNotifications.GATEWAY_TYPES:
         return "Gateway"
     if alarm_type in AlarmNotifications.CONSUMPTION_TYPES:
@@ -51,6 +55,11 @@ def _group(alarm_type):
 
 
 def _row(alarm_type, name, setting):
+    """One alarm type of a site as JSON for the settings page (mode, limits, recipients, whether it is
+    raised at all).
+
+    Origin: Ashu
+    """
     return {
         "alarm_type": alarm_type,
         "alarm_name": name,
@@ -67,6 +76,10 @@ def _row(alarm_type, name, setting):
 
 
 def _site(site_id):
+    """Site of a site_id parameter, or None.
+
+    Origin: Ashu
+    """
     try:
         return Site.objects.get(id=int(site_id))
     except (TypeError, ValueError, Site.DoesNotExist):
@@ -74,6 +87,10 @@ def _site(site_id):
 
 
 def _flag(value, default):
+    """Yes / no value from the request ('1', 'true', 'yes', 'on'); the default when missing.
+
+    Origin: Ashu
+    """
     if value is None:
         return default
     if isinstance(value, str):
@@ -82,6 +99,10 @@ def _flag(value, default):
 
 
 def _number(value, field):
+    """Number from the request; None when empty; ValueError naming the field when it is not a number.
+
+    Origin: Ashu
+    """
     if value in (None, ""):
         return None
     try:
@@ -95,15 +116,25 @@ class AlarmSettingsApi(APIView):
     POST /api/alarmSettings/ {"site_id": 114, "alarm_type": 7, "mode": "manual", "threshold": 250,
                               "email_software": true, "email_ground": false, "repeat_tolerance_percent": 10}
          mode "default" removes the site's setting (the alarm works as before).
+
+    Origin: Ashu
     """
 
     permission_classes = [IsAuthenticated]
 
     def _check(self, request):
+        """Only Super Admin (user type 1) may change alarm settings.
+
+        Origin: Ashu
+        """
         if request.user.UserType != 1:
             raise PermissionDenied("Only Super_Admin users can change alarm settings.")
 
     def _payload(self, site):
+        """Alarm settings of a site as the API response: one row per alarm type.
+
+        Origin: Ashu
+        """
         settings = {row.alarm_type: row for row in AlarmSetting.objects.filter(site=site)}
         return {
             "status": 200,
@@ -113,6 +144,11 @@ class AlarmSettingsApi(APIView):
         }
 
     def get(self, request):
+        """GET /api/alarmSettings/. Request fields: alarm_type, email_ground, email_software, mode,
+        repeat_tolerance_percent, site_id, threshold. Response keys: msg, status.
+
+        Origin: Ashu
+        """
         self._check(request)
         site = _site(request.query_params.get("site_id"))
         if site is None:
@@ -120,6 +156,11 @@ class AlarmSettingsApi(APIView):
         return Response(self._payload(site))
 
     def post(self, request):
+        """POST /api/alarmSettings/. Request fields: alarm_type, email_ground, email_software, mode,
+        repeat_tolerance_percent, site_id, threshold. Response keys: msg, status.
+
+        Origin: Ashu
+        """
         self._check(request)
         data = request.data
         site = _site(data.get("site_id"))

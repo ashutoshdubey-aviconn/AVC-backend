@@ -15,6 +15,8 @@ Annotated git tags, local (pushed only when we push tags).
 | `fov2-pre-merge-20261119` | `387ce4e7` | Our code before any merge work started (19 Nov). |
 | `ours-before-daksh-views-merge-20261121` | `ed717fa2` | Our code just before his views came in. Everything up to here is ours, apart from main's own hotfixes listed in [MERGE_GUIDE.md](MERGE_GUIDE.md). |
 | `daksh-views-merge-20261121` | `55017069` | His 4 API views merged: `LightsDataApi`, `FansDataApi`, `SubmeteringMonthlyBarChart_new`, `SubmeteringSnapshotAPI`. |
+| `merge-final-base-views-loaddata-dgfuel-recovery-features` | `f1f2585c` | Start of the branch `merge-final` (25 Nov, pushed): our views, LoadData, DG fuel, HTTP recovery and features (sync status, catch-up spread, baseline setup, gateway status, alarm settings), before the MQTT merge. |
+| `merge-final-origin-docs` | (next commit) | Every function and class has a description and an `Origin:` line (see below). |
 
 ## Where each area comes from today
 
@@ -42,8 +44,8 @@ from his code.
    ```
 3. **Tag after**: `daksh-<area>-merge-YYYYMMDD` on that commit (areas: `views`, `mqtt`, `loaddata`,
    `dgfuel`, `alarms`, ...).
-4. **One comment line** above each class or function taken from him (not on our code: markers
-   on every function only create merge conflicts):
+4. **One comment line** above each class or function taken from him, and its `Origin:` line
+   (below) set to `Daksh (...)`:
    ```python
    # Merged from the colleague's code (<his commit>, <his file>), <date>: <what changed>
    ```
@@ -55,6 +57,26 @@ from his code.
 If one of his ideas is rebuilt by us (for example batched LoadData writes on RabbitMQ instead of his
 Redis buffers), it is our code: no `Source:` trailer, but say "idea from Daksh's code" in the
 commit message.
+
+## Origin line in every function (since 25 Nov 2026)
+
+User request: every function and class in `wareApp/` and `warehouse/` (not tests, migrations or
+Django `Meta` classes) has a description, and its docstring ends with an `Origin:` line:
+
+| Origin line | Meaning | Count (25 Nov) |
+|---|---|---|
+| `Origin: Ashu` | Written on our branch (not in main's code) | 635 |
+| `Origin: Ashu (changed from main)` | Main's function, changed by us | 243 |
+| `Origin: main (unchanged)` | Main's original code, same as `origin/main` | 95 |
+| `Origin: Daksh (merged <date> from <his commit>, <his file>)` | Taken from his code | 8 |
+| `Origin: Ashu + Daksh (...)` | Our function with his change merged in (MQTT merge) | - |
+
+Set by `.work/merge_final/origin_docs.py`: same qualified name and same code (docstrings ignored)
+in `origin/main` = main (unchanged); same name, other code = changed; otherwise Ashu; the
+"Merged from the colleague's code" comment = Daksh. 724 descriptions were added (399 drafted from
+the code: API route, methods, login rule, request fields, response keys, table fields; 325 written
+by hand). Checked: the code without docstrings is identical (AST compare), no migration change,
+tests OK. New code must follow the same rule: one-line description, then `Origin: ...`.
 
 ## How to check
 
@@ -68,6 +90,7 @@ git diff ours-before-daksh-views-merge-20261121 daksh-views-merge-20261121 --sta
 
 # Classes / functions in the code that came from him
 grep -rn "Merged from the colleague" wareApp/
+grep -rn "Origin: Daksh\|Origin: Ashu + Daksh" wareApp/
 
 # Who last changed a line (a merged line points to the Source: commit)
 git blame wareApp/views/submetering.py

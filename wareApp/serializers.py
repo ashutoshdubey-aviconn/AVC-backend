@@ -7,12 +7,21 @@ from rest_framework import serializers
 from .models import AlarmNotifications, CustomerInfo, MeterDisconnectionEvent, Site, User
 
 class LoginSerializer(serializers.Serializer):
+    """DRF serializer: converts rows to and from JSON for the API.
+
+    Origin: Ashu (changed from main)
+    """
     username = serializers.CharField()
     password = serializers.CharField()
 
     
     def validate(self, data):
         # The client sends the password base64-encoded. Never log or print it.
+        """Checks the login: decodes the base64 password, authenticates the user and refuses inactive
+        users.
+
+        Origin: Ashu (changed from main)
+        """
         username = data.get("username", "")
         try:
             password = base64.b64decode(data.get("password", ""), validate=True)
@@ -30,6 +39,10 @@ class LoginSerializer(serializers.Serializer):
 
 # for login purpose
 class UserSerializer(serializers.ModelSerializer):
+    """DRF serializer for User: converts rows to and from JSON for the API.
+
+    Origin: main (unchanged)
+    """
     class Meta:
         model = User
         fields = ["id", "username", "email", "UserType", "first_name", "last_name", "Contact_number"]
@@ -37,6 +50,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserCustomerInfoSerializer(serializers.ModelSerializer):
 
+    """DRF serializer for User: converts rows to and from JSON for the API.
+
+    Origin: main (unchanged)
+    """
     class Meta:
         model = User
         fields = ["id", "username", "email", "Contact_number", "first_name", "last_name"]
@@ -44,6 +61,10 @@ class UserCustomerInfoSerializer(serializers.ModelSerializer):
 
 class CustomerInfoSerializer(serializers.ModelSerializer):
 
+    """DRF serializer for CustomerInfo: converts rows to and from JSON for the API.
+
+    Origin: main (unchanged)
+    """
     customer = UserCustomerInfoSerializer(many=False, read_only=True)
 
     class Meta:
@@ -55,6 +76,10 @@ class SiteSerializer(serializers.ModelSerializer):
 
     #site_manager = UserSerializer(many=False, read_only=True)
 
+    """DRF serializer for Site: converts rows to and from JSON for the API.
+
+    Origin: main (unchanged)
+    """
     class Meta:
         model = Site
         fields = ["site_name",
@@ -83,6 +108,8 @@ class AlarmListSerializer(serializers.ModelSerializer):
 
     Keeps the keys of the former NewAlarmsNotifications list (the dashboard reads
     them) and adds the aisle, reason and repeat count of the single alarm table.
+
+    Origin: Ashu (changed from main)
     """
 
     get_alarm_type_display = serializers.CharField(source="get_Alarm_type_display", read_only=True)
@@ -95,13 +122,25 @@ class AlarmListSerializer(serializers.ModelSerializer):
     open_for = serializers.SerializerMethodField()
 
     def _open(self, alarm):
+        """How long an alarm has been open (days and text), from alarm_feed.open_info.
+
+        Origin: Ashu
+        """
         from wareApp.alarm_feed import open_info
         return open_info(alarm.created_time, alarm.is_active, alarm.off_time)
 
     def get_open_days(self, alarm):
+        """Days the alarm has been open.
+
+        Origin: Ashu
+        """
         return self._open(alarm)["open_days"]
 
     def get_open_for(self, alarm):
+        """How long the alarm has been open, as text.
+
+        Origin: Ashu
+        """
         return self._open(alarm)["open_for"]
 
     class Meta:
@@ -114,6 +153,10 @@ class AlarmListSerializer(serializers.ModelSerializer):
         ]
 
 class MeterDisconnectionEventSerializer(serializers.ModelSerializer):
+    """DRF serializer for MeterDisconnectionEvent: converts rows to and from JSON for the API.
+
+    Origin: Ashu
+    """
     class Meta:
         model = MeterDisconnectionEvent
         fields = [

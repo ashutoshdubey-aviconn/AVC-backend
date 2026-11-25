@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_daily_recovery_message(message):
+    """Parses a dailyConsumption recovery packet (aisle, recovery dates, kWh per date, gateway
+    cumulative); ValueError when it doesn't match.
+
+    Origin: Ashu
+    """
     match = re.search(
         r"Aisle_group_id : (.*); Recovery_Dates : (.*); Unit_consumptions : (.*);"
         r" GW_Total_cumulative : (.*)",
@@ -39,13 +44,19 @@ def _parse_daily_recovery_message(message):
 
 
 def _baseline_for_day(location_id, aisle_group_id, observed_at):
-    """Daily baseline for the day (dated row first, else latest), or None."""
+    """Daily baseline for the day (dated row first, else latest), or None.
+
+    Origin: Ashu
+    """
     row = baseline_row(location_id, aisle_group_id, observed_at.date())
     return None if row is None else row[0]
 
 
 def handle_daily_consumption_recovery_message(site, location_id, gateway_id, message):
-    """Persist recovered daily consumption readings without lowering known values."""
+    """Persist recovered daily consumption readings without lowering known values.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         aisle_group_id, recovery_dates, recovery_values = _parse_daily_recovery_message(

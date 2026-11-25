@@ -73,18 +73,33 @@ EMPTY, NO_DATA, CATCH_UP = "empty", "no_data", "catch_up"
 
 
 class SpreadError(ValueError):
-    """Shown to the user."""
+    """Shown to the user.
+
+    Origin: Ashu
+    """
 
 
 def _hour(at):
+    """Start of the hour for a datetime.
+
+    Origin: Ashu
+    """
     return at.replace(minute=0, second=0, microsecond=0)
 
 
 def _iso(at):
+    """Datetime as YYYY-MM-DDTHH:MM:SS text.
+
+    Origin: Ashu
+    """
     return f"{at:%Y-%m-%dT%H:%M:%S}"
 
 
 def parse_day(value):
+    """Parses a day given as a date, YYYY/MM/DD or YYYY-MM-DD.
+
+    Origin: Ashu
+    """
     if isinstance(value, date):
         return value
     for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
@@ -97,6 +112,11 @@ def parse_day(value):
 
 @dataclass
 class CatchUp:
+    """One catch-up hour found after a data gap: the aisle, its time and kWh, the last real reading
+    before the gap, the normal hour and the missing hours.
+
+    Origin: Ashu
+    """
     aisle: AisleGroup
     at: datetime
     kwh: float
@@ -110,16 +130,33 @@ class CatchUp:
 
     @property
     def hours(self):
+        """Hours the catch-up kWh is spread over: the missing hours plus the catch-up hour itself.
+
+        Origin: Ashu
+        """
         return len(self.missing) + 1
 
     @property
     def share(self):
+        """kWh each hour gets when the catch-up is spread evenly.
+
+        Origin: Ashu
+        """
         return self.kwh / self.hours
 
     def kind(self, hour):
+        """Whether a missing hour had no row at all (NO_DATA) or a row with 0 kWh (EMPTY).
+
+        Origin: Ashu
+        """
         return NO_DATA if hour in self.no_data else EMPTY
 
     def as_dict(self, before, after):
+        """The catch-up as JSON for the preview / apply API, with the hours before and after the
+        spread.
+
+        Origin: Ashu
+        """
         days = sorted({m.date() for m in self.missing} | {self.at.date()})
         return {
             "leg_id": str(self.aisle.attached_leg_id),
@@ -148,6 +185,8 @@ def find_catch_ups(site, aisle, day, not_spreadable=None):
 
     A big hour with no real reading in the LOOKBACK_DAYS before it cannot be spread (the gap's
     start is unknown); it is added to ``not_spreadable``.
+
+    Origin: Ashu
     """
     start = datetime.combine(day, time.min)
     end = start + timedelta(days=1)
@@ -164,6 +203,11 @@ def find_catch_ups(site, aisle, day, not_spreadable=None):
     real = [(at, kwh) for at, kwh in sorted(values.items()) if at not in gap_zeros]
 
     def normal_before(at):
+        """Normal hourly kWh before a time: median of the real hours of the week before, or of the day
+        after when nothing is known before.
+
+        Origin: Ashu
+        """
         week = [kwh for hour, kwh in real if at - timedelta(days=NORMAL_DAYS) <= hour < at and kwh > 0]
         if not week:  # nothing before it (gap start unknown): judge by the hours after it
             week = [kwh for hour, kwh in real if at < hour <= at + timedelta(days=1) and kwh > 0]
@@ -196,7 +240,10 @@ def find_catch_ups(site, aisle, day, not_spreadable=None):
 
 
 def _readiness(site, items):
-    """Set ``waiting`` on items whose aisle is not synced again or whose gap is still being recovered."""
+    """Set ``waiting`` on items whose aisle is not synced again or whose gap is still being recovered.
+
+    Origin: Ashu
+    """
     legs = {str(item.aisle.attached_leg_id) for item in items}
     states = dict(
         AisleSyncRecoveryStatus.objects.filter(site=site, leg_id__in=legs, aisle_group__isnull=False)
@@ -218,6 +265,10 @@ def _readiness(site, items):
 
 
 def _daily_average(site, aisle, first_day):
+    """Average daily kWh of an aisle over the days before first_day (only days above 0).
+
+    Origin: Ashu
+    """
     rows = [
         kwh for kwh in DailySiteReading.objects.filter(
             associated_Site=site, leg_id=aisle.attached_leg_id,
@@ -229,7 +280,10 @@ def _daily_average(site, aisle, first_day):
 
 
 def _doubts(site, item):
-    """Reasons the catch-up needs a manual spread (empty: clear case)."""
+    """Reasons the catch-up needs a manual spread (empty: clear case).
+
+    Origin: Ashu
+    """
     if item.share > SHARE_WARN_FACTOR * item.normal_hour:
         item.warnings.append(
             f"share {item.share:.2f} kWh is still more than {SHARE_WARN_FACTOR} x the normal hour "
@@ -247,7 +301,10 @@ def _doubts(site, item):
 
 
 def _hour_sums(site, aisle, days):
-    """Sum of the aisle's hourly rows per day."""
+    """Sum of the aisle's hourly rows per day.
+
+    Origin: Ashu
+    """
     sums = defaultdict(float)
     for at, kwh in HourlySiteReading.objects.filter(
         associated_Site=site, leg_id=aisle.attached_leg_id,
@@ -259,6 +316,10 @@ def _hour_sums(site, aisle, days):
 
 
 def _waiting_dict(item):
+    """A catch-up that is not spread automatically, as JSON with the reason it is waiting.
+
+    Origin: Ashu
+    """
     return {
         "leg_id": str(item.aisle.attached_leg_id), "aisle_name": item.aisle.aisleGroupName,
         "at": f"{item.at:%Y/%m/%d %H:%M}", "kwh": round(item.kwh, 2), "missing_hours": len(item.missing),
@@ -270,6 +331,8 @@ def plan(site, day, legs=None, not_spreadable=None, waiting=None):
     """``[(CatchUp, preview dict)]`` ready to spread for ``site`` on ``day``; changes nothing.
 
     Big hours that cannot be spread go to ``not_spreadable``; catch-ups not ready yet to ``waiting``.
+
+    Origin: Ashu
     """
     day = parse_day(day)
     aisles = AisleGroup.objects.filter(site=site).order_by("id")
@@ -298,7 +361,10 @@ def plan(site, day, legs=None, not_spreadable=None, waiting=None):
 
 
 def recompute_days(site, aisle, days):
-    """Daily total, baseline and saving of ``days`` from the counted hourly rows."""
+    """Daily total, baseline and saving of ``days`` from the counted hourly rows.
+
+    Origin: Ashu
+    """
     memo = BaselineMemo(site, aisle)
     for day in sorted(set(days)):
         _, daily_baseline = memo.for_day(day)
@@ -316,11 +382,21 @@ def recompute_days(site, aisle, days):
 
 
 def _saving(memo, aisle, hour, kwh):
+    """Hourly baseline and energy saved for one hour of an aisle (saving 0 when the aisle is not
+    active).
+
+    Origin: Ashu
+    """
     hourly_baseline, _ = memo.for_day(hour.date())
     return hourly_baseline, (hourly_baseline - kwh) if aisle.is_active else 0.0
 
 
 def _hourly_row(site, aisle, memo, hour, kwh):
+    """New HourlySiteReading for a missing hour, filled with its share of the catch-up and its baseline
+    / saving.
+
+    Origin: Ashu
+    """
     hourly_baseline, saved = _saving(memo, aisle, hour, kwh)
     return HourlySiteReading(
         associated_Site=site, aisle_group=aisle, leg_id=aisle.attached_leg_id,
@@ -331,7 +407,10 @@ def _hourly_row(site, aisle, memo, hour, kwh):
 
 
 def apply(site, items, user=None, mode=CatchUpSpread.MANUAL):
-    """Spread every planned catch-up (each in its own transaction); returns the CatchUpSpread rows."""
+    """Spread every planned catch-up (each in its own transaction); returns the CatchUpSpread rows.
+
+    Origin: Ashu
+    """
     done = []
     for item, _ in items:
         done.append(_apply_one(site, item, user, mode))
@@ -339,6 +418,11 @@ def apply(site, items, user=None, mode=CatchUpSpread.MANUAL):
 
 
 def _apply_one(site, item, user, mode):
+    """Spreads one catch-up in one transaction: locks the catch-up row, rewrites it and the missing
+    hours, records a CatchUpSpread for undo, then fixes the day totals.
+
+    Origin: Ashu
+    """
     aisle = item.aisle
     leg = aisle.attached_leg_id
     with transaction.atomic():
@@ -401,15 +485,26 @@ def _apply_one(site, item, user, mode):
 
 
 def undo_until(spread):
+    """Last moment a spread can still be undone (applied_at + UNDO_DAYS).
+
+    Origin: Ashu
+    """
     return spread.applied_at + timedelta(days=UNDO_DAYS)
 
 
 def can_undo(spread, now=None):
+    """True when the spread was not undone yet and is still inside the undo period.
+
+    Origin: Ashu
+    """
     return spread.undone_at is None and (now or datetime.now()) <= undo_until(spread)
 
 
 def undo(spread, user=None, now=None):
-    """Reverse one spread exactly (within UNDO_DAYS); returns the number of gap hours put back."""
+    """Reverse one spread exactly (within UNDO_DAYS); returns the number of gap hours put back.
+
+    Origin: Ashu
+    """
     if spread.undone_at:
         raise SpreadError("this spread was already undone")
     if not can_undo(spread, now):
@@ -452,13 +547,20 @@ def undo(spread, user=None, now=None):
 
 # ------------------------------------------------------------ recovery leaves spreads alone
 def _active_spreads(site_id, leg_id, start, end):
+    """Spreads of one aisle that overlap a time range and were not undone (gap start, catch-up time).
+
+    Origin: Ashu
+    """
     return CatchUpSpread.objects.filter(
         site_id=site_id, leg_id=str(leg_id), undone_at__isnull=True, gap_from__lt=end, catch_up_at__gte=start,
     ).values_list("gap_from", "catch_up_at")
 
 
 def spread_hours(site_id, leg_id, start, end):
-    """Hour starts in [start, end] that belong to a spread (recovery replies must not change them)."""
+    """Hour starts in [start, end] that belong to a spread (recovery replies must not change them).
+
+    Origin: Ashu
+    """
     hours = set()
     for gap_from, catch_up_at in _active_spreads(site_id, leg_id, start, end + HOUR):
         step = gap_from
@@ -469,7 +571,10 @@ def spread_hours(site_id, leg_id, start, end):
 
 
 def spread_days(site_id, leg_id, first_day, last_day):
-    """Days in [first_day, last_day] touched by a spread (daily recovery must not change them)."""
+    """Days in [first_day, last_day] touched by a spread (daily recovery must not change them).
+
+    Origin: Ashu
+    """
     start = datetime.combine(first_day, time.min)
     return {hour.date() for hour in spread_hours(site_id, leg_id, start, datetime.combine(last_day, time.max))
             if first_day <= hour.date() <= last_day}
@@ -477,14 +582,20 @@ def spread_days(site_id, leg_id, first_day, last_day):
 
 # ------------------------------------------------------------ automatic spreading
 def in_auto_window(now):
-    """19:00-11:00 every day (CATCH_UP_AUTO_FROM_HOUR / _UNTIL_HOUR) and all day on Sunday."""
+    """19:00-11:00 every day (CATCH_UP_AUTO_FROM_HOUR / _UNTIL_HOUR) and all day on Sunday.
+
+    Origin: Ashu
+    """
     start = getattr(settings, "CATCH_UP_AUTO_FROM_HOUR", 19)
     until = getattr(settings, "CATCH_UP_AUTO_UNTIL_HOUR", 11)
     return now.weekday() == 6 or now.hour >= start or now.hour < until
 
 
 def auto_spread(now=None, days_back=None):
-    """Spread the clear catch-ups of the last days; e-mail the doubtful ones to the software team once."""
+    """Spread the clear catch-ups of the last days; e-mail the doubtful ones to the software team once.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services import alarm_sites
     from wareApp.mqtt.services.notifications import notify
     from wareApp.sendmail import send_software_team_email

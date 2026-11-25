@@ -23,13 +23,27 @@ CHECKS = (
 
 
 class Command(BaseCommand):
+    """manage.py report_reading_duplicates: Report duplicate hourly/daily/runtime reading keys
+    (read-only).
+
+    Origin: Ashu
+    """
     help = "Report duplicate hourly/daily/runtime reading keys (read-only)."
 
     def add_arguments(self, parser):
+        """Command-line options: --since, --examples.
+
+        Origin: Ashu
+        """
         parser.add_argument("--since", help="Only rows on/after this date (YYYY-MM-DD)")
         parser.add_argument("--examples", type=int, default=5)
 
     def handle(self, *args, since=None, examples=5, **options):
+        """Runs manage.py report_reading_duplicates: Report duplicate hourly/daily/runtime reading keys
+        (read-only).
+
+        Origin: Ashu
+        """
         since_value = datetime.strptime(since, "%Y-%m-%d") if since else None
         for label, model, key, slot_field in CHECKS:
             rows = model.objects.all()

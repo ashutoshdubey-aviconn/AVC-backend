@@ -5,15 +5,29 @@ from .setup import Site
 
 
 class FireEquipmentsSystemType(models.Model):
+    """Table wareApp_fireequipmentssystemtype: fire equipments system type. Fields: site, devicename,
+    categories.
+
+    Origin: main (unchanged)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     devicename = models.CharField(max_length=30, null=True, blank=True)
     categories = models.CharField(max_length=30, null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.devicename.
+
+        Origin: main (unchanged)
+        """
         return self.devicename
 
 
 class FireEquipmentsSystem(models.Model):
+    """Table wareApp_fireequipmentssystem: fire equipments system. Fields: deviceType, assetNo,
+    modelNo, loaction, Warrenty_till, last_service, next_service, updatedBy.
+
+    Origin: main (unchanged)
+    """
     deviceType = models.ForeignKey(
         FireEquipmentsSystemType, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -26,10 +40,19 @@ class FireEquipmentsSystem(models.Model):
     updatedBy = models.CharField(max_length=25, blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.modelNo.
+
+        Origin: main (unchanged)
+        """
         return self.modelNo
 
 
 class LightsData(models.Model):
+    """Table wareApp_lightsdata: lights data. Fields: areaName, totalLights, watt_18_Lights,
+    watt_20_Lights, watt_24_Lights, watt_36_Lights, watt_40_Lights, totalWattLights, totalUnits.
+
+    Origin: main (unchanged)
+    """
     areaName = models.CharField(max_length=40, null=True, blank=True)
     totalLights = models.IntegerField(null=True, blank=True)
     watt_18_Lights = models.IntegerField(null=True, blank=True)
@@ -41,10 +64,19 @@ class LightsData(models.Model):
     totalUnits = models.FloatField(null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.areaName.
+
+        Origin: main (unchanged)
+        """
         return self.areaName
 
 
 class FansData(models.Model):
+    """Table wareApp_fansdata: fans data. Fields: areaName, totalFans, watt_80_Lights, watt_100_Lights,
+    totalWattFans, totalUnits.
+
+    Origin: main (unchanged)
+    """
     areaName = models.CharField(max_length=40, null=True, blank=True)
     totalFans = models.IntegerField(null=True, blank=True)
     watt_80_Lights = models.IntegerField(null=True, blank=True)
@@ -53,4 +85,8 @@ class FansData(models.Model):
     totalUnits = models.FloatField(null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.areaName.
+
+        Origin: main (unchanged)
+        """
         return self.areaName

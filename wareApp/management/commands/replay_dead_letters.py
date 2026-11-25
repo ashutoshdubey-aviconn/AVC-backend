@@ -35,6 +35,11 @@ ORDERED_TYPES = {"consumption", "load", "SupplyTime", "FIREALARM"}
 
 
 def _parse_time(value, name):
+    """Parses a --from / --to option (YYYY-MM-DD with optional HH:MM[:SS]); CommandError when the
+    format is wrong.
+
+    Origin: Ashu
+    """
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(value, fmt)
@@ -48,6 +53,8 @@ def replay(row):
 
     Calls the handlers directly (not the Celery task wrappers, which close the
     database connection after every packet).
+
+    Origin: Ashu
     """
     from wareApp.load_data import handle_load_data_message
     from wareApp.mqtt.registry import handler_for
@@ -73,9 +80,18 @@ def replay(row):
 
 
 class Command(BaseCommand):
+    """manage.py replay_dead_letters: Replay stored MQTT dead letters (dry run unless --apply).
+
+    Origin: Ashu
+    """
     help = "Replay stored MQTT dead letters (dry run unless --apply)."
 
     def add_arguments(self, parser):
+        """Command-line options: --type, --site, --since, --until, --id, --limit,
+        --allow-ordered-types, --apply.
+
+        Origin: Ashu
+        """
         parser.add_argument("--type", dest="types", action="append",
                             help="message_type, e.g. LoadData (repeatable)")
         parser.add_argument("--site", type=int, action="append", help="Site id (repeatable)")
@@ -89,6 +105,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, types=None, site=None, since=None, until=None, ids=None,
                limit=5000, allow_ordered_types=False, apply=False, **options):
+        """Runs manage.py replay_dead_letters: Replay stored MQTT dead letters (dry run unless
+        --apply).
+
+        Origin: Ashu
+        """
         rows = MqttDeadLetter.objects.filter(is_resolved=False).order_by("created_at", "id")
         if types:
             rows = rows.filter(message_type__in=types)

@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_supply_time_message(message):
+    """Parses a SupplyTime packet: power source, run time and time; ValueError on a bad field.
+
+    Origin: Ashu
+    """
     value_for = KeyValuePayload.parse(message, "SupplyTime").get
 
     try:
@@ -35,6 +39,10 @@ def _parse_supply_time_message(message):
 
 
 def _update_monthly_share_if_due(site, location_id, last_runtime_entry, now):
+    """On the first packet of a new month, saves last month's run-time share per power source.
+
+    Origin: Ashu
+    """
     if not last_runtime_entry or now.month == last_runtime_entry.reading_from.month:
         return
 
@@ -74,6 +82,8 @@ def _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end):
 
     The latest row was already fetched, so the extra ``exists()`` query is only
     needed when that row is newer than the previous hour (late packet).
+
+    Origin: Ashu
     """
     previous_start = hour_start - timedelta(hours=1)
     previous_end = hour_end - timedelta(hours=1)
@@ -92,7 +102,10 @@ def _previous_hour_exists(run_time, last_runtime_entry, hour_start, hour_end):
 def handle_supply_time_message(
     client, site, location_id, gateway_id, message, publish_recovery=None
 ):
-    """Persist one SupplyTime packet and request gateway recovery for a detected gap."""
+    """Persist one SupplyTime packet and request gateway recovery for a detected gap.
+
+    Origin: Ashu
+    """
     home_gateway_id = home_gateway_id_for(location_id, gateway_id)
     try:
         source, source_run_time, observed_at = _parse_supply_time_message(message)

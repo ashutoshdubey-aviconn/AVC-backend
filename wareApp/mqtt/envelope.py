@@ -8,6 +8,10 @@ from wareApp.mqtt.topics import parse_gateway_topic
 
 
 def _payload_text(payload):
+    """Payload as text (bytes decoded as UTF-8).
+
+    Origin: Ashu
+    """
     if isinstance(payload, bytes):
         return payload.decode("utf-8", errors="replace")
     return str(payload)
@@ -15,6 +19,10 @@ def _payload_text(payload):
 
 @dataclass(frozen=True, slots=True)
 class MqttEnvelope:
+    """One MQTT packet with its parsed topic: site, gateway, message type / subtype and payload text.
+
+    Origin: Ashu
+    """
     topic: str
     site_id: int
     gateway_id: str
@@ -25,7 +33,10 @@ class MqttEnvelope:
 
     @classmethod
     def from_mqtt(cls, topic, payload):
-        """Build an envelope from a raw topic; raises ``TopicParseError`` if malformed."""
+        """Build an envelope from a raw topic; raises ``TopicParseError`` if malformed.
+
+        Origin: Ashu
+        """
         parsed = parse_gateway_topic(topic)
         return cls(
             topic=topic,
@@ -38,10 +49,16 @@ class MqttEnvelope:
 
     @property
     def message_id(self):
-        """Stable id of the packet content (same topic + payload → same id)."""
+        """Stable id of the packet content (same topic + payload → same id).
+
+        Origin: Ashu
+        """
         return hashlib.sha1(f"{self.topic}\n{self.payload}".encode()).hexdigest()
 
     @property
     def task_args(self):
-        """Arguments of the ``process_*`` tasks: ``(site_id, gateway_id, payload)``."""
+        """Arguments of the ``process_*`` tasks: ``(site_id, gateway_id, payload)``.
+
+        Origin: Ashu
+        """
         return (self.site_id, self.gateway_id, self.payload)

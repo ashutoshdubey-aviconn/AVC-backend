@@ -52,6 +52,10 @@ from .models import (
 
 @admin.register(HourlySiteReading)
 class HourlyReadingFields(admin.ModelAdmin):
+    """Django admin page for HourlySiteReading.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["associated_Site", "aisle_group"]
 
     list_display = [
@@ -65,6 +69,10 @@ class HourlyReadingFields(admin.ModelAdmin):
 
 @admin.register(SupplyLoadTimeShare)
 class SupplyTimeShareFields(admin.ModelAdmin):
+    """Django admin page for SupplyLoadTimeShare.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site"]
 
     list_display = [
@@ -78,12 +86,20 @@ class SupplyTimeShareFields(admin.ModelAdmin):
 
 @admin.register(SiteLoadPower)
 class SiteLoadPowerAdmin(admin.ModelAdmin):
+    """Django admin page for SiteLoadPower.
+
+    Origin: Ashu
+    """
     list_display = ["Associated_Site", "Supply_Source", "Status"]
     readonly_fields = ("Supply_Source", "Meter_Number")
 
 
 @admin.register(MonthlyLoadSharePercentage)
 class MonthlyLoadSharePercentageAdmin(admin.ModelAdmin):
+    """Django admin page for MonthlyLoadSharePercentage.
+
+    Origin: Ashu
+    """
     list_select_related = ["site"]
     list_display = [
         "site",
@@ -96,6 +112,10 @@ class MonthlyLoadSharePercentageAdmin(admin.ModelAdmin):
 
 @admin.register(DailySiteReading)
 class DailyReadingFields(admin.ModelAdmin):
+    """Django admin page for DailySiteReading.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["associated_Site", "aisle_group"]
     list_display = [
         "associated_Site",
@@ -108,6 +128,10 @@ class DailyReadingFields(admin.ModelAdmin):
 
 @admin.register(SiteBaseline)
 class SiteBaselineFields(admin.ModelAdmin):
+    """Django admin page for SiteBaseline.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["associated_site_id", "aisle_group"]
     list_display = [
         "associated_site_id",
@@ -121,6 +145,10 @@ class SiteBaselineFields(admin.ModelAdmin):
 
 @admin.register(AisleGroup)
 class AisleGroupFields(admin.ModelAdmin):
+    """Django admin page for AisleGroup.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site"]
     list_display = [
         "site",
@@ -137,6 +165,10 @@ class AisleGroupFields(admin.ModelAdmin):
 
 @admin.register(Site)
 class SiteFields(admin.ModelAdmin):
+    """Django admin page for Site.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["customer"]
     search_fields = ["site_name"]
     list_display = [
@@ -153,17 +185,29 @@ class SiteFields(admin.ModelAdmin):
 
 @admin.register(Floor)
 class FloorFields(admin.ModelAdmin):
+    """Django admin page for Floor.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site"]
     list_display = ["id", "site", "floor"]
 
 
 @admin.register(Email_History)
 class EmailHistoryAdmin(admin.ModelAdmin):
+    """Django admin page for Email_History.
+
+    Origin: Ashu (changed from main)
+    """
     list_display = ["deviceName", "fire_site", "email_for"]
 
 
 @admin.register(HourlyLoadData)
 class HourlyLoadDataAdmin(admin.ModelAdmin):
+    """Django admin page for HourlyLoadData.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
@@ -178,6 +222,10 @@ class HourlyLoadDataAdmin(admin.ModelAdmin):
 
 @admin.register(DailyLoadData)
 class DailyLoadDataAdmin(admin.ModelAdmin):
+    """Django admin page for DailyLoadData.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
@@ -192,6 +240,10 @@ class DailyLoadDataAdmin(admin.ModelAdmin):
 
 @admin.register(MainsDgLoadData)
 class MainsDgLoadDataAdmin(admin.ModelAdmin):
+    """Django admin page for MainsDgLoadData.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["site", "aisle_group"]
     list_display = [
         "id",
@@ -205,11 +257,19 @@ class MainsDgLoadDataAdmin(admin.ModelAdmin):
 
 
 class DgFuelConsumptionDataAdmin(admin.ModelAdmin):
+    """Django admin page for dg fuel consumption data.
+
+    Origin: Ashu (changed from main)
+    """
     list_display = ["vehicle_number", "fuel_consumption", "epoch_time"]
 
 
 @admin.register(DgUnitConsumption)
 class DgUnitConsumptionAdmin(admin.ModelAdmin):
+    """Django admin page for DgUnitConsumption.
+
+    Origin: Ashu (changed from main)
+    """
     list_select_related = ["aisle_group"]
     list_display = [
         "id",
@@ -227,11 +287,19 @@ class DgUnitConsumptionAdmin(admin.ModelAdmin):
 
 @admin.register(SensorAisleUnitConsumption)
 class SensorAisleUnitConsumptionAdmin(admin.ModelAdmin):
+    """Django admin page for SensorAisleUnitConsumption.
+
+    Origin: Ashu (changed from main)
+    """
     list_display = ["leg_id", "unit_consumption", "reading_for"]
 
 
 @admin.register(DGFuelAlertsData)
 class DGFuelAlertDataAdmin(admin.ModelAdmin):
+    """Django admin page for DGFuelAlertsData.
+
+    Origin: Ashu (changed from main)
+    """
     list_display = [f.name for f in DGFuelAlertsData._meta.get_fields()]
 
 
@@ -260,6 +328,10 @@ admin.site.register(MeterDisconnectionEvent)
 
 @admin.register(SiteConsumptionPing)
 class SiteConsumptionPingAdmin(admin.ModelAdmin):
+    """Django admin page for SiteConsumptionPing.
+
+    Origin: Ashu
+    """
     list_select_related = ["site"]
     list_display = [
         "site",
@@ -274,6 +346,10 @@ class SiteConsumptionPingAdmin(admin.ModelAdmin):
 
 @admin.register(SiteCeleryPing)
 class SiteCeleryPingAdmin(admin.ModelAdmin):
+    """Django admin page for SiteCeleryPing.
+
+    Origin: Ashu
+    """
     list_select_related = ["site"]
     list_display = [
         "site",
@@ -289,7 +365,10 @@ class SiteCeleryPingAdmin(admin.ModelAdmin):
 
 
 def _retry_recovery(monitors):
-    """Re-arm failed/timed-out requests: the next gap packet publishes again."""
+    """Re-arm failed/timed-out requests: the next gap packet publishes again.
+
+    Origin: Ashu
+    """
     count = 0
     for monitor in monitors:
         monitor.status = "timeout"
@@ -314,6 +393,10 @@ def _retry_recovery(monitors):
 
 @admin.register(AisleSyncRecoveryStatus)
 class AisleSyncRecoveryStatusAdmin(admin.ModelAdmin):
+    """Django admin page for AisleSyncRecoveryStatus.
+
+    Origin: Ashu
+    """
     list_display = [
         "site",
         "home_gateway_id",
@@ -334,6 +417,11 @@ class AisleSyncRecoveryStatusAdmin(admin.ModelAdmin):
 
     @admin.action(description="Retry recovery for selected (failed) rows")
     def retry_failed_recovery(self, request, queryset):
+        """Admin action: re-arms the failed or timed-out recovery requests behind the selected aisle
+        sync rows, so the gateway is asked again.
+
+        Origin: Ashu
+        """
         monitors = RecoveryMonitor.objects.filter(
             id__in=queryset.exclude(recovery_monitor__isnull=True).values(
                 "recovery_monitor_id"
@@ -345,6 +433,10 @@ class AisleSyncRecoveryStatusAdmin(admin.ModelAdmin):
 
 @admin.register(RecoveryMonitor)
 class RecoveryMonitorAdmin(admin.ModelAdmin):
+    """Django admin page for RecoveryMonitor.
+
+    Origin: Ashu
+    """
     list_display = [
         "id",
         "site",
@@ -375,12 +467,21 @@ class RecoveryMonitorAdmin(admin.ModelAdmin):
 
     @admin.action(description="Retry selected failed / timed-out requests")
     def retry_recovery(self, request, queryset):
+        """Admin action: re-arms the selected failed or timed-out recovery requests and reports how
+        many were re-armed.
+
+        Origin: Ashu
+        """
         count = _retry_recovery(queryset.filter(status__in=("failed", "timeout")))
         self.message_user(request, f"{count} request(s) re-armed.")
 
 
 @admin.register(MqttDeadLetter)
 class MqttDeadLetterAdmin(admin.ModelAdmin):
+    """Django admin page for MqttDeadLetter.
+
+    Origin: Ashu
+    """
     list_display = ["id", "message_type", "site_id", "gateway_id", "created_at", "is_resolved"]
     list_filter = ["message_type", "is_resolved"]
     search_fields = ["gateway_id", "error", "payload"]
@@ -389,7 +490,10 @@ class MqttDeadLetterAdmin(admin.ModelAdmin):
 
 @admin.register(AlarmSetting)
 class AlarmSettingAdmin(admin.ModelAdmin):
-    """Per site and alarm type: Auto / Manual (threshold) / Off and e-mail groups."""
+    """Per site and alarm type: Auto / Manual (threshold) / Off and e-mail groups.
+
+    Origin: Ashu
+    """
 
     list_display = (
         "site", "alarm_type", "mode", "threshold", "email_software", "email_ground",
@@ -403,7 +507,10 @@ class AlarmSettingAdmin(admin.ModelAdmin):
 
 @admin.register(AlarmNotifications)
 class AlarmNotificationsAdmin(admin.ModelAdmin):
-    """The single alarm table (consumption, meter, gateway, power and DG)."""
+    """The single alarm table (consumption, meter, gateway, power and DG).
+
+    Origin: Ashu
+    """
 
     list_display = [
         "id", "site_id", "Alarm_type", "Alarm_priority", "aisle_group", "power_source",
@@ -417,7 +524,10 @@ class AlarmNotificationsAdmin(admin.ModelAdmin):
 
 @admin.register(PendingEmail)
 class PendingEmailAdmin(admin.ModelAdmin):
-    """Alarm e-mails waiting for a retry (docs/mqtt-flows/EMAIL_RETRIES.md)."""
+    """Alarm e-mails waiting for a retry (docs/mqtt-flows/EMAIL_RETRIES.md).
+
+    Origin: Ashu
+    """
 
     list_display = ("id", "summary", "attempts", "first_failed_at", "next_try_at", "last_error")
     ordering = ("first_failed_at",)

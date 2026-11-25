@@ -4,6 +4,10 @@ from wareApp.load_data.parser import LoadReading
 
 
 def save_raw_load_reading(site, aisle_group, reading: LoadReading):
+    """Saves one LoadData reading as a RawLoadData row (one INSERT per packet).
+
+    Origin: Ashu
+    """
     return RawLoadData.objects.create(
         site=site,
         aisle_group=aisle_group,

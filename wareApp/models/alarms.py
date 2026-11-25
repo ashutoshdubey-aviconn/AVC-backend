@@ -17,6 +17,8 @@ class AlarmNotifications(models.Model):
     Power / DG alarms were stored in a second table (NewAlarmsNotifications)
     until migration 0099 copied them here with the same type numbers; 0103
     dropped that table.
+
+    Origin: Ashu (changed from main)
     """
 
     # Alarm types: one list for all sources, numbers unchanged from the two
@@ -132,7 +134,10 @@ class AlarmNotifications(models.Model):
 
     @property
     def source(self):
-        """'power', 'gateway' or 'consumption' (what raised the alarm)."""
+        """'power', 'gateway' or 'consumption' (what raised the alarm).
+
+        Origin: Ashu
+        """
         if self.Alarm_type in self.POWER_TYPES:
             return "power"
         if self.Alarm_type in self.GATEWAY_TYPES:
@@ -140,6 +145,10 @@ class AlarmNotifications(models.Model):
         return "consumption"
 
     def save(self, *args, **kwargs):
+        """Rounds the phase values to 2 decimals before saving.
+
+        Origin: Ashu
+        """
         for name in ("r_phase", "y_phase", "b_phase"):
             value = getattr(self, name)
             if value is not None:
@@ -150,6 +159,10 @@ class AlarmNotifications(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
+        """Text for this row in admin and logs: 'Notification for {}'.format(str(self.site_id)).
+
+        Origin: main (unchanged)
+        """
         return "Notification for {}".format(str(self.site_id))
 
 
@@ -164,6 +177,8 @@ class AlarmSetting(models.Model):
     Manual: ``threshold`` (kWh, volts, PF or °C depending on the type).
     Off: the alarm is not raised. Without a row the alarm works as before
     (site fields and defaults).
+
+    Origin: Ashu
     """
 
     AUTO = 1
@@ -196,10 +211,21 @@ class AlarmSetting(models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: f'{self.site} - {self.get_alarm_type_display()}:
+        {self.get_mode_display()}'.
+
+        Origin: Ashu
+        """
         return f"{self.site} - {self.get_alarm_type_display()}: {self.get_mode_display()}"
 
 
 class FirePumpAlarm(models.Model):
+    """Table wareApp_firepumpalarm: fire pump alarm. Fields: Site, aisleGroup, r_volt, y_volt, b_volt,
+    Meter_Number, motor_status, auto_mode_updated_time, manual_mode_updated_time,
+    power_source_updated_time, off_mode_time, motor_status_time....
+
+    Origin: Ashu (changed from main)
+    """
     Site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     aisleGroup = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
@@ -217,6 +243,10 @@ class FirePumpAlarm(models.Model):
     Updated_on = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.aisleGroup.aisleGroupName.
+
+        Origin: main (unchanged)
+        """
         return self.aisleGroup.aisleGroupName
 
     class Meta:
@@ -226,6 +256,10 @@ class FirePumpAlarm(models.Model):
 
 
 class Email_History(models.Model):
+    """Table wareApp_email_history: email history. Fields: fire_site, deviceName, email_for, created.
+
+    Origin: Ashu (changed from main)
+    """
     fire_site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     deviceName = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
@@ -242,6 +276,10 @@ class Email_History(models.Model):
     created = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.fire_site.site_name.
+
+        Origin: main (unchanged)
+        """
         return self.fire_site.site_name
 
     class Meta:
@@ -254,6 +292,10 @@ class Email_History(models.Model):
 
 
 class Email(models.Model):
+    """Table wareApp_email: email. Fields: fire_site, deviceName, email_for, created.
+
+    Origin: main (unchanged)
+    """
     fire_site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     deviceName = models.ForeignKey(
         FirePumpAlarm, on_delete=models.CASCADE, null=True, blank=True
@@ -263,10 +305,20 @@ class Email(models.Model):
     created = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.fire_site.site_name.
+
+        Origin: main (unchanged)
+        """
         return self.fire_site.site_name
 
 
 class MeterDisconnectionEvent(models.Model):
+    """Table wareApp_meterdisconnectionevent: meter disconnection event. Fields: remote_site_id,
+    logged_site_id, meter_source_id, meter_id, meter_number, meter_name, status, port_id,
+    detection_window_start, detection_window_end, last_seen_at, source_log_path....
+
+    Origin: Ashu
+    """
     remote_site_id = models.PositiveIntegerField(null=True, blank=True)
     logged_site_id = models.PositiveIntegerField(null=True, blank=True)
     meter_source_id = models.PositiveIntegerField(null=True, blank=True)
@@ -296,6 +348,10 @@ class MeterDisconnectionEvent(models.Model):
         ordering = ["-detection_window_end", "meter_id"]
 
     def __str__(self):
+        """Text for this row in admin and logs: '{} {}'.format(self.meter_name, self.status).
+
+        Origin: Ashu
+        """
         return "{} {}".format(self.meter_name, self.status)
 
 
@@ -303,7 +359,10 @@ class PendingEmail(models.Model):
     """An alarm e-mail whose send failed for a passing reason (e.g. the mail
     server refused the login); retried by ``tasks.retry_pending_emails`` with
     back-off for up to NOTIFICATION_RETRY_HOURS, then given up (decided
-    2026-11-06, docs/mqtt-flows/EMAIL_RETRIES.md)."""
+    2026-11-06, docs/mqtt-flows/EMAIL_RETRIES.md).
+
+    Origin: Ashu
+    """
 
     function_name = models.CharField(max_length=60)
     args = models.JSONField(default=list)
@@ -314,4 +373,9 @@ class PendingEmail(models.Model):
     last_error = models.CharField(max_length=300, blank=True, default="")
 
     def __str__(self):
+        """Text for this row in admin and logs: f'{self.function_name}: {self.summary} (attempts
+        {self.attempts})'.
+
+        Origin: Ashu
+        """
         return f"{self.function_name}: {self.summary} (attempts {self.attempts})"

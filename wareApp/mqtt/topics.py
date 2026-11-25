@@ -2,11 +2,18 @@ from dataclasses import dataclass
 
 
 class TopicParseError(ValueError):
-    """Raised when an MQTT topic does not match the gateway topic contract."""
+    """Raised when an MQTT topic does not match the gateway topic contract.
+
+    Origin: Ashu
+    """
 
 
 @dataclass(frozen=True, slots=True)
 class GatewayTopic:
+    """Parsed gateway topic: site, gateway, message type and subtype.
+
+    Origin: Ashu
+    """
     site_id: int
     gateway_id: str
     message_type: str
@@ -14,7 +21,10 @@ class GatewayTopic:
 
 
 def parse_gateway_topic(topic: str) -> GatewayTopic:
-    """Parse a gateway inbound MQTT topic into its stable routing fields."""
+    """Parse a gateway inbound MQTT topic into its stable routing fields.
+
+    Origin: Ashu
+    """
     segments = topic.split("/", 8)
 
     if len(segments) < 8 or segments[1] != "Acclivate" or segments[2] != "iOmniControl":

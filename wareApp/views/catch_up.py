@@ -16,6 +16,11 @@ HISTORY_MAX_DAYS = 92
 
 
 def _spread_dict(s, now, detail=False):
+    """A catch-up spread as JSON for the history list (who, when, hours, kWh, undo state; hours in
+    detail mode).
+
+    Origin: Ashu
+    """
     body = {
         "id": s.id, "leg_id": s.leg_id, "aisle_name": getattr(s.aisle_group, "aisleGroupName", ""),
         "catch_up_at": f"{s.catch_up_at:%Y/%m/%d %H:%M}", "original_kwh": round(s.original_kwh, 2),
@@ -33,7 +38,10 @@ def _spread_dict(s, now, detail=False):
 
 
 def _applied_spreads(site, day, now):
-    """Spreads of this site's catch-up hours on ``day`` that are not undone (Undo for 5 days)."""
+    """Spreads of this site's catch-up hours on ``day`` that are not undone (Undo for 5 days).
+
+    Origin: Ashu
+    """
     rows = (
         CatchUpSpread.objects.filter(site=site, catch_up_at__date=day, undone_at__isnull=True)
         .select_related("aisle_group").order_by("catch_up_at", "id")
@@ -42,7 +50,10 @@ def _applied_spreads(site, day, now):
 
 
 def _history(site, data, now):
-    """All spreads of the site whose catch-up hour is in [from, to] (newest first), with their hours."""
+    """All spreads of the site whose catch-up hour is in [from, to] (newest first), with their hours.
+
+    Origin: Ashu
+    """
     to_day = catch_up_spread.parse_day(data.get("to") or now.date())
     from_day = catch_up_spread.parse_day(data.get("from") or (to_day - timedelta(days=30)))
     if from_day > to_day:
@@ -67,11 +78,18 @@ class CatchUpSpreadApi(APIView):
     {"site_id": 114, "day": "2026/11/16", "legs": ["692"], "apply": true}    # spread (manual)
     {"undo": 12}                                                            # undo spread 12 (5 days)
     {"site_id": 114, "history": true, "from": "2026/11/01", "to": "2026/11/20"}  # spreads, per hour
+
+    Origin: Ashu
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """POST /api/catchUpSpread/. Request fields: apply, day, history, legs, site_id, undo. Response
+        keys: error, estimated_hours_removed, hours_reverted, status, undone.
+
+        Origin: Ashu
+        """
         if request.user.UserType != 1:
             raise PermissionDenied("Only Super_Admin users can spread catch-up hours.")
         data = request.data

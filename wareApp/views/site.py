@@ -21,7 +21,18 @@ from wareApp.utility import entryExit, logger
 
 class SiteTotalGraphDataDaily(APIView):
 
+    """API view for /api/getSiteDailyConsumptionData/ (POST; Login required (default)). Reads
+    AisleGroup, DailySiteReading, Site. Takes from_date, site_id, till_date. Returns Data, Dates,
+    error, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/getSiteDailyConsumptionData/. Request fields: from_date, site_id, till_date.
+        Response keys: Data, Dates, error, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         from django.core.cache import cache
 
         data = request.data
@@ -186,7 +197,16 @@ class SiteTotalGraphDataDaily(APIView):
 
 class SiteTotalGraphDataHourly(APIView):
 
+    """API view, not wired to any URL (POST; Login required (default)). Reads AisleGroup,
+    DailySiteReading, HourlySiteReading, Site. Takes date, site_id. Returns error.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST (view not wired to any URL). Request fields: date, site_id. Response keys: error.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         date = data.get("date", "")
         logger.debug("%s %s", "input date: ", date)
@@ -253,7 +273,17 @@ class SiteTotalGraphDataHourly(APIView):
 
 
 class SiteTotalGraphDataHourlyWHTM(APIView):
+    """API view for /api/getSiteHourlyConsumptionData/ (POST; Login required (default)). Reads
+    AisleGroup, HourlySiteReading. Takes date, site_id. Returns Data, Hours, error, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
+        """POST /api/getSiteHourlyConsumptionData/. Request fields: date, site_id. Response keys: Data,
+        Hours, error, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         date, site_id = data.get("date", ""), data.get("site_id", "")
         date = datetime.strptime(date, "%Y/%m/%d")
@@ -300,8 +330,20 @@ class SiteTotalGraphDataHourlyWHTM(APIView):
 
 class SiteCurrentLoadInfo(APIView):
 
+    """API view for /api/getSiteCurrLoadInfo/ (POST; Login required (default)). Reads SiteLoadPower.
+    Takes site_id. Returns B_Current, B_Power_Factor, B_Voltage, Power_supply, R_Current,
+    R_Power_Factor, R_Voltage, Status, Total_Load, Y_Current, Y_Power_Factor, Y_Voltage....
+
+    Origin: Ashu (changed from main)
+    """
     def post(self, request):
 
+        """POST /api/getSiteCurrLoadInfo/. Request fields: site_id. Response keys: B_Current,
+        B_Power_Factor, B_Voltage, Power_supply, R_Current, R_Power_Factor, R_Voltage, Status,
+        Total_Load, Y_Current, Y_Power_Factor, Y_Voltage, error, max_load, min_load, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id")
         load_value = r_current = y_current = b_current = 0
@@ -362,9 +404,18 @@ class SiteCurrentLoadInfo(APIView):
 
 
 class SiteInfo(APIView):
+    """API view for /api/site-details/ (POST; Login required (default)). Reads Site. Takes siteId.
+    Returns site.
+
+    Origin: Ashu (changed from main)
+    """
     @csrf_exempt
     @entryExit
     def post(self, request):  # post method should be used
+        """POST /api/site-details/. Request fields: siteId. Response keys: site.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "This is the site data", data)
         id = data["siteId"]
@@ -375,8 +426,17 @@ class SiteInfo(APIView):
 
 class HourlySiteReadingForOneSite(APIView):
 
+    """API view for /api/hourlyConsumption (POST; Login required (default)). Reads HourlySiteReading,
+    Site. Takes date, site_id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/hourlyConsumption. Request fields: date, site_id. Response keys: data, result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         site_id = data.get("site_id", "")
         logger.debug("%s %s %s", "siteId", site_id, type(site_id))
@@ -420,8 +480,17 @@ class HourlySiteReadingForOneSite(APIView):
 
 
 class DemoApi(APIView):
+    """API view for /api/demoapi/ (GET; Login required (default)). Reads DailySiteReading. Returns
+    data, result.
+
+    Origin: main (unchanged)
+    """
     @entryExit
     def get(self, request):
+        """GET /api/demoapi/. No request fields. Response keys: data, result.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         my_list = []
         daily = DailySiteReading.objects.filter(associated_Site=1)
@@ -441,10 +510,17 @@ class TotalAlarmsOnSitePageTabularForm(APIView):
     before; it used to read rows that nothing writes, fixed 2026-11-06).
 
     object_name: the aisle group, else the power source, else the object id
-    (meter / gateway number)."""
+    (meter / gateway number).
+
+    Origin: Ashu (changed from main)
+    """
 
     @entryExit
     def post(self, request):
+        """POST /api/alarmListOnSitePage/. Request fields: site_id. Response keys: data, msg, result.
+
+        Origin: Ashu (changed from main)
+        """
         site = Site.objects.get(id=request.data.get("site_id", ""))
         data_list = []
         for alarm in (
@@ -470,8 +546,18 @@ class TotalAlarmsOnSitePageTabularForm(APIView):
 
 
 class SiteApiBasedOnSiteType(APIView):
+    """API view for /api/switchSiteDashboard/ (POST; Login required (default)). Reads Site. Takes
+    customer_id, site_id. Returns data, result.
+
+    Origin: Ashu (changed from main)
+    """
     @entryExit
     def post(self, request):
+        """POST /api/switchSiteDashboard/. Request fields: customer_id, site_id. Response keys: data,
+        result.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         logger.debug("%s %s", "data is: ", data)
         customer_id = data.get("customer_id")

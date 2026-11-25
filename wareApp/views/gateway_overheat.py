@@ -17,18 +17,30 @@ __all__ = ["GatewayOverheatAlertApi"]
 
 
 class GatewayOverheatThrottle(AnonRateThrottle):
-    """Gateways post every few seconds while hot; allow that, cap anything more."""
+    """Gateways post every few seconds while hot; allow that, cap anything more.
+
+    Origin: Ashu
+    """
 
     scope = "gateway_overheat"
 
 
 class GatewayOverheatAlertApi(APIView):
     # Called by the gateway script, which has no account or token.
+    """API view for /api/temp/dispatch/mail/ (POST; Open: no login (AllowAny); rate limit
+    [GatewayOverheatThrottle]). Returns error, status.
+
+    Origin: Ashu
+    """
     authentication_classes = []
     permission_classes = [AllowAny]
     throttle_classes = [GatewayOverheatThrottle]
 
     def post(self, request):
+        """POST /api/temp/dispatch/mail/. No request fields. Response keys: error, status.
+
+        Origin: Ashu
+        """
         try:
             alert = parse_alert(request.data)
             outcome = record_overheat(alert)

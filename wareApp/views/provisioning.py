@@ -12,10 +12,19 @@ from wareApp.utility import entryExit, logger
 
 
 class FetchAllCustomers(APIView):
+    """API view for /api/fetchAllCustomers/ (GET; Open: no login (AllowAny)). Reads User. Returns data,
+    msg, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def get(self, request):
+        """GET /api/fetchAllCustomers/. No request fields. Response keys: data, msg, status.
+
+        Origin: main (unchanged)
+        """
         header = request.META.get("HTTP_AUTHORIZATION")
         customers = User.objects.filter(UserType=4)
         customer_data_list = []
@@ -30,10 +39,21 @@ class FetchAllCustomers(APIView):
 
 
 class CreateCustomerUsingProvisioning(APIView):
+    """API view for /api/createCustomer/ (POST; Open: no login (AllowAny)). Saves to CustomerInfo,
+    User. Takes customer_contact, customer_email, customer_name. Returns error, msg, status,
+    user_id.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/createCustomer/. Request fields: customer_contact, customer_email, customer_name.
+        Response keys: error, msg, status, user_id.
+
+        Origin: Ashu (changed from main)
+        """
         data = request.data
         try:
             username = data.get("customer_name")
@@ -64,10 +84,20 @@ class CreateCustomerUsingProvisioning(APIView):
 
 
 class CreateSiteUsingProvisioning(APIView):
+    """API view for /api/createSite/ (POST; Open: no login (AllowAny)). Saves to Site. Reads User.
+    Takes customer_id, site_location, site_name, site_type. Returns msg, site_id, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/createSite/. Request fields: customer_id, site_location, site_name, site_type.
+        Response keys: msg, site_id, status.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         sitename = data.get("site_name")
         sitetype = data.get("site_type")
@@ -90,10 +120,19 @@ class CreateSiteUsingProvisioning(APIView):
 
 
 class FetchAllSitesForProvisoning(APIView):
+    """API view for /api/allSitesList/ (GET; Open: no login (AllowAny)). Reads Site. Returns data,
+    status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def get(self, request):
+        """GET /api/allSitesList/. No request fields. Response keys: data, status.
+
+        Origin: Ashu (changed from main)
+        """
         all_sites = Site.objects.all()
         site_list = []
         for i in all_sites:
@@ -110,10 +149,21 @@ class FetchAllSitesForProvisoning(APIView):
 
 
 class CreateAisleGroupUsingProvisioning(APIView):
+    """API view for /api/createAisleGroups/ (POST; Open: no login (AllowAny)). Saves to AisleGroup.
+    Reads Site. Takes aisle_name, power_source, site_id, site_type. Returns aisle_id, error, msg,
+    status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/createAisleGroups/. Request fields: aisle_name, power_source, site_id, site_type.
+        Response keys: aisle_id, error, msg, status.
+
+        Origin: main (unchanged)
+        """
         try:
             data = request.data
             aisle_name = data.get("aisle_name")
@@ -150,10 +200,21 @@ class CreateAisleGroupUsingProvisioning(APIView):
 
 
 class CreateHomeGatewayIdUsingProvisioning(APIView):
+    """API view for /api/createHomeGatewayId/ (POST; Open: no login (AllowAny)). Saves to
+    HomeGatewayId. Reads Site. Takes home_gateway_name, monitoring_port, rssh_port, site_id. Returns
+    error, msg, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/createHomeGatewayId/. Request fields: home_gateway_name, monitoring_port,
+        rssh_port, site_id. Response keys: error, msg, status.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             logger.debug("%s %s", "data : ", data)
@@ -185,10 +246,19 @@ class CreateHomeGatewayIdUsingProvisioning(APIView):
 
 
 class FetchAisleGroupsForParticularSiteUsingProvisioning(APIView):
+    """API view for /api/fetchAisleGroups/ (POST; Open: no login (AllowAny)). Reads AisleGroup. Takes
+    site_id. Returns data, error, status.
+
+    Origin: Ashu (changed from main)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/fetchAisleGroups/. Request fields: site_id. Response keys: data, error, status.
+
+        Origin: Ashu (changed from main)
+        """
         try:
             data = request.data
             site_id = data.get("site_id")
@@ -199,9 +269,18 @@ class FetchAisleGroupsForParticularSiteUsingProvisioning(APIView):
 
 
 class FetchHGID(APIView):
+    """API view for /api/fetchHomeGatewayId/ (GET; Open: no login (AllowAny)). Reads HomeGatewayId.
+    Takes site_id. Returns msg, status.
+
+    Origin: Ashu
+    """
     permission_classes = [AllowAny]
 
     def get(self, request):
+        """GET /api/fetchHomeGatewayId/. Request fields: site_id. Response keys: msg, status.
+
+        Origin: Ashu
+        """
         try:
             site_id = request.query_params.get("site_id")
 
@@ -233,10 +312,20 @@ class FetchHGID(APIView):
 
 
 class FetchParticularCustomerUsingProvisioningScript(APIView):
+    """API view for /api/fetchParticularCustomer/ (POST; Open: no login (AllowAny)). Reads User. Takes
+    id. Returns contact, email, status, username.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/fetchParticularCustomer/. Request fields: id. Response keys: contact, email,
+        status, username.
+
+        Origin: main (unchanged)
+        """
         data = request.data
         customer_id = data.get("id", "")
         customer = User.objects.get(id=customer_id)
@@ -251,9 +340,18 @@ class FetchParticularCustomerUsingProvisioningScript(APIView):
 
 
 class FetchLastRsshPort(APIView):
+    """API view for /api/fetchLastRsshPort/ (GET; Open: no login (AllowAny)). Reads HomeGatewayId.
+    Returns rssh_port, status.
+
+    Origin: main (unchanged)
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def get(self, request):
+        """GET /api/fetchLastRsshPort/. No request fields. Response keys: rssh_port, status.
+
+        Origin: main (unchanged)
+        """
         rssh_port = HomeGatewayId.objects.all().order_by("-id")[0]
         return Response({"status": 200, "rssh_port": rssh_port.rssh_port})

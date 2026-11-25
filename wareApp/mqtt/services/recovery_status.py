@@ -46,22 +46,36 @@ MAX_PAYLOAD_CHARS = 20000
 
 @dataclass(frozen=True)
 class RecoveryScope:
-    """What a recovery is about: an aisle group (consumption) or a power source."""
+    """What a recovery is about: an aisle group (consumption) or a power source.
+
+    Origin: Ashu
+    """
 
     aisle_group: object = None
     power_source: int = None
 
     @classmethod
     def aisle(cls, aisle_group):
+        """Recovery scope for one aisle (consumption).
+
+        Origin: Ashu
+        """
         return cls(aisle_group=aisle_group)
 
     @classmethod
     def source(cls, power_source):
+        """Recovery scope for one power source (run time).
+
+        Origin: Ashu
+        """
         return cls(power_source=int(power_source))
 
     @property
     def label(self):
-        """``leg_id=735 aisle_group_name=HB_RA`` or ``source=1`` for log lines."""
+        """``leg_id=735 aisle_group_name=HB_RA`` or ``source=1`` for log lines.
+
+        Origin: Ashu
+        """
         if self.aisle_group is None:
             return f"source={self.power_source}"
         return (
@@ -71,35 +85,63 @@ class RecoveryScope:
 
     @property
     def leg_id(self):
+        """Leg id of the aisle in scope, or None for a power source.
+
+        Origin: Ashu
+        """
         if self.aisle_group is None:
             return None
         return str(self.aisle_group.attached_leg_id or "")
 
     def monitor_filter(self):
+        """Filter for RecoveryMonitor rows of this scope.
+
+        Origin: Ashu
+        """
         if self.aisle_group is not None:
             return {"leg_id": self.leg_id}
         return {"power_source": self.power_source}
 
     def status_kwargs(self):
+        """Fields that identify the AisleSyncRecoveryStatus row of this scope.
+
+        Origin: Ashu
+        """
         return {"aisle_group": self.aisle_group, "power_source": self.power_source}
 
 
 @dataclass(frozen=True)
 class RecoveryDecision:
+    """Whether a recovery request should be published now, with its RecoveryMonitor row.
+
+    Origin: Ashu
+    """
     publish: bool
     monitor: RecoveryMonitor = None
 
 
 @dataclass(frozen=True)
 class RecoverySlot:
-    """One hour (or day) of a recovery payload."""
+    """One hour (or day) of a recovery payload.
+
+    Origin: Ashu
+    """
 
     start: object
     is_error: bool
 
 
 class RecoveryStatusService:
+    """Keeps recovery requests and the per-aisle sync state of one gateway: when to ask again,
+    attempts, timeouts, success.
+
+    Origin: Ashu
+    """
     def __init__(self, site, home_gateway_id, now=None):
+        """Service for one site and gateway at a given time.
+
+        Origin: Ashu
+        """
         self.site = site
         self.home_gateway_id = str(home_gateway_id)
         self.now = now or timezone.now()
@@ -107,10 +149,20 @@ class RecoveryStatusService:
     # ------------------------------------------------------------ settings
     @staticmethod
     def max_attempts():
+        """How many times a recovery is asked before it is marked failed (MQTT_RECOVERY_MAX_ATTEMPTS,
+        3).
+
+        Origin: Ashu
+        """
         return getattr(settings, "MQTT_RECOVERY_MAX_ATTEMPTS", 3)
 
     @staticmethod
     def failed_retry_after():
+        """How long after a failed recovery it may be tried again (MQTT_RECOVERY_FAILED_RETRY_SECONDS,
+        6 h).
+
+        Origin: Ashu
+        """
         return timedelta(
             seconds=getattr(settings, "MQTT_RECOVERY_FAILED_RETRY_SECONDS", 6 * 3600)
         )
@@ -123,6 +175,10 @@ class RecoveryStatusService:
     NEWEST_FIRST = (F("requested_at").desc(nulls_last=True), "-id")
 
     def _latest_monitor(self, scope, recovery_type):
+        """Newest recovery request of a scope and recovery type.
+
+        Origin: Ashu
+        """
         return (
             RecoveryMonitor.objects.filter(
                 site=self.site, recovery_type=recovery_type, **scope.monitor_filter()
@@ -132,6 +188,10 @@ class RecoveryStatusService:
         )
 
     def _write_status(self, scope, **fields):
+        """Updates (or creates) the sync status row of a scope.
+
+        Origin: Ashu
+        """
         upsert_status(self.site, self.home_gateway_id, fields, **scope.status_kwargs())
 
     # ------------------------------------------------------------ requests
@@ -141,6 +201,8 @@ class RecoveryStatusService:
         ``last_stored_slot`` is the start of the newest stored hour and
         ``observed_slot`` the hour of the packet that revealed the gap; the
         missing hours are ``[last_stored_slot + 1h, observed_slot)``.
+
+        Origin: Ashu
         """
         missing_from = last_stored_slot + HOUR
         missing_to = observed_slot
@@ -223,7 +285,10 @@ class RecoveryStatusService:
 
     # ------------------------------------------------------------ responses
     def record_response(self, scope, recovery_type, slots, payload, slot_length=HOUR):
-        """Link a recovery payload to its open request (or record it as unsolicited)."""
+        """Link a recovery payload to its open request (or record it as unsolicited).
+
+        Origin: Ashu
+        """
         slots = sorted(slots, key=lambda slot: slot.start)
         monitor = None
         if recovery_type != DAILY_CONSUMPTION:
@@ -270,7 +335,10 @@ class RecoveryStatusService:
         return monitor
 
     def record_applied(self, monitor, scope, slots):
-        """Rows are written: count, mark the catch-up hour, verify the gap."""
+        """Rows are written: count, mark the catch-up hour, verify the gap.
+
+        Origin: Ashu
+        """
         slots = sorted(slots, key=lambda slot: slot.start)
         error_slots = sum(1 for slot in slots if slot.is_error)
         monitor.recovered_slots = len(slots) - error_slots
@@ -325,7 +393,10 @@ class RecoveryStatusService:
 
     @staticmethod
     def _catch_up_slot(monitor, slots):
-        """First slot with data after the last ERROR404 slot (None if no errors)."""
+        """First slot with data after the last ERROR404 slot (None if no errors).
+
+        Origin: Ashu
+        """
         last_error = max(
             (index for index, slot in enumerate(slots) if slot.is_error), default=None
         )
@@ -339,6 +410,11 @@ class RecoveryStatusService:
         return monitor.missing_to
 
     def _stored_slots(self, monitor, scope):
+        """Hours already stored for a recovery request's range (run time or hourly readings), to see if
+        recovery filled the gap.
+
+        Origin: Ashu
+        """
         if monitor.recovery_type == LOAD_RUNTIME:
             rows = SupplyLoadTimeShare.objects.filter(
                 site=self.site, power_source=scope.power_source
@@ -364,7 +440,10 @@ class RecoveryStatusService:
 # hours (lights off at night), which must stay as they are.
 def no_data_monitors(site_ids, since, until=None):
     """``{(site_id, leg_id): [(catch_up_at, error_slots, error_hours)]}``: hourly recoveries whose
-    gateway had no data for some hours, with their catch-up hour in [since, until)."""
+    gateway had no data for some hours, with their catch-up hour in [since, until).
+
+    Origin: Ashu
+    """
     rows = RecoveryMonitor.objects.filter(
         site_id__in=list(site_ids), recovery_type=HOURLY_CONSUMPTION, error_slots__gt=0,
         catch_up_at__gte=since, leg_id__isnull=False,
@@ -386,6 +465,8 @@ def no_data_hours(monitors, values):
     Uses the ERROR404 hours kept on the request; for older requests (before 2026-11-20) the run
     of 0 kWh hours right before the catch-up hour, at most ``error_slots`` long. An hour whose
     value is no longer 0 (real data came later) is not counted.
+
+    Origin: Ashu
     """
     hours = set()
     for catch_up_at, error_slots, error_hours in monitors:

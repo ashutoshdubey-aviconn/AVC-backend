@@ -24,6 +24,10 @@ _mqtt_start_dispatched = set()
 
 
 def _run_mqtt_listener(listener, description):
+    """Runs an MQTT listener until it stops; raises when it exits with an error so Celery logs it.
+
+    Origin: Ashu
+    """
     result = listener()
     if result not in (None, MQTT_ERR_SUCCESS):
         raise RuntimeError(f"{description} MQTT listener exited with status {result}")
@@ -39,6 +43,10 @@ def _run_mqtt_listener(listener, description):
     max_retries=None,
 )
 def mqtt_client1():
+    """Celery task: queue 1 MQTT listener (every type except LoadData).
+
+    Origin: Ashu (changed from main)
+    """
     return _run_mqtt_listener(run_mqtt_client1, "Queue1")
 
 
@@ -51,10 +59,19 @@ def mqtt_client1():
     max_retries=None,
 )
 def mqtt_client2():
+    """Celery task: queue 2 MQTT listener (LoadData only).
+
+    Origin: Ashu (changed from main)
+    """
     return _run_mqtt_listener(run_mqtt_client2, "Queue2")
 
 
 def _task_is_active_or_reserved(task_name):
+    """True when a task with this name is already running or waiting on some worker (so a second
+    listener is not started).
+
+    Origin: Ashu
+    """
     try:
         inspector = app.control.inspect()
         active = inspector.active() or {}
@@ -71,12 +88,19 @@ def _task_is_active_or_reserved(task_name):
 
 
 def _is_listener_worker(hostname, worker_queue):
+    """True when a worker's host name is the listener worker of a queue.
+
+    Origin: Ashu
+    """
     worker_name = hostname.partition("@")[0]
     return worker_name == worker_queue or worker_name.endswith(f".{worker_queue}")
 
 
 def _consumed_queues(sender):
-    """Queues this worker was started with (``-Q``), or None if unknown."""
+    """Queues this worker was started with (``-Q``), or None if unknown.
+
+    Origin: Ashu
+    """
     try:
         consume_from = sender.app.amqp.queues.consume_from
     except AttributeError:
@@ -85,6 +109,11 @@ def _consumed_queues(sender):
 
 
 def _start_mqtt_client_for_worker(sender, worker_queue, task_name, description):
+    """When the listener worker of a queue starts, queues its MQTT listener task once (not when it is
+    already running).
+
+    Origin: Ashu
+    """
     hostname = str(getattr(sender, "hostname", ""))
     # Only the worker that consumes the listener queue starts the listener. The
     # hostname check alone also matched processing workers named e.g.
@@ -121,6 +150,10 @@ def _start_mqtt_client_for_worker(sender, worker_queue, task_name, description):
 
 @worker_ready.connect
 def start_queue_one_mqtt_client(sender, **kwargs):
+    """Worker-ready signal: starts the queue 1 listener on the queue1 worker.
+
+    Origin: Ashu
+    """
     _start_mqtt_client_for_worker(
         sender,
         worker_queue="queue1",
@@ -131,6 +164,10 @@ def start_queue_one_mqtt_client(sender, **kwargs):
 
 @worker_ready.connect
 def start_queue_two_mqtt_client(sender, **kwargs):
+    """Worker-ready signal: starts the LoadData listener on the queue2 worker.
+
+    Origin: Ashu
+    """
     _start_mqtt_client_for_worker(
         sender,
         worker_queue="queue2",
@@ -147,7 +184,10 @@ def start_queue_two_mqtt_client(sender, **kwargs):
     max_retries=5,
 )
 def send_notification(function_name, args):
-    """Send one alarm email queued by ``wareApp.mqtt.services.notifications``."""
+    """Send one alarm email queued by ``wareApp.mqtt.services.notifications``.
+
+    Origin: Ashu
+    """
     if function_name not in ALLOWED_NOTIFICATIONS:
         logger.error("Rejected unknown notification function %r", function_name)
         return
@@ -166,6 +206,10 @@ def send_notification(function_name, args):
 
 
 def _site_for_queued_message(site_id, gateway_id, message_type):
+    """Site of a queued packet (cached); None and a warning when the site doesn't exist.
+
+    Origin: Ashu
+    """
     try:
         return site_config.site(site_id)
     except Site.DoesNotExist:
@@ -184,10 +228,17 @@ def _with_database_connection_cleanup(task_handler):
     Handlers re-raise only transient database errors (everything else is
     stored as an MqttDeadLetter). Retrying inside the task keeps the packet in
     its place in the site's queue instead of re-queueing it behind newer ones.
+
+    Origin: Ashu
     """
 
     @wraps(task_handler)
     def wrapped(*args, **kwargs):
+        """Runs the task with fresh database connections before and after, retrying once on a dropped
+        connection.
+
+        Origin: Ashu
+        """
         close_old_connections()
         try:
             return run_with_db_retry(task_handler, *args, **kwargs)
@@ -198,7 +249,10 @@ def _with_database_connection_cleanup(task_handler):
 
 
 def _dispatch(message_type, message_subtype, site_id, gateway_id, message):
-    """Run one queue-1 packet through its handler and return the outcome text."""
+    """Run one queue-1 packet through its handler and return the outcome text.
+
+    Origin: Ashu
+    """
     handler = handler_for(message_type, message_subtype)
     if handler is None:
         logger.warning(
@@ -231,6 +285,10 @@ def _dispatch(message_type, message_subtype, site_id, gateway_id, message):
 
 @_with_database_connection_cleanup
 def _run_handler(handler, site_id, gateway_id, message):
+    """Runs a message handler for a queued packet; skips packets of unknown sites.
+
+    Origin: Ashu
+    """
     site = _site_for_queued_message(site_id, gateway_id, handler.name)
     if site is None:
         return f"skipped: unknown site {site_id}"
@@ -239,14 +297,20 @@ def _run_handler(handler, site_id, gateway_id, message):
 
 @app.task(queue="queue1_processing")
 def process_mqtt_message(message_type, message_subtype, site_id, gateway_id, message):
-    """Process one queue-1 gateway packet (all types; see mqtt/registry.py)."""
+    """Process one queue-1 gateway packet (all types; see mqtt/registry.py).
+
+    Origin: Ashu
+    """
     return _dispatch(message_type, message_subtype, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 @_with_database_connection_cleanup
 def flush_consumption_batch():
-    """Write the consumption packets collected since the last run in bulk."""
+    """Write the consumption packets collected since the last run in bulk.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt import consumption_batch
     from wareApp.mqtt.handlers import publish_recovery_request
 
@@ -256,7 +320,10 @@ def flush_consumption_batch():
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def check_gateway_health():
-    """Raise / clear Meter Disconnected, Gateway Disconnected, Service / Modbus alarms."""
+    """Raise / clear Meter Disconnected, Gateway Disconnected, Service / Modbus alarms.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services import gateway_health
 
     # Test server: pings come from main's broker log (GATEWAY_PINGS_SSH).
@@ -268,7 +335,10 @@ def check_gateway_health():
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def close_resolved_alarms():
-    """Close alarms that are no longer happening (services/alarm_closer.py)."""
+    """Close alarms that are no longer happening (services/alarm_closer.py).
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services import alarm_closer
 
     counts = alarm_closer.close_resolved()
@@ -279,7 +349,10 @@ def close_resolved_alarms():
 @_with_database_connection_cleanup
 def refresh_baseline_backfill(site_id, effective_from, legs=None):
     """Re-run a baseline setup's backfill (wareApp/baseline_setup.py) after the
-    workers' baseline cache has expired, for hours stored in between."""
+    workers' baseline cache has expired, for hours stored in between.
+
+    Origin: Ashu
+    """
     from wareApp import baseline_setup
     from wareApp.models import Site
 
@@ -292,7 +365,10 @@ def refresh_baseline_backfill(site_id, effective_from, legs=None):
 @app.task(queue="notifications")
 @_with_database_connection_cleanup
 def retry_pending_emails():
-    """Send failed alarm e-mails again (wareApp/mqtt/services/notifications.py)."""
+    """Send failed alarm e-mails again (wareApp/mqtt/services/notifications.py).
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services.notifications import retry_pending
 
     return retry_pending()
@@ -301,7 +377,10 @@ def retry_pending_emails():
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def check_consumption_spikes():
-    """Raise / update Consumption Spike alarms (type 17) for today and yesterday."""
+    """Raise / update Consumption Spike alarms (type 17) for today and yesterday.
+
+    Origin: Ashu
+    """
     from wareApp.mqtt.services import spike_alarms
 
     return spike_alarms.scan()
@@ -310,7 +389,10 @@ def check_consumption_spikes():
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def auto_spread_catch_ups():
-    """Spread clear catch-up hours at night / on Sunday; e-mail the ones that need a manual spread."""
+    """Spread clear catch-up hours at night / on Sunday; e-mail the ones that need a manual spread.
+
+    Origin: Ashu
+    """
     from wareApp import catch_up_spread
 
     return catch_up_spread.auto_spread()
@@ -319,6 +401,10 @@ def auto_spread_catch_ups():
 @app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
 def process_load_data_message(site_id, gateway_id, message):
+    """Celery task (queue 2): saves a LoadData packet and its roll-ups.
+
+    Origin: Ashu
+    """
     site = _site_for_queued_message(site_id, gateway_id, "LoadData")
     if site is None:
         return f"skipped: unknown site {site_id}"
@@ -337,34 +423,62 @@ def process_load_data_message(site_id, gateway_id, message):
 # Kept registered so packets already waiting in RabbitMQ are still processed.
 @app.task(queue="queue1_processing")
 def process_supply_time_message(site_id, gateway_id, message):
+    """Celery task: processes a SupplyTime packet.
+
+    Origin: Ashu
+    """
     return _dispatch("SupplyTime", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_load_runtime_recovery_message(site_id, gateway_id, message):
+    """Celery task: processes a loadRuntime recovery packet.
+
+    Origin: Ashu
+    """
     return _dispatch("recovery", "loadRuntime", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_daily_consumption_recovery_message(site_id, gateway_id, message):
+    """Celery task: processes a dailyConsumption recovery packet.
+
+    Origin: Ashu
+    """
     return _dispatch("recovery", "dailyConsumption", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
+    """Celery task: processes an hourlyConsumption recovery packet.
+
+    Origin: Ashu
+    """
     return _dispatch("recovery", "hourlyConsumption", site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_fire_alarm_message(site_id, gateway_id, message):
+    """Celery task: processes a FIREALARM packet.
+
+    Origin: Ashu
+    """
     return _dispatch("FIREALARM", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_consumption_message(site_id, gateway_id, message):
+    """Celery task: processes one consumption packet (when batching is off).
+
+    Origin: Ashu
+    """
     return _dispatch("consumption", None, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
 def process_load_message(site_id, gateway_id, message):
+    """Celery task: processes a load packet.
+
+    Origin: Ashu
+    """
     return _dispatch("load", None, site_id, gateway_id, message)

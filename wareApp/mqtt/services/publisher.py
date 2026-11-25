@@ -18,13 +18,20 @@ logger = logging.getLogger(__name__)
 
 
 class MqttPublisher:
-    """One background-connected paho client per worker process."""
+    """One background-connected paho client per worker process.
+
+    Origin: Ashu
+    """
 
     _instance = None
     _instance_pid = None
     _lock = threading.Lock()
 
     def __init__(self, host=None, port=None, client_factory=mqtt.Client):
+        """Connects a publishing MQTT client to the broker in the background (reconnects every 1-30 s).
+
+        Origin: Ashu
+        """
         self.host = host or getattr(settings, "MQTT_BROKER_HOST", "127.0.0.1")
         self.port = port or getattr(settings, "MQTT_BROKER_PORT", 1883)
         self._client = client_factory(client_id=f"server-publisher-{os.getpid()}")
@@ -34,7 +41,10 @@ class MqttPublisher:
 
     @classmethod
     def get(cls):
-        """Return this process's publisher, creating it after a fork if needed."""
+        """Return this process's publisher, creating it after a fork if needed.
+
+        Origin: Ashu
+        """
         pid = os.getpid()
         with cls._lock:
             if cls._instance is None or cls._instance_pid != pid:
@@ -43,6 +53,10 @@ class MqttPublisher:
             return cls._instance
 
     def publish(self, topic, payload, qos=1):
+        """Publishes a command to a gateway (QoS 1); logs when it is queued without a live connection.
+
+        Origin: Ashu
+        """
         info = self._client.publish(topic, payload=payload, qos=qos, retain=False)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
             # With qos >= 1 paho keeps the message queued and sends it once the
@@ -56,5 +70,8 @@ class MqttPublisher:
 
 
 def publish_after_commit(topic, payload, qos=1):
-    """Publish once the surrounding DB transaction commits (immediately if none)."""
+    """Publish once the surrounding DB transaction commits (immediately if none).
+
+    Origin: Ashu
+    """
     transaction.on_commit(lambda: MqttPublisher.get().publish(topic, payload, qos=qos))

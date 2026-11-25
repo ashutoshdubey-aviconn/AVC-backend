@@ -29,10 +29,21 @@ from wareApp.utility import entryExit
 
 
 class SiteConsumptionPingApi(APIView):
+    """API view for /api/siteConsumptionPingsMosquitto/ (POST; Open: no login (AllowAny)). Reads
+    CustomerSiteManager, Site, SiteConsumptionPing, User. Takes id, siteId. Returns data, msg,
+    result.
+
+    Origin: Ashu
+    """
     permission_classes = [AllowAny]
 
     @entryExit
     def post(self, request):
+        """POST /api/siteConsumptionPingsMosquitto/. Request fields: id, siteId. Response keys: data,
+        msg, result.
+
+        Origin: Ashu
+        """
         try:
             data = request.data
             user_id = data.get("id", "")
@@ -84,11 +95,22 @@ class SiteConsumptionPingApi(APIView):
 
 
 class SiteCeleryPingApi(APIView):
+    """API view for /api/siteCeleryPings/ (POST; Open: no login (AllowAny)). Reads CustomerSiteManager,
+    Site, SiteCeleryPing, User. Takes id, page, page_size, siteId. Returns data, msg, page,
+    page_size, pagination, result, total.
+
+    Origin: Ashu
+    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
     @entryExit
     def post(self, request):
+        """POST /api/siteCeleryPings/. Request fields: id, page, page_size, siteId. Response keys:
+        data, msg, page, page_size, pagination, result, total.
+
+        Origin: Ashu
+        """
         try:
             data = request.data
             user_id = data.get("id", "")
@@ -200,9 +222,18 @@ class SiteCeleryPingApi(APIView):
 
 
 class SiteAisleGroupsWithLastEntries(APIView):
+    """API view for /api/sitesWithAisleGroupsLastEntries/ (GET, POST; Open: no login (AllowAny)). Reads
+    AisleGroup, DailySiteReading, HourlySiteReading, Site. Takes site_id. Returns data, result.
+
+    Origin: Ashu
+    """
     permission_classes = [AllowAny]
 
     def _serialize_daily_entry(self, daily_entry):
+        """Latest daily reading of an aisle as JSON, or None.
+
+        Origin: Ashu
+        """
         if not daily_entry:
             return None
 
@@ -214,6 +245,10 @@ class SiteAisleGroupsWithLastEntries(APIView):
         }
 
     def _get_latest_hourly_entries(self, site_ids, leg_ids, required_keys):
+        """Latest hourly reading of each aisle of the sites.
+
+        Origin: Ashu
+        """
         latest_entries = {}
         hourly_entries = (
             HourlySiteReading.objects.filter(
@@ -247,6 +282,10 @@ class SiteAisleGroupsWithLastEntries(APIView):
         return latest_entries
 
     def _get_latest_daily_entries(self, site_ids, leg_ids, required_keys):
+        """Latest daily reading of each aisle of the sites.
+
+        Origin: Ashu
+        """
         latest_entries = {}
         daily_entries = (
             DailySiteReading.objects.filter(
@@ -278,6 +317,10 @@ class SiteAisleGroupsWithLastEntries(APIView):
         return latest_entries
 
     def _build_response(self, request):
+        """Aisles of a site (or all sites) with their latest hourly and daily readings.
+
+        Origin: Ashu
+        """
         site_id = (
             request.data.get("site_id")
             if request.method == "POST"
@@ -353,18 +396,38 @@ class SiteAisleGroupsWithLastEntries(APIView):
 
     @entryExit
     def get(self, request):
+        """GET /api/sitesWithAisleGroupsLastEntries/. Request fields: site_id. Response keys: data,
+        result.
+
+        Origin: Ashu
+        """
         return self._build_response(request)
 
     @entryExit
     def post(self, request):
+        """POST /api/sitesWithAisleGroupsLastEntries/. Request fields: site_id. Response keys: data,
+        result.
+
+        Origin: Ashu
+        """
         return self._build_response(request)
 
 
 class MeterDisconnectionIngestView(APIView):
+    """API view for /api/meter-disconnections/ingest/ (POST; Open: no permission check ([])). Saves to
+    MeterDisconnectionEvent. Returns msg, received, saved, status.
+
+    Origin: Ashu
+    """
     authentication_classes = []
     permission_classes = []
 
     def post(self, request):
+        """POST /api/meter-disconnections/ingest/. No request fields. Response keys: msg, received,
+        saved, status.
+
+        Origin: Ashu
+        """
         payload = request.data
         if isinstance(payload, dict):
             payload = [payload]
@@ -446,7 +509,19 @@ class MeterDisconnectionIngestView(APIView):
 
 
 class MeterDisconnectionListView(APIView):
+    """API view for /api/meter-disconnections/ (GET; Login required (default)). Reads
+    MeterDisconnectionEvent. Takes from, limit, logged_site_id, meter_id, meter_number, offset,
+    site_id, status, to. Returns count, limit, msg, offset, results, status.
+
+    Origin: Ashu
+    """
     def get(self, request):
+        """GET /api/meter-disconnections/. Request fields: from, limit, logged_site_id, meter_id,
+        meter_number, offset, site_id, status, to. Response keys: count, limit, msg, offset,
+        results, status.
+
+        Origin: Ashu
+        """
         queryset = MeterDisconnectionEvent.objects.all().order_by(
             "-updated_at", "meter_number", "meter_id"
         )
@@ -514,7 +589,10 @@ GATEWAY_HEALTH_MODBUS = "modbus_issue"
 
 def open_gateway_alarms():
     """``{hgw_id: (health, since, detail)}`` from the open Gateway Disconnected
-    (15) and Gateway Service / Modbus Issue (16) alarms. 15 wins over 16."""
+    (15) and Gateway Service / Modbus Issue (16) alarms. 15 wins over 16.
+
+    Origin: Ashu
+    """
     found = {}
     rows = (
         AlarmNotifications.objects.filter(
@@ -553,17 +631,30 @@ class HomeGatewayStatusApi(APIView):
 
     GET is for the Super Admin monitoring dashboard only (decided 2026-11-21: every API of this
     branch is Super Admin only): token required (401) and UserType 1 (403). POST (a gateway's
-    location, sent by gateways / scripts) keeps its open access."""
+    location, sent by gateways / scripts) keeps its open access.
+
+    Origin: Ashu
+    """
 
     permission_classes = [AllowAny]
     throttle_classes = []
 
     def get_permissions(self):
+        """GET needs login; other methods use the view's normal rule.
+
+        Origin: Ashu
+        """
         if self.request.method == "GET":
             return [IsAuthenticated()]
         return super().get_permissions()
 
     def get(self, request):
+        """GET /api/gateway-status/. Request fields: gateway_id, id, latitude, limit, longitude,
+        offset, status. Response keys: count, customer_name, data, error, gateway_id, id, latitude,
+        limit, longitude, message, offset, results, site_id, site_name, status.
+
+        Origin: Ashu
+        """
         if getattr(request.user, "UserType", None) != 1:
             raise PermissionDenied("Only Super_Admin users can see the gateway status.")
         try:
@@ -645,6 +736,12 @@ class HomeGatewayStatusApi(APIView):
             )
 
     def post(self, request):
+        """POST /api/gateway-status/. Request fields: gateway_id, id, latitude, limit, longitude,
+        offset, status. Response keys: count, customer_name, data, error, gateway_id, id, latitude,
+        limit, longitude, message, offset, results, site_id, site_name, status.
+
+        Origin: Ashu
+        """
         try:
             gateway_id = request.data.get("gateway_id")
             status_id = request.data.get("id")

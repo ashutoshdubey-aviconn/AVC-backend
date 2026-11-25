@@ -7,6 +7,11 @@ from .users import User
 
 
 class CustomerInfo(models.Model):
+    """Table wareApp_customerinfo: customer info. Fields: customer, address, created_by,
+    total_energy_consumed, total_energy_saved, total_sites.
+
+    Origin: Ashu (changed from main)
+    """
     customer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="customer",
@@ -24,10 +29,20 @@ class CustomerInfo(models.Model):
     total_sites = models.PositiveIntegerField(default=0)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.customer.username.
+
+        Origin: main (unchanged)
+        """
         return self.customer.username
 
 
 class Site(models.Model):
+    """Table wareApp_site: site. Fields: customer, site_name, site_type, total_no_of_blocks,
+    total_no_of_aisles, location, per_unit_cost, genset_unit_rate, no_of_single_source_meters,
+    no_of_dual_source_meters, is_active, is_visible....
+
+    Origin: Ashu (changed from main)
+    """
     customer = models.ForeignKey(
         User, related_name="site", on_delete=models.CASCADE, null=True, blank=True
     )
@@ -109,10 +124,20 @@ class Site(models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: f'{self.site_name} ({self.id})' if self.site_name else
+        f'Site {self.id}'.
+
+        Origin: Ashu
+        """
         return f"{self.site_name} ({self.id})" if self.site_name else f"Site {self.id}"
 
 
 class CustomerSiteManager(models.Model):
+    """Table wareApp_customersitemanager: customer site manager. Fields: customer, created_by,
+    associated_site, created.
+
+    Origin: Ashu (changed from main)
+    """
     customer = models.ForeignKey(
         User,
         related_name="customerSiteManager",
@@ -127,6 +152,10 @@ class CustomerSiteManager(models.Model):
     created = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: f'CustomerSiteManager {self.pk}'.
+
+        Origin: Ashu
+        """
         if self.customer:
             full_name = self.customer.get_full_name().strip()
             return full_name or self.customer.username
@@ -134,6 +163,11 @@ class CustomerSiteManager(models.Model):
 
 
 class HomeGatewayId(models.Model):
+    """Table wareApp_homegatewayid: home gateway id. Fields: hgw_id, owned_by, connected_to, rssh_port,
+    monitoring_port.
+
+    Origin: Ashu (changed from main)
+    """
     hgw_id = models.CharField(max_length=200)
     owned_by = models.ForeignKey(
         CustomerInfo,
@@ -155,10 +189,18 @@ class HomeGatewayId(models.Model):
     )
 
     def __str__(self):
+        """Text for this row in admin and logs: self.hgw_id.
+
+        Origin: main (unchanged)
+        """
         return self.hgw_id
 
 
 class Image(models.Model):
+    """Table wareApp_image: image. Fields: which_site, image_file, image_id.
+
+    Origin: Ashu (changed from main)
+    """
     which_site = models.ForeignKey(
         Site, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -166,27 +208,51 @@ class Image(models.Model):
     image_id = models.CharField(max_length=10)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.image_file.
+
+        Origin: main (unchanged)
+        """
         return self.image_file
 
 
 class BlockInfo(models.Model):
+    """Table wareApp_blockinfo: block info. Fields: block_name, site_id, is_active.
+
+    Origin: Ashu (changed from main)
+    """
     block_name = models.CharField(max_length=50)
     site_id = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     is_active = models.BooleanField()
 
     def __str__(self):
+        """Text for this row in admin and logs: self.block_name + ' ' + str(self.site_id).
+
+        Origin: main (unchanged)
+        """
         return self.block_name + " " + str(self.site_id)
 
 
 class Panel(models.Model):
+    """Table wareApp_panel: panel. Fields: site, panel.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     panel = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.panel + ' ' + str(self.site).
+
+        Origin: main (unchanged)
+        """
         return self.panel + " " + str(self.site)
 
 
 class Floor(models.Model):
+    """Table wareApp_floor: floor. Fields: site, floor.
+
+    Origin: Ashu (changed from main)
+    """
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True, blank=True)
     FLOOR = (
         ("GF", "Ground Floor"),
@@ -199,11 +265,25 @@ class Floor(models.Model):
     floor = models.CharField(max_length=30, choices=FLOOR, null=True, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.floor + ' ' + str(self.site).
+
+        Origin: main (unchanged)
+        """
         return self.floor + " " + str(self.site)
 
 
 class AisleGroup(models.Model):
+    """Table wareApp_aislegroup: aisle group. Fields: site, attached_leg_id, block_id, panel, floor,
+    aisleGroupName, total_lights, one_light_watt, expected_consumption, cumulative_consumption,
+    on_sensor_power, is_active....
+
+    Origin: Ashu (changed from main)
+    """
     class DgFuelProvider(models.TextChoices):
+        """Fuel providers a DG aisle can use: LocoNav or Roadcast.
+
+        Origin: Ashu
+        """
         LOCONAV = "loconav", "LocoNav"
         ROADCAST = "roadcast", "Roadcast"
 
@@ -259,16 +339,27 @@ class AisleGroup(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        """On first save, sets the virtual site to the aisle's own site when none is given.
+
+        Origin: main (unchanged)
+        """
         if self.pk is None and self.virtual_siteID_id is None:
             self.virtual_siteID = self.site
         super().save(*args, **kwargs)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.aisleGroupName + ' ' + str(self.site).
+
+        Origin: main (unchanged)
+        """
         return self.aisleGroupName + " " + str(self.site)
 
 
 def aisle_group_update_leg_id(sender, instance, created=False, **kwargs):
-    """A new aisle group's leg id is its own id (set once, on creation)."""
+    """A new aisle group's leg id is its own id (set once, on creation).
+
+    Origin: Ashu (changed from main)
+    """
     if created and str(instance.attached_leg_id or "") != str(instance.id):
         AisleGroup.objects.filter(id=instance.id).update(attached_leg_id=instance.id)
         instance.attached_leg_id = str(instance.id)
@@ -278,6 +369,10 @@ post_save.connect(aisle_group_update_leg_id, sender=AisleGroup)
 
 
 class AisleInfo(models.Model):
+    """Table wareApp_aisleinfo: aisle info. Fields: aisle_name, aisle_group, is_active.
+
+    Origin: Ashu (changed from main)
+    """
     aisle_name = models.CharField(max_length=100)
     aisle_group = models.ForeignKey(
         AisleGroup, on_delete=models.CASCADE, null=True, blank=True
@@ -285,10 +380,19 @@ class AisleInfo(models.Model):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: self.aisle_name.
+
+        Origin: main (unchanged)
+        """
         return self.aisle_name
 
 
 class SiteBaseline(models.Model):
+    """Table wareApp_sitebaseline: site baseline. Fields: associated_site_id, aisle_group, leg_id,
+    baseline_value, working_hours, baseline_from, baseline_to.
+
+    Origin: Ashu (changed from main)
+    """
     associated_site_id = models.ForeignKey(
         Site, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -302,6 +406,10 @@ class SiteBaseline(models.Model):
     baseline_to = models.DateField(blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: str(self.baseline_value).
+
+        Origin: main (unchanged)
+        """
         return str(self.baseline_value)
 
     class Meta:
@@ -314,6 +422,11 @@ class SiteBaseline(models.Model):
 
 
 class SensorData(models.Model):
+    """Table wareApp_sensordata: sensor data. Fields: sensor_id, sensor_associated_with, sensor_status,
+    sensor_on_date_time, sensor_off_date_time.
+
+    Origin: main (unchanged)
+    """
     sensor_id = models.CharField(max_length=10)
     sensor_associated_with = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
     sensor_status = models.BooleanField()
@@ -322,6 +435,11 @@ class SensorData(models.Model):
 
 
 class SiteStaticData(models.Model):
+    """Table wareApp_sitestaticdata: site static data. Fields: site_id, block_id, aisle_group,
+    aisle_id, sensor_id, total_lights, total_watts.
+
+    Origin: main (unchanged)
+    """
     site_id = models.ForeignKey(Site, on_delete=models.CASCADE)
     block_id = models.ForeignKey(BlockInfo, on_delete=models.CASCADE)
     aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)

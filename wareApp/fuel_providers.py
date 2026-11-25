@@ -21,6 +21,10 @@ def _try_request(
     retries: int = 3,
     backoff: float = 0.5,
 ):
+    """GET with retries: returns the response, or None after the given number of failed attempts.
+
+    Origin: Ashu
+    """
     attempt = 0
     while attempt < retries:
         try:
@@ -41,6 +45,10 @@ ROADCAST_PULL_API_URL = "https://api-track-py.roadcast.co.in/api/v1/auth/pull_ap
 
 
 def roadcast_credentials():
+    """Roadcast pull user name and password from settings (.env).
+
+    Origin: Ashu
+    """
     return (
         getattr(settings, "ROADCAST_PULL_USERNAME", ""),
         getattr(settings, "ROADCAST_PULL_PASSWORD", ""),
@@ -48,7 +56,10 @@ def roadcast_credentials():
 
 
 def roadcast_auth_headers():
-    """Basic auth header for the Roadcast report API ({} when not configured)."""
+    """Basic auth header for the Roadcast report API ({} when not configured).
+
+    Origin: Ashu
+    """
     username, password = roadcast_credentials()
     if not username or not password:
         LOG.warning("Roadcast: ROADCAST_PULL_USERNAME/PASSWORD not configured")
@@ -58,12 +69,19 @@ def roadcast_auth_headers():
 
 
 def roadcast_pull_params():
+    """Query parameters for the Roadcast pull API (user name and password).
+
+    Origin: Ashu
+    """
     username, password = roadcast_credentials()
     return {"username": username, "password": password}
 
 
 def loconav_auth_headers():
-    """Loconav API token header ({} when not configured)."""
+    """Loconav API token header ({} when not configured).
+
+    Origin: Ashu
+    """
     token = getattr(settings, "LOCONAV_API_TOKEN", "")
     if not token:
         LOG.warning("Loconav: LOCONAV_API_TOKEN not configured")
@@ -72,6 +90,10 @@ def loconav_auth_headers():
 
 
 def _to_float(value) -> Optional[float]:
+    """Number from a value, also from text with units; None when it is not a number.
+
+    Origin: Ashu
+    """
     if value is None:
         return None
     try:
@@ -88,6 +110,8 @@ def fetch_roadcast_fuel(
 ) -> Optional[float]:
     """Robustly fetch fuel_consumed from Roadcaste endpoints.
     Returns numeric value or None on failure.
+
+    Origin: Ashu
     """
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
     headers = roadcast_auth_headers()
@@ -150,6 +174,11 @@ def fetch_roadcast_fuel(
 
 
 def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
+    """Calls the Roadcast pull API for all devices; None when credentials are missing or the call
+    fails.
+
+    Origin: Ashu
+    """
     username, password = roadcast_credentials()
     if not username or not password:
         LOG.warning("fetch_roadcast_pull_api: ROADCAST_PULL_USERNAME/PASSWORD not configured")
@@ -167,6 +196,11 @@ def fetch_roadcast_pull_api() -> Optional[Dict[str, Any]]:
 
 
 def vehicle_variants(v: str) -> List[str]:
+    """Spellings of a vehicle number to try at a provider (as given, upper case, without spaces /
+    dashes).
+
+    Origin: Ashu
+    """
     if not v:
         return []
     v = str(v).strip()
@@ -195,6 +229,8 @@ def fetch_loconav_fuel(
 ) -> Optional[float]:
     """Attempt to fetch Loconav fuel consumed between start_dt and end_dt.
     Returns numeric fuel_consumed or None.
+
+    Origin: Ashu
     """
     headers = loconav_auth_headers()
     start_ts = int(start_dt.timestamp())
@@ -256,6 +292,10 @@ def fetch_loconav_fuel(
 
         # sort by timestamp if present
         def _ts(p):
+            """Timestamp of a Loconav data point (time or timestamp field).
+
+            Origin: Ashu
+            """
             for k in ("time", "timestamp"):
                 if k in p:
                     try:
@@ -269,6 +309,10 @@ def fetch_loconav_fuel(
         last = points[-1]
 
         def _val(p):
+            """Fuel value of a Loconav data point (value, fuel_in_liters or fuel field).
+
+            Origin: Ashu
+            """
             return _to_float(p.get("value") or p.get("fuel_in_liters") or p.get("fuel"))
 
         v_first = _val(first)
@@ -327,6 +371,10 @@ def fetch_loconav_fuel(
 def fetch_roadcast_report(
     vehicle_imei: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
+    """Roadcast fuel report (refills, drains) for one device and time range.
+
+    Origin: Ashu
+    """
     url = "https://test-track.roadcast.net/api/v1/auth/pull_fuel_report"
     headers = roadcast_auth_headers()
     params = {
@@ -391,6 +439,10 @@ def fetch_roadcast_report(
 def fetch_loconav_report(
     vehicle_number: str, start_dt: datetime, end_dt: datetime
 ) -> Optional[Dict[str, Any]]:
+    """Loconav fuel report for one vehicle and time range.
+
+    Origin: Ashu
+    """
     headers = loconav_auth_headers()
     start_ts = int(start_dt.timestamp())
     end_ts = int(end_dt.timestamp())
@@ -414,6 +466,10 @@ def fetch_loconav_report(
 
 
 def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Refuel events found in a provider alerts response.
+
+    Origin: Ashu
+    """
     out = []
     if not alerts_json or not isinstance(alerts_json, dict):
         return out
@@ -434,6 +490,10 @@ def detect_refuel_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any
 
 
 def detect_theft_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Theft / drain events found in a provider alerts response.
+
+    Origin: Ashu
+    """
     out = []
     if not alerts_json or not isinstance(alerts_json, dict):
         return out
@@ -454,6 +514,11 @@ def detect_theft_from_alerts(alerts_json: Dict[str, Any]) -> List[Dict[str, Any]
 
 
 def detect_suspicious_fuel(tank_capacity: float, fuel_consumed: float) -> bool:
+    """True when the fuel used in a run is more than 120% of the tank capacity (impossible, so
+    suspicious).
+
+    Origin: Ashu
+    """
     try:
         if tank_capacity is None or fuel_consumed is None:
             return False

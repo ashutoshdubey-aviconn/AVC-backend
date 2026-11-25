@@ -6,6 +6,12 @@ from .setup import AisleGroup, HomeGatewayId, Site
 
 
 class RecoveryMonitor(models.Model):
+    """Table wareApp_recoverymonitor: recovery monitor. Fields: site, gateway_id, aisle_group, leg_id,
+    power_source, recovery_type, status, missing_from, missing_to, expected_slots, recovered_slots,
+    error_slots....
+
+    Origin: Ashu
+    """
     RECOVERY_TYPES = (
         ("hourly_consumption", "Hourly Consumption"),
         ("daily_consumption", "Daily Consumption"),
@@ -76,10 +82,22 @@ class RecoveryMonitor(models.Model):
         ordering = ["-requested_at"]
 
     def __str__(self):
+        """Text for this row in admin and logs: '{} {} {}'.format(self.site, self.recovery_type,
+        self.status).
+
+        Origin: Ashu
+        """
         return "{} {} {}".format(self.site, self.recovery_type, self.status)
 
 
 class AisleSyncRecoveryStatus(models.Model):
+    """Table wareApp_aislesyncrecoverystatus: aisle sync recovery status. Fields: site,
+    home_gateway_id, aisle_group, power_source, leg_id, sync_status, is_sync_gone,
+    recovery_requested, recovery_received, last_sync_at, last_recovery_requested_at,
+    last_recovery_received_at....
+
+    Origin: Ashu
+    """
     SYNC_STATUSES = (
         ("unknown", "Unknown"),
         ("healthy", "Healthy"),
@@ -149,10 +167,20 @@ class AisleSyncRecoveryStatus(models.Model):
         ]
 
     def __str__(self):
+        """Text for this row in admin and logs: '{} {} {}'.format(self.site, self.leg_id,
+        self.sync_status).
+
+        Origin: Ashu
+        """
         return "{} {} {}".format(self.site, self.leg_id, self.sync_status)
 
 
 class HomeGatewayStatus(models.Model):
+    """Table wareApp_homegatewaystatus: home gateway status. Fields: home_gateway, latitude, longitude,
+    status, last_ping_at, last_data_at.
+
+    Origin: Ashu
+    """
     home_gateway = models.ForeignKey(
         HomeGatewayId, on_delete=models.CASCADE, related_name="locations"
     )
@@ -170,13 +198,21 @@ class HomeGatewayStatus(models.Model):
     last_data_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: f"{(self.home_gateway.hgw_id if self.home_gateway else
+        'No Gateway')} - ({self.l.
+
+        Origin: Ashu
+        """
         return f"{self.home_gateway.hgw_id if self.home_gateway else 'No Gateway'} - ({self.latitude}, {self.longitude})"
 
 
 class CatchUpSpread(models.Model):
     """One catch-up hour spread over the data gap before it (wareApp/catch_up_spread.py,
     POST /api/catchUpSpread/; decided 2026-11-16, reworked 2026-11-20: spread hours are
-    real readings, manual or automatic, undo for 5 days). Kept for the record and for undo."""
+    real readings, manual or automatic, undo for 5 days). Kept for the record and for undo.
+
+    Origin: Ashu
+    """
 
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     aisle_group = models.ForeignKey(AisleGroup, on_delete=models.CASCADE)
@@ -197,4 +233,9 @@ class CatchUpSpread(models.Model):
     hours_detail = models.JSONField(default=list, blank=True)
 
     def __str__(self):
+        """Text for this row in admin and logs: f'site {self.site_id} leg {self.leg_id}
+        {self.catch_up_at:%Y-%m-%d %H:%M}: {self.
+
+        Origin: Ashu
+        """
         return f"site {self.site_id} leg {self.leg_id} {self.catch_up_at:%Y-%m-%d %H:%M}: {self.original_kwh} kWh / {self.hours} h"

@@ -30,11 +30,18 @@ GATEWAY_OVERHEAT = AlarmNotifications.GATEWAY_OVERHEAT
 
 
 def _fmt(value):
+    """Formats a number for the alarm feed without trailing zeros; None stays None.
+
+    Origin: Ashu
+    """
     return None if value is None else f"{float(value):g}"
 
 
 def _power_issue(row):
-    """Readable details of a voltage / PF / DG alarm row."""
+    """Readable details of a voltage / PF / DG alarm row.
+
+    Origin: Ashu
+    """
     alarm_type = row.Alarm_type
     phases = "/".join(_fmt(v) or "-" for v in (row.r_phase, row.y_phase, row.b_phase))
     if alarm_type in (0, 1):
@@ -49,7 +56,10 @@ def _power_issue(row):
 
 
 def open_for(start, end):
-    """``(whole days, text)`` an issue has been open, e.g. ``(2, "2 days 5 h")``."""
+    """``(whole days, text)`` an issue has been open, e.g. ``(2, "2 days 5 h")``.
+
+    Origin: Ashu
+    """
     seconds = max((end - start).total_seconds(), 0)
     days, hours = int(seconds // 86400), int(seconds % 86400 // 3600)
     if days:
@@ -58,7 +68,10 @@ def open_for(start, end):
 
 
 def open_info(start, alarm_is_active, off_time, now=None):
-    """API fields: whole days and text an alarm has been (or was) open."""
+    """API fields: whole days and text an alarm has been (or was) open.
+
+    Origin: Ashu
+    """
     if start is None:
         return {"open_days": None, "open_for": None}
     end = (now or datetime.now()) if alarm_is_active or off_time is None else off_time
@@ -67,7 +80,10 @@ def open_info(start, alarm_is_active, off_time, now=None):
 
 
 def _cutoff():
-    """Oldest last-seen time shown (ALARM_FEED_MAX_AGE_DAYS; 0 = no limit)."""
+    """Oldest last-seen time shown (ALARM_FEED_MAX_AGE_DAYS; 0 = no limit).
+
+    Origin: Ashu
+    """
     days = getattr(settings, "ALARM_FEED_MAX_AGE_DAYS", 30)
     return datetime.now() - timedelta(days=days) if days else None
 
@@ -78,6 +94,8 @@ def active_alarms(site_ids):
     Issues whose latest occurrence is older than ALARM_FEED_MAX_AGE_DAYS are
     left out; the filter applies to the whole issue, so "since" still shows
     when it really started.
+
+    Origin: Ashu
     """
     site_ids = list(site_ids)
     cutoff = _cutoff()
@@ -207,6 +225,11 @@ def active_alarms(site_ids):
 
 
 def _row(site, *, first_seen, priority, alarm, **fields):
+    """Builds one alarm feed row with the keys the existing dashboard table reads (alarm, priority,
+    site and customer names, first seen and extra fields).
+
+    Origin: Ashu
+    """
     customer = site.customer
     return {
         # Keys the existing dashboard table already reads:

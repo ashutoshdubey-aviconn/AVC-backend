@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 def _created_from_epoch(epoch_ms: int) -> datetime:
+    """Datetime from an epoch in milliseconds.
+
+    Origin: Ashu
+    """
     return datetime.fromtimestamp(epoch_ms / 1000)
 
 
@@ -28,7 +32,10 @@ def record_fuel_level(
     created: Optional[datetime] = None,
     aisle_group: Optional[AisleGroup] = None,
 ) -> Tuple[DgFuelConsumptionData, bool]:
-    """Create one provider tank-level sample for a site and normalized epoch."""
+    """Create one provider tank-level sample for a site and normalized epoch.
+
+    Origin: Ashu
+    """
     normalized_fuel = as_float(fuel_liters)
     normalized_epoch = epoch_milliseconds(epoch_value)
     if normalized_fuel is None or normalized_epoch is None or not vehicle_number:
@@ -81,7 +88,10 @@ def record_fuel_alert(
     created: Optional[datetime] = None,
     aisle_group: Optional[AisleGroup] = None,
 ) -> Tuple[DGFuelAlertsData, bool]:
-    """Create one provider refuel or theft event for a normalized timestamp."""
+    """Create one provider refuel or theft event for a normalized timestamp.
+
+    Origin: Ashu
+    """
     normalized_fuel = as_float(fuel_liters)
     normalized_epoch = epoch_milliseconds(epoch_value)
     if normalized_fuel is None or normalized_epoch is None or not vehicle_number:

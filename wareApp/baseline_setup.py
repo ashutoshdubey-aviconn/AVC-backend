@@ -45,10 +45,18 @@ BATCH = 2000
 
 
 class BaselineSetupError(ValueError):
-    """The request cannot be planned or applied (message is shown to the user)."""
+    """The request cannot be planned or applied (message is shown to the user).
+
+    Origin: Ashu
+    """
 
 
 def parse_day(value, name):
+    """Parses a day given as a date, YYYY/MM/DD or YYYY-MM-DD; raises a clear error naming the field
+    when it can't.
+
+    Origin: Ashu
+    """
     if isinstance(value, date):
         return value
     for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
@@ -61,6 +69,11 @@ def parse_day(value, name):
 
 @dataclass
 class AislePlan:
+    """Baseline plan for one aisle: the sampled daily kWh, their average, an optional manual override,
+    warnings and working hours.
+
+    Origin: Ashu
+    """
     aisle: AisleGroup
     days: dict = field(default_factory=dict)  # day -> kWh or None (no row)
     average: float = None
@@ -70,9 +83,18 @@ class AislePlan:
 
     @property
     def value(self):
+        """Baseline that will be saved: the manual override when given, else the sampled average.
+
+        Origin: Ashu
+        """
         return self.override if self.override is not None else self.average
 
     def as_dict(self):
+        """The aisle plan as JSON for the baseline setup API (leg, name, days, average, override,
+        warnings).
+
+        Origin: Ashu
+        """
         return {
             "leg_id": str(self.aisle.attached_leg_id),
             "aisle_name": self.aisle.aisleGroupName,
@@ -87,6 +109,11 @@ class AislePlan:
 
 @dataclass
 class Plan:
+    """Baseline setup plan for one site: sample period, the day the new baseline starts, one AislePlan
+    per aisle and any errors.
+
+    Origin: Ashu
+    """
     site: object
     sample_from: date
     sample_to: date
@@ -95,6 +122,10 @@ class Plan:
     errors: list = field(default_factory=list)
 
     def as_dict(self):
+        """The site plan as JSON for the baseline setup API.
+
+        Origin: Ashu
+        """
         return {
             "site_id": self.site.id,
             "site_name": self.site.site_name,
@@ -108,7 +139,10 @@ class Plan:
 
 
 def plan(site, sample_from, sample_to, effective_from=None, legs=None, overrides=None, today=None):
-    """Work out the baseline per aisle; changes nothing."""
+    """Work out the baseline per aisle; changes nothing.
+
+    Origin: Ashu
+    """
     today = today or date.today()
     sample_from = parse_day(sample_from, "sample_from")
     sample_to = parse_day(sample_to, "sample_to")
@@ -203,6 +237,11 @@ def plan(site, sample_from, sample_to, effective_from=None, legs=None, overrides
 
 
 def _set_baseline(site, aisle, value, working_hours, effective_from):
+    """Saves one aisle's new baseline from effective_from: updates a row starting that same day,
+    otherwise closes the open row the day before and adds a new one.
+
+    Origin: Ashu
+    """
     leg = str(aisle.attached_leg_id)
     rows = SiteBaseline.objects.filter(associated_site_id=site, leg_id=leg)
     same_day = rows.filter(baseline_from=effective_from).order_by("-id").first()
@@ -227,6 +266,8 @@ def backfill(site, effective_from, legs=None, until=None):
 
     Uses the SiteBaseline rows directly (not the cache), so it is right inside
     the apply transaction. Returns ``{"daily": n, "hourly": n}`` rows changed.
+
+    Origin: Ashu
     """
     effective_from = parse_day(effective_from, "effective_from")
     until = until or datetime.now()
@@ -245,6 +286,11 @@ def backfill(site, effective_from, legs=None, until=None):
             continue
 
         def daily_value(day):
+            """Baseline value and working hours in force on a given day (latest period that covers it),
+            or None.
+
+            Origin: Ashu
+            """
             for start, end, value, working_hours in reversed(periods):
                 if start and start <= day and (end is None or day <= end):
                     return value, working_hours
@@ -287,7 +333,10 @@ def backfill(site, effective_from, legs=None, until=None):
 
 
 def apply(site, the_plan, manager=None, user=None, schedule_refresh=True):
-    """Write the plan (one transaction); returns a summary dict."""
+    """Write the plan (one transaction); returns a summary dict.
+
+    Origin: Ashu
+    """
     if the_plan.errors:
         raise BaselineSetupError("; ".join(the_plan.errors))
     manager = manager or {}
@@ -327,6 +376,11 @@ def apply(site, the_plan, manager=None, user=None, schedule_refresh=True):
 
 
 def _schedule_refresh(site_id, effective_from, legs):
+    """Queues the baseline backfill task 6 minutes later, after workers' cached baselines (5 min) have
+    expired.
+
+    Origin: Ashu
+    """
     from wareApp.tasks import refresh_baseline_backfill
 
     # Workers may cache the old baseline for up to CONFIG_CACHE_TTL (300 s).

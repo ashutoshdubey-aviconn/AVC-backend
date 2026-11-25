@@ -31,10 +31,18 @@ GUARDED_FAMILIES = frozenset({"consumption"})
 
 
 def _ttl():
+    """How long a processed packet is remembered (MQTT_IDEMPOTENCY_TTL_SECONDS, 6 h).
+
+    Origin: Ashu
+    """
     return getattr(settings, "MQTT_IDEMPOTENCY_TTL_SECONDS", 6 * 60 * 60)
 
 
 def message_key(family, site_id, gateway_id, payload):
+    """Cache key of a packet: SHA-1 of type, site, gateway and payload.
+
+    Origin: Ashu
+    """
     digest = hashlib.sha1(
         f"{family}|{site_id}|{gateway_id}|{payload}".encode("utf-8", "replace")
     ).hexdigest()
@@ -42,7 +50,10 @@ def message_key(family, site_id, gateway_id, payload):
 
 
 def claim(family, site_id, gateway_id, payload):
-    """Return a key to release on failure, or None if this is a duplicate."""
+    """Return a key to release on failure, or None if this is a duplicate.
+
+    Origin: Ashu
+    """
     ttl = _ttl()
     key = message_key(family, site_id, gateway_id, payload)
     if family not in GUARDED_FAMILIES or ttl <= 0:
@@ -51,4 +62,8 @@ def claim(family, site_id, gateway_id, payload):
 
 
 def release(key):
+    """Forgets a packet key so the packet can be processed again (after a failure).
+
+    Origin: Ashu
+    """
     cache.delete(key)
