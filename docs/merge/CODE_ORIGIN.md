@@ -25,7 +25,7 @@ Annotated git tags, local (pushed only when we push tags).
 | DG fuel | `wareApp/dg_fuel/`, `fetch_fuel_data.py`, `wareApp/views/dg_fuel.py` | `services/fuel_service.py`, `views/dg_fuel_views.py` | No. Ours only. |
 | Alarms | `wareApp/mqtt/services/` (alarms, closer, policy, gateway health, spikes), `wareApp/views/alarms.py`, `alarm_settings.py`, `monitoring.py` | `services/alarm_service.py`, `email_service.py`, `views/alert_views.py` | No. His dashboard / acknowledge / digest are on the port list, not merged yet. |
 | Recovery, sync status, catch-up spread, baseline | `wareApp/recovery/`, `wareApp/catch_up_spread.py`, `views/sync_status.py`, `views/catch_up.py`, `views/baseline.py` | none | Ours only. |
-| Models, migrations, settings | `wareApp/models.py`, `wareApp/migrations/`, `warehouse/settings.py` | `wareApp/models/`, his own `0002`–`0032`, his `settings.py` | No. Never take his migrations or his `models/` / `tasks/` packages. |
+| Models, migrations, settings | `wareApp/models/` (10 area modules since 25 Nov 2026; was one `models.py`), `wareApp/migrations/`, `warehouse/settings.py` | `wareApp/models/` (8 other modules), his own `0002`–`0032`, his `settings.py` | No. Never take his migrations or copy his `models/` files: `__init__.py`, `dg_fuel.py` and `load.py` have the same names as ours and would replace them. A model change from him is ported by hand into our module plus a new migration of ours. |
 | Other API views | `wareApp/views/*.py` | `wareApp/views/*_views.py` | 4 views (above). Decision for every view: [views_merge_decisions_20261121.csv](views_merge_decisions_20261121.csv). |
 
 So: **everything in `wareApp/mqtt/`, `load_data/`, `dg_fuel/`, `recovery/`, the alarm services and

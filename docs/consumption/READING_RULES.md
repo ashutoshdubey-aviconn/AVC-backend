@@ -1,10 +1,10 @@
 # Consumption reading rules
 
 How hourly and daily consumption readings are cleaned and added up before they
-are stored. Both rules live in one place, `wareApp/models.py`, and every write
+are stored. Both rules live in one place, `wareApp/models/cleaning.py`, and every write
 path uses them.
 
-| Rule | Function (`wareApp/models.py`) | Since |
+| Rule | Function (`wareApp/models/cleaning.py`) | Since |
 |---|---|---|
 | 1. 10,000 kWh glitch limit | `reading_capped`, `cap_reading`, `cap_reading_row` | 2026-11-03 |
 | 2. Spike hours left out of the day total | `hour_counts_in_day` | 2026-11-05 |

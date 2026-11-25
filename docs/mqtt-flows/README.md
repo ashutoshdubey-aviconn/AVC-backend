@@ -1231,7 +1231,7 @@ fields. Who is e-mailed and when a repeat is e-mailed again: flow 10.
 
 | File | Function / role |
 | --- | --- |
-| `wareApp/models.py` | AlarmNotifications: Alarm_type, POWER_TYPES / CONSUMPTION_TYPES / GATEWAY_TYPES, source |
+| `wareApp/models/alarms.py` | AlarmNotifications: Alarm_type, POWER_TYPES / CONSUMPTION_TYPES / GATEWAY_TYPES, source |
 | `wareApp/mqtt/services/alarms.py` | raise_power_alarm: power / DG types |
 | `wareApp/views/alarms.py` | alarmList / alarmListDetail: every type of a site |
 | `wareApp/mqtt/services/consumption_alarms.py` | 7, 8, 11, 12 |

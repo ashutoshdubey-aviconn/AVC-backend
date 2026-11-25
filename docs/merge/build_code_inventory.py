@@ -138,7 +138,7 @@ COLLEAGUE_COMPARISON = [
      "Git cannot merge them: one code base must be the base and the other's features are ported into it."],
     ["Deployed / verified", "Running on the test server with live gateway data; parts on main since Oct (MQTT queues, LoadData, DG fuel).",
      "Not deployed anywhere we know of; not run here (read-only check).", "Base = the deployed one (ours)."],
-    ["Code structure", "wareApp/models.py (one module), wareApp/views/ 18 area modules, wareApp/mqtt/ + mqtt/services/, tasks.py.",
+    ["Code structure", "wareApp/models/ (10 area modules), wareApp/views/ 18 area modules, wareApp/mqtt/ + mqtt/services/, tasks.py.",
      "wareApp/models/ package (8 modules), wareApp/views/ 7 *_views.py, wareApp/services/, wareApp/tasks/ package, "
      "constants.py with typed Enums, separate mqtt_pipeline/ project.",
      "models/ package and models.py cannot both exist (the package wins, models.py is ignored); same for tasks/ vs "
@@ -197,7 +197,7 @@ MODULE_NOTES = {
     "wareApp/load_data/rollups.py": "Hourly and daily min / max rollups of LoadData, run when a bucket is complete.",
     "wareApp/management/commands/simulate_mqtt_gateway_traffic.py": "manage.py command: sends simulated gateway MQTT traffic for tests.",
     "wareApp/management/commands/simulate_mqtt_queue_routing.py": "manage.py command: checks which queue each topic is routed to.",
-    "wareApp/models.py": "All database models (sites, aisles, readings, alarms, DG fuel, baselines, catch-up spreads ...).",
+    "wareApp/models/__init__.py": "All database models, re-exported from the area modules (setup, consumption, load, DG fuel, alarms, sync, monitoring ...).",
     "wareApp/mqtt/consumers.py": "The two MQTT listeners (queue 1 and queue 2): subscribe and hand each message to a processing task.",
     "wareApp/mqtt/consumption.py": "Consumption packets: parse, apply reading rules (glitch cap, spikes), store hourly / daily, raise consumption alarms.",
     "wareApp/mqtt/daily_consumption_recovery.py": "Recovery messages with past daily consumption sent by the gateway after a gap.",
@@ -290,6 +290,18 @@ def parse(path):
         return None
 
 
+def models_module(root):
+    """All model code as one ast.Module: wareApp/models.py, or the wareApp/models/ package
+    (split by area on 25 Nov 2026)."""
+    single = root / "wareApp" / "models.py"
+    if single.exists():
+        return parse(single)
+    body = []
+    for f in sorted((root / "wareApp" / "models").glob("*.py")):
+        body += (parse(f) or ast.Module(body=[], type_ignores=[])).body
+    return ast.Module(body=body, type_ignores=[])
+
+
 def first_sentence(text, limit=400):
     text = " ".join((text or "").split("\n\n")[0].split())
     return text if len(text) <= limit else text[: limit - 3] + "..."
@@ -369,7 +381,7 @@ def describe(qual, node, cls, lines, routes_by_view, models, rel):
             r = routes_by_view.get(node.name, [])
             where = ", ".join(f"/api/{x}" for x in r) or "no route"
             return f"API view: {'/'.join(methods) or '-'} {where}.", "derived (route)"
-        if any("Model" in b for b in bases) and "models.py" in rel:
+        if any("Model" in b for b in bases) and ("models.py" in rel or "wareApp/models/" in rel):
             return f"Database model {node.name} (table wareApp_{node.name.lower()}).", "derived (model)"
         if any("Serializer" in b for b in bases):
             return f"DRF serializer: {words(name)}.", "derived (base class)"
@@ -452,7 +464,7 @@ def main():
     tidx = tests_index()
 
     # models (for "uses ..." descriptions)
-    models_tree = parse(ROOT / "wareApp" / "models.py")
+    models_tree = models_module(ROOT)
     model_names = [n.name for n in models_tree.body if isinstance(n, ast.ClassDef)]
 
     # routes
@@ -611,7 +623,7 @@ def main():
         src = ast.unparse(meta)
         return src.count("models.Index("), src.count("Constraint(")
 
-    legacy_models = {n.name: n for n in parse(legacy_root / "wareApp" / "models.py").body if isinstance(n, ast.ClassDef)}
+    legacy_models = {n.name: n for n in models_module(legacy_root).body if isinstance(n, ast.ClassDef)}
     model_rows = []
     for n in models_tree.body:
         if not isinstance(n, ast.ClassDef):
