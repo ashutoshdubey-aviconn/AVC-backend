@@ -18,7 +18,7 @@ Annotated git tags, local (pushed only when we push tags).
 | `merge-final-base-views-loaddata-dgfuel-recovery-features` | `f1f2585c` | Start of the branch `merge-final` (25 Nov, pushed): our views, LoadData, DG fuel, HTTP recovery and features (sync status, catch-up spread, baseline setup, gateway status, alarm settings), before the MQTT merge. |
 | `merge-final-origin-docs` | `7d3551d6` | Every function and class has a description and an `Origin:` line (see below). |
 | `ours-before-daksh-mqtt-merge-20261125` | `7d3551d6` | Our code just before the MQTT merge. |
-| `daksh-mqtt-merge-20261125` | (MQTT merge commit) | MQTT merge: his acks_late / task retry idea rebuilt in our packet tasks; the rest of his MQTT code not taken ([decisions](mqtt_merge_decisions_20261125.csv)). |
+| `daksh-mqtt-merge-20261125` | `a1ea9409` | MQTT merge: his acks_late / task retry idea rebuilt in our packet tasks; the rest of his MQTT code not taken ([decisions](mqtt_merge_decisions_20261125.csv)). |
 
 ## Where each area comes from today
 
