@@ -306,6 +306,12 @@ MQTT_BROKER_PORT = config("MQTT_BROKER_PORT", default=1883, cast=int)
 MQTT_QUEUE1_CLIENT_ID = config("MQTT_QUEUE1_CLIENT_ID", default="server_paho_client_1")
 MQTT_QUEUE2_CLIENT_ID = config("MQTT_QUEUE2_CLIENT_ID", default="server_paho_client_2")
 # Consumption packets already processed are skipped for this long (0 = off).
+# Packet tasks (process_mqtt_message, LoadData, per-type tasks) are acknowledged after processing
+# (acks_late). A database error that survives the in-place retries retries the task this many
+# times, this many seconds apart, then keeps the packet as a dead letter (idea from Daksh's code).
+MQTT_TASK_RETRY_MAX = config("MQTT_TASK_RETRY_MAX", default=3, cast=int)
+MQTT_TASK_RETRY_DELAY_SECONDS = config("MQTT_TASK_RETRY_DELAY_SECONDS", default=10, cast=int)
+
 MQTT_IDEMPOTENCY_TTL_SECONDS = config(
     "MQTT_IDEMPOTENCY_TTL_SECONDS", default=6 * 60 * 60, cast=int
 )

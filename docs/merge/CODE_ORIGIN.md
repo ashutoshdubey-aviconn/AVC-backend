@@ -16,7 +16,9 @@ Annotated git tags, local (pushed only when we push tags).
 | `ours-before-daksh-views-merge-20261121` | `ed717fa2` | Our code just before his views came in. Everything up to here is ours, apart from main's own hotfixes listed in [MERGE_GUIDE.md](MERGE_GUIDE.md). |
 | `daksh-views-merge-20261121` | `55017069` | His 4 API views merged: `LightsDataApi`, `FansDataApi`, `SubmeteringMonthlyBarChart_new`, `SubmeteringSnapshotAPI`. |
 | `merge-final-base-views-loaddata-dgfuel-recovery-features` | `f1f2585c` | Start of the branch `merge-final` (25 Nov, pushed): our views, LoadData, DG fuel, HTTP recovery and features (sync status, catch-up spread, baseline setup, gateway status, alarm settings), before the MQTT merge. |
-| `merge-final-origin-docs` | (next commit) | Every function and class has a description and an `Origin:` line (see below). |
+| `merge-final-origin-docs` | `7d3551d6` | Every function and class has a description and an `Origin:` line (see below). |
+| `ours-before-daksh-mqtt-merge-20261125` | `7d3551d6` | Our code just before the MQTT merge. |
+| `daksh-mqtt-merge-20261125` | (MQTT merge commit) | MQTT merge: his acks_late / task retry idea rebuilt in our packet tasks; the rest of his MQTT code not taken ([decisions](mqtt_merge_decisions_20261125.csv)). |
 
 ## Where each area comes from today
 

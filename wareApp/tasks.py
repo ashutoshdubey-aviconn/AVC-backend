@@ -3,6 +3,7 @@ from functools import wraps
 from threading import Lock
 
 from celery.signals import worker_ready
+from django.conf import settings
 from django.db import close_old_connections
 from kombu.exceptions import KombuError
 from paho.mqtt.client import MQTT_ERR_SUCCESS
@@ -14,7 +15,7 @@ from wareApp.mqtt.registry import handler_for
 from wareApp.mqtt.services.notifications import ALLOWED_NOTIFICATIONS
 from wareApp.mqtt.services import idempotency
 from wareApp.mqtt.services import site_cache as site_config
-from wareApp.mqtt.services.failures import run_with_db_retry
+from wareApp.mqtt.services.failures import TRANSIENT_DB_ERRORS, record_dead_letter, run_with_db_retry
 from warehouse.celery import app
 
 logger = logging.getLogger(__name__)
@@ -295,13 +296,56 @@ def _run_handler(handler, site_id, gateway_id, message):
     return handler.handle(site, site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_mqtt_message(message_type, message_subtype, site_id, gateway_id, message):
-    """Process one queue-1 gateway packet (all types; see mqtt/registry.py).
+# Merged from the colleague's code (54313d5, mqtt_pipeline/mqtt_pipeline/tasks/*_task.py), 2026-11-25:
+# his acks_late + Celery retry, rebuilt on our RabbitMQ queues, with a dead letter after the last retry.
+MQTT_PACKET_TASK_OPTIONS = {
+    "bind": True,
+    "acks_late": True,              # acknowledge after the packet is processed, not on receipt
+    "reject_on_worker_lost": True,  # worker killed mid-task (restart, OOM): RabbitMQ delivers it again
+}
 
-    Origin: Ashu
+
+def _retry_or_dead_letter(task, error, message_type, site_id, gateway_id, message):
+    """Database still failing after the in-place retries: retry the task later (Celery retry,
+    MQTT_TASK_RETRY_DELAY_SECONDS apart, at most MQTT_TASK_RETRY_MAX times), then keep the packet
+    as a dead letter for replay_dead_letters instead of losing it.
+
+    Origin: Ashu + Daksh (idea: acks_late / retry of his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch(message_type, message_subtype, site_id, gateway_id, message)
+    max_retries = getattr(settings, "MQTT_TASK_RETRY_MAX", 3)
+    if task.request.retries < max_retries:
+        logger.warning(
+            "Database error on %s packet, task retry %s/%s: site=%s gateway=%s error=%s",
+            message_type, task.request.retries + 1, max_retries, site_id, gateway_id, error,
+        )
+        raise task.retry(
+            exc=error,
+            countdown=getattr(settings, "MQTT_TASK_RETRY_DELAY_SECONDS", 10),
+            max_retries=max_retries,
+        )
+    record_dead_letter(message_type, site_id, gateway_id, message, error, dedupe=False)
+    return f"failed: {type(error).__name__} after {max_retries} task retries (dead letter)"
+
+
+def _process_packet(task, message_type, message_subtype, site_id, gateway_id, message):
+    """Run one packet through _dispatch; on a database error retry the task or keep a dead letter.
+
+    Origin: Ashu + Daksh (idea: acks_late / retry of his mqtt_pipeline tasks, 54313d5)
+    """
+    try:
+        return _dispatch(message_type, message_subtype, site_id, gateway_id, message)
+    except TRANSIENT_DB_ERRORS as error:
+        return _retry_or_dead_letter(task, error, message_type, site_id, gateway_id, message)
+
+
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_mqtt_message(self, message_type, message_subtype, site_id, gateway_id, message):
+    """Process one queue-1 gateway packet (all types; see mqtt/registry.py). Acknowledged only
+    after processing; retried on a database error.
+
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
+    """
+    return _process_packet(self, message_type, message_subtype, site_id, gateway_id, message)
 
 
 @app.task(queue="queue1_processing")
@@ -398,10 +442,9 @@ def auto_spread_catch_ups():
     return catch_up_spread.auto_spread()
 
 
-@app.task(queue="queue2_processing")
 @_with_database_connection_cleanup
-def process_load_data_message(site_id, gateway_id, message):
-    """Celery task (queue 2): saves a LoadData packet and its roll-ups.
+def _save_load_data(site_id, gateway_id, message):
+    """Saves one LoadData packet and its roll-ups (our LoadData code, wareApp/load_data/).
 
     Origin: Ashu
     """
@@ -419,66 +462,79 @@ def process_load_data_message(site_id, gateway_id, message):
     )
 
 
+@app.task(queue="queue2_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_load_data_message(self, site_id, gateway_id, message):
+    """Celery task (queue 2): saves a LoadData packet and its roll-ups. Acknowledged only after
+    processing; retried on a database error, then kept as a dead letter. The LoadData logic is ours.
+
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
+    """
+    try:
+        return _save_load_data(site_id, gateway_id, message)
+    except TRANSIENT_DB_ERRORS as error:
+        return _retry_or_dead_letter(self, error, "LoadData", site_id, gateway_id, message)
+
+
 # Per-type tasks queued by listeners deployed before process_mqtt_message.
 # Kept registered so packets already waiting in RabbitMQ are still processed.
-@app.task(queue="queue1_processing")
-def process_supply_time_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_supply_time_message(self, site_id, gateway_id, message):
     """Celery task: processes a SupplyTime packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("SupplyTime", None, site_id, gateway_id, message)
+    return _process_packet(self, "SupplyTime", None, site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_load_runtime_recovery_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_load_runtime_recovery_message(self, site_id, gateway_id, message):
     """Celery task: processes a loadRuntime recovery packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("recovery", "loadRuntime", site_id, gateway_id, message)
+    return _process_packet(self, "recovery", "loadRuntime", site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_daily_consumption_recovery_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_daily_consumption_recovery_message(self, site_id, gateway_id, message):
     """Celery task: processes a dailyConsumption recovery packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("recovery", "dailyConsumption", site_id, gateway_id, message)
+    return _process_packet(self, "recovery", "dailyConsumption", site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_hourly_consumption_recovery_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_hourly_consumption_recovery_message(self, site_id, gateway_id, message):
     """Celery task: processes an hourlyConsumption recovery packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("recovery", "hourlyConsumption", site_id, gateway_id, message)
+    return _process_packet(self, "recovery", "hourlyConsumption", site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_fire_alarm_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_fire_alarm_message(self, site_id, gateway_id, message):
     """Celery task: processes a FIREALARM packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("FIREALARM", None, site_id, gateway_id, message)
+    return _process_packet(self, "FIREALARM", None, site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_consumption_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_consumption_message(self, site_id, gateway_id, message):
     """Celery task: processes one consumption packet (when batching is off).
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("consumption", None, site_id, gateway_id, message)
+    return _process_packet(self, "consumption", None, site_id, gateway_id, message)
 
 
-@app.task(queue="queue1_processing")
-def process_load_message(site_id, gateway_id, message):
+@app.task(queue="queue1_processing", **MQTT_PACKET_TASK_OPTIONS)
+def process_load_message(self, site_id, gateway_id, message):
     """Celery task: processes a load packet.
 
-    Origin: Ashu
+    Origin: Ashu + Daksh (acks_late / retry idea from his mqtt_pipeline tasks, 54313d5)
     """
-    return _dispatch("load", None, site_id, gateway_id, message)
+    return _process_packet(self, "load", None, site_id, gateway_id, message)
