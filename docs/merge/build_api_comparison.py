@@ -5,6 +5,11 @@ login rule, models it reads and writes, request fields, response keys, placehold
 plus the first line of its docstring when it has one. Decisions come from
 views_merge_decisions_20261121.csv (21 Nov views merge).
 
+"Main vs his" sheets: does his code have every API the main server has? Main is read from a
+read-only snapshot of its urls.py, views.py, recovery/ and models.py in .work/main_snapshot_20261125
+(copied over ssh with cat/tar; nothing on main changed). Main's default permission is
+[AllowAny, IsAuthenticated]; DRF needs all of them, so "default" on main means login required.
+
     virtualwarehouse/bin/python docs/merge/build_api_comparison.py
 """
 
@@ -25,6 +30,8 @@ THEIRS = ROOT / ".work" / "colleague_repo"
 FRONTEND = pathlib.Path.home() / "Aviconncorp-new-migrated-frontend" / "src"
 DECISIONS = pathlib.Path(__file__).with_name("views_merge_decisions_20261121.csv")
 OUT = pathlib.Path(__file__).with_name("API_COMPARISON_COLLEAGUE_VS_OURS.xlsx")
+MAIN = ROOT / ".work" / "main_snapshot_20261125"
+MAIN_DATE = "25 Nov 2026"
 
 FONT = "Arial"
 HEAD_FILL = PatternFill("solid", fgColor="14213D")
@@ -32,6 +39,10 @@ FILL = {
     "Only his": PatternFill("solid", fgColor="FFE6D3"),
     "Only ours": PatternFill("solid", fgColor="DDEBD8"),
     "Differs": PatternFill("solid", fgColor="FFF4C2"),
+    "Missing in his": PatternFill("solid", fgColor="F8D3D3"),
+    "Frontend would fail": PatternFill("solid", fgColor="F8D3D3"),
+    "Login rule changed": PatternFill("solid", fgColor="FFF4C2"),
+    "Same": PatternFill("solid", fgColor="DDEBD8"),
 }
 THIN = Side(style="thin", color="C8CCD2")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -85,6 +96,8 @@ def login_rule(cls):
         rule = "Login required (default)"
     elif "AllowAny" in perm:
         rule = "Open: no login (AllowAny)"
+    elif perm in ("[]", "()"):
+        rule = "Open: no permission check ([])"
     elif "IsAuthenticated" in perm:
         rule = "Login required"
     else:
@@ -222,6 +235,86 @@ def title(ws, text, sub=""):
         ws["A2"].font = Font(name=FONT, italic=True, size=10, color="4E5A6B")
 
 
+# ------------------------------------------------------------------ main server vs his
+
+def open_or_login(rule):
+    return "open" if (rule or "").startswith("Open") else ("login" if rule else "")
+
+
+def frontend_methods(fe, route):
+    """HTTP methods the frontend uses for a route: http.get(... 'route' ...) / http.post(...)."""
+    import re
+    stem = route.split("<")[0]
+    if not fe or not stem.strip("/"):
+        return ""
+    pat = re.compile(r"http\.(get|post|put|patch|delete)\s*(?:<[^(]*?>)?\s*\((?:(?!http\.)[^;])*?['\"`]" + re.escape(stem) + r"['\"`]", re.S)
+    return ", ".join(sorted({m.upper() for m in pat.findall(fe)}))
+
+
+def main_vs_his_rows(fe, called):
+    main_cls, his_cls, ours_cls = acc.classes(MAIN), acc.classes(THEIRS), acc.classes(ROOT)
+    main_models, his_models = known_models(MAIN), known_models(THEIRS)
+    main_r = {r: (v, a) for r, v, a in url_routes(MAIN)}
+    his_r = {r: (v, a) for r, v, a in url_routes(THEIRS)}
+    ours_r = {r for r, _, _ in url_routes(ROOT)}
+    rows = []
+    for route in sorted(set(main_r) | set(his_r), key=str.lower):
+        mv, ma = main_r.get(route, ("", ""))
+        hv, ha = his_r.get(route, ("", ""))
+        m = describe(main_cls[mv][0], main_models) if mv in main_cls else {}
+        h = describe(his_cls[hv][0], his_models) if hv in his_cls else {}
+        fem = frontend_methods(fe, route)
+        problems, effect = [], []
+        if mv and not hv:
+            status = "Missing in his"
+            effect.append("Frontend calls it: that screen would break" if called(route) else "Frontend does not call it")
+        elif hv and not mv:
+            status = "Only his"
+        else:
+            status = "Same"
+            hm = set((h.get("methods") or "").replace(" ", "").split(",")) - {""}
+            if "ViewSet" not in hv and fem and hm and not set(fem.replace(" ", "").split(",")) <= hm:
+                status = "Frontend would fail"
+                problems.append(f"frontend sends {fem}; his accepts {', '.join(sorted(hm))}")
+                effect.append("405 Method Not Allowed")
+            if m.get("methods") != h.get("methods") and "ViewSet" not in hv:
+                problems.append(f"methods {m.get('methods') or '-'} -> {h.get('methods') or '-'}")
+            ml, hl = open_or_login(m.get("login")), open_or_login(h.get("login"))
+            if ml and hl and ml != hl:
+                problems.append(f"login: {ml} on main -> {hl} in his")
+                if hl == "open":
+                    effect.append("anyone can call it without login")
+                elif called(route) and fem:
+                    effect.append("needs a token now: check the frontend sends one")
+                if status == "Same":
+                    status = "Login rule changed"
+            if mv != hv:
+                problems.append(f"view {mv} -> {hv}")
+        rows.append([route, status, called(route), fem,
+                     mv + (f" ({ma})" if ma else ""), m.get("methods", ""), m.get("login", ""),
+                     hv + (f" ({ha})" if ha else ""), his_cls[hv][1] if hv in his_cls else "", h.get("methods", ""), h.get("login", ""),
+                     "yes" if route in ours_r else "", "; ".join(problems), "; ".join(effect)])
+    return rows
+
+
+def add_main_vs_his(wb, fe, called):
+    rows = main_vs_his_rows(fe, called)
+    cols = ["Route", "Status", "Frontend calls it", "Frontend method",
+            "Main view", "Main methods", "Main login rule",
+            "His view", "His file", "His methods", "His login rule",
+            "In our code", "Difference", "Effect"]
+    widths = [34, 18, 9, 10, 32, 10, 24, 32, 26, 10, 24, 8, 50, 40]
+    sub = (f"Main server snapshot {MAIN_DATE} (read only) vs Daksh's code @ 54313d5. "
+           "Main default permission = login required.")
+    for name, keep in (("Main vs his", lambda r: True),
+                       ("Main vs his - problems", lambda r: r[1] != "Same")):
+        sel = [r for r in rows if keep(r)]
+        sh = wb.create_sheet(name)
+        title(sh, f"{name}: {len(sel)} routes", sub)
+        table(sh, 3, cols, sel, widths, fill_col=1)
+    return rows
+
+
 # ------------------------------------------------------------------ build
 
 def build():
@@ -299,6 +392,8 @@ def build():
         ("What it does", "Generated from the code (models read / saved, fields, keys, placeholder, forwarding) plus the view's docstring. A response built in a helper or serializer shows no keys: check by hand."),
         ("Frontend", "yes = the route text appears in ~/Aviconncorp-new-migrated-frontend/src."),
         ("Decision", "From the 21 Nov views merge (views_merge_decisions_20261121.csv)."),
+        ("Main vs his", f"Every route on the main server ({MAIN_DATE}, read-only snapshot) next to his code: missing routes, methods the frontend sends that his view does not accept, and login rule changes."),
+        ("Main vs his - problems", "Only the rows of Main vs his that are not the same."),
         ("Rebuild", "virtualwarehouse/bin/python docs/merge/build_api_comparison.py"),
     ]
     for i, (k, v) in enumerate(info, 4):
@@ -346,9 +441,26 @@ def build():
         title(sheet, f"{name}: {len(sel)} routes", "His = Daksh's code @ 54313d5; ours = full-optimization-v2.")
         table(sheet, 3, cols, sel, widths, fill_col=1)
 
+    mrows = add_main_vs_his(wb, fe, called)
+    mrng = f"'Main vs his'!$B$4:$B${3 + len(mrows)}"
+    r2 = r1 + 5
+    ws.cell(row=r2, column=1, value="Main server vs his (formulas)").font = Font(name=FONT, bold=True, size=12)
+    for i, (k, f) in enumerate((
+            ("Routes on main", f'=COUNTA({mrng})-COUNTIF({mrng},"Only his")'),
+            ("Same on main and his", f'=COUNTIF({mrng},"Same")'),
+            ("Missing in his", f'=COUNTIF({mrng},"Missing in his")'),
+            ("Frontend would fail (wrong method)", f'=COUNTIF({mrng},"Frontend would fail")'),
+            ("Login rule changed", f'=COUNTIF({mrng},"Login rule changed")'),
+            ("Only his (not on main)", f'=COUNTIF({mrng},"Only his")')), r2 + 1):
+        ws.cell(row=i, column=1, value=k).font = Font(name=FONT)
+        c = ws.cell(row=i, column=2, value=f)
+        c.font = Font(name=FONT, bold=True)
+        c.alignment = Alignment(horizontal="left")
+
     wb.save(OUT)
     from collections import Counter
     print(f"Wrote {OUT}: {n} routes", dict(Counter(r[1] for r in rows)))
+    print("Main vs his:", dict(Counter(r[1] for r in mrows)))
 
 
 if __name__ == "__main__":

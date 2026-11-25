@@ -17,6 +17,7 @@ For his code compared with **our branch**, see [COLLEAGUE_CODE_REVIEW.md](COLLEA
 | [`colleague_vs_main_apis_20261119.csv`](colleague_vs_main_apis_20261119.csv) | every API view: verdict, request fields and response keys on each side, whether the frontend calls it |
 | [`overlap_colleague_vs_main_20261119.csv`](overlap_colleague_vs_main_20261119.csv) | every function, class, setting and URL route |
 | [`CODE_INVENTORY.xlsx`](CODE_INVENTORY.xlsx) | sheets "Colleague vs main (APIs)" and "Colleague vs main (functions)" |
+| [`API_COMPARISON_COLLEAGUE_VS_OURS.xlsx`](API_COMPARISON_COLLEAGUE_VS_OURS.xlsx) | sheets "Main vs his" and "Main vs his - problems" (25 Nov, main snapshot): every active route on main next to his code, with missing routes, HTTP method the frontend sends vs his, and login rule. 109 routes on main (commented-out routes not counted), 104 in his code |
 
 ## In short
 
