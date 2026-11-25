@@ -11,7 +11,7 @@
 **Every API, his vs ours, what each does (21 Nov):** [`API_COMPARISON_COLLEAGUE_VS_OURS.xlsx`](API_COMPARISON_COLLEAGUE_VS_OURS.xlsx) (built by `build_api_comparison.py`).
 **Every API on main's server vs his code (25 Nov):** sheets "Main vs his" and "Main vs his - problems" in the same workbook: 109 routes on main, 104 in his code; 5 missing (recovery upload, gateway-status, 2 monitoring lists, hourly Excel V1), 3 the frontend would call with the wrong method (POST vs his GET), 21 with a different login rule.
 **Views merge, step 1 (21 Nov):** one decision per API view in [`views_merge_decisions_20261121.csv`](views_merge_decisions_20261121.csv) (also sheet "Views merge" in the analysis workbook): 4 merged from his code, 3 already the same, 123 kept ours.
-**Detailed analysis, his vs ours, with examples (21 Nov):** [`COLLEAGUE_CODE_ANALYSIS.xlsx`](COLLEAGUE_CODE_ANALYSIS.xlsx) (built by `build_colleague_analysis.py`).
+**Detailed analysis, his vs ours, with examples (21 Nov, re-checked 25 Nov):** [`COLLEAGUE_CODE_ANALYSIS.xlsx`](COLLEAGUE_CODE_ANALYSIS.xlsx) (built by `build_colleague_analysis.py`): 38 points, ours better 25, his 8, both 4, neither 1. New on 25 Nov: our `process_mqtt_message` acknowledges early, so a killed worker loses that packet (C32, port his acks_late).
 **His code vs the code on main's server** (APIs the frontend calls, DG fuel, LoadData, DB): [COLLEAGUE_VS_MAIN.md](COLLEAGUE_VS_MAIN.md).
 
 ## What his code is

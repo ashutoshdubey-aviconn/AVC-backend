@@ -25,6 +25,7 @@ import re
 import subprocess
 import sys
 from collections import Counter, defaultdict
+from datetime import date
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -35,7 +36,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "merge"))
 import overlap_check as oc  # noqa: E402
 
-UPDATED = "2026-11-19"
+UPDATED = date.today().isoformat()
 LEGACY_REF = "origin/main"
 TAG = "fov2-pre-merge-20261119"
 

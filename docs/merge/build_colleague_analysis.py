@@ -23,13 +23,14 @@ FILLS = {
     "His": PatternFill("solid", fgColor="FFE6D3"),
     "Ours": PatternFill("solid", fgColor="DDEBD8"),
     "Both": PatternFill("solid", fgColor="FFF4C2"),
+    "Neither": PatternFill("solid", fgColor="F8D3D3"),
 }
 THIN = Side(style="thin", color="C8CCD2")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 WRAP = Alignment(wrap_text=True, vertical="top")
 
 HIS = "Daksh (colleague) @ 54313d5"
-OURS = "Ours: full-optimization-v2 (latest, 21 Nov 2026)"
+OURS = "Ours: full-optimization-v2 (latest, re-checked 25 Nov 2026)"
 
 # ---------------------------------------------------------------- data
 
@@ -37,17 +38,21 @@ STACK = [
     # area, his, ours, comment
     ("Framework", "Django 5.2.1, DRF 3.16, Celery 5.5.2, psycopg2", "Django, DRF, Celery (same family)", "Same base stack."),
     ("Message broker for Celery", "Redis (also used as cache and MQTT buffer)", "RabbitMQ (durable queues) for Celery and MQTT batches", "RabbitMQ keeps messages on disk until acknowledged."),
-    ("Cache", "django-redis 7.0 + redis 8.1", "Django default cache (main's server has Redis CACHES, to be ported)", "His is better here; port Redis cache."),
+    ("Cache", "django-redis 7.0 + redis 8.1", "django-redis when REDIS_URL is set in .env; otherwise per-process LocMemCache (200,000 entries)", "Same ability since 25 Nov re-check; set REDIS_URL on the servers so the cache is shared."),
     ("MQTT intake", "Standalone bridge.py: paho-mqtt on_message -> Redis list 'asem:mqtt:incoming'", "Celery listener tasks mqtt_client1 / mqtt_client2 (loop_forever) -> processing queues", "His listener is outside Celery; ours occupies a worker slot."),
     ("Routing", "dispatcher.py (Celery Beat every 2 s, up to 1,000 msgs/tick) -> 6 queues", "Broker subscriptions per queue (routing.py): queue1 business, queue2 LoadData only", "Ours filters at the broker, his after receiving everything (topic '#')."),
     ("Queues / workers", "mqtt_consumption x4, mqtt_load_data x4, mqtt_load_params x2, mqtt_supply_time x2, mqtt_recovery x2, mqtt_fire_alarm x1, mqtt_flush, mqtt_dispatcher", "root-mqtt-queue1/2 listeners, mqtt-processing-queue1/2, mqtt-notifications, celerybeat", ""),
     ("DB writes", "Redis row buffers + bulk_create every 5-30 s; hourly/daily totals in a Redis hash, last write wins, UPDATE per key", "Consumption: batched per aisle in one transaction (bulk_create / bulk_update); LoadData raw rows one INSERT each; rollups bulk_create", "Bulk LoadData is his good idea; ours is safer for consumption."),
-    ("Code layout", "wareApp/models/ (8), views/ (7 *_views.py), services/ (alarm, email, fuel, baseline), tasks/ package, constants.py, mqtt_pipeline/", "models.py, views/ (21 modules), mqtt/ (39), load_data/, dg_fuel/, recovery/, management/", "Both modular. His models/ and tasks/ packages would hide our models.py and tasks.py."),
-    ("Constants", "Typed IntEnums (NewAlarmType, priorities, SiteType)", "Integer constants and choices", "His is cleaner."),
+    ("Code layout", "wareApp/models/ (8), views/ (7 *_views.py), services/ (alarm, email, fuel, baseline), tasks/ package, constants.py, mqtt_pipeline/", "models/ (10 area modules since 25 Nov), views/ (21 modules), mqtt/ (39), load_data/, dg_fuel/, recovery/, management/", "Both modular. Both have a models/ package: his __init__.py, dg_fuel.py, load.py have our file names. His tasks/ package would hide our tasks.py."),
+    ("Constants", "Typed IntEnums (8: NewAlarmType, priorities, SiteType ...)", "Integer constants; 2 TextChoices", "His is cleaner."),
+    ("Type hints", "70 functions with return type hints", "32 functions with return type hints", "His is better."),
+    ("Celery acknowledgement", "acks_late on 19 tasks (but the Redis list in front loses packets anyway)", "Consumption: manual ack after commit; other MQTT types: process_mqtt_message with default early ack; prefetch 1", "Ours: add acks_late to process_mqtt_message (C32)."),
+    ("DB connections", "CONN_MAX_AGE 60 in PROD, 0 elsewhere; no health checks", "CONN_MAX_AGE 60 and CONN_HEALTH_CHECKS = True everywhere", "Ours."),
+    ("Logging", "StreamHandler only (console)", "3 RotatingFileHandlers + console", "His fits Docker; ours keeps logs on the server."),
     ("Alarms", "Two tables: NewAlarmsNotifications + legacy AlarmNotifications; AlarmService; NotificationPolicy; digest", "One table AlarmNotifications (one row per issue per day, occurrences), alarm_policy per site, alarm closer every 5 min", ""),
     ("Deployment", "Dockerfile, docker-compose (redis, web, nginx), Kubernetes manifests in bridge/", "systemd services on the servers, deploy docs and backups", "His is more portable for developers."),
     ("Migrations", "0001 (same as main) then his own 0002-0032", "Follows main's history (0059-0115), main's own 0073-0076 to reconcile", "His can't run on main's DB."),
-    ("Tests", "44 (test_alarms 34, test_models 5, test_services 5); not run here", "539 tests, run before every deploy", ""),
+    ("Tests", "44 (test_alarms 34, test_models 5, test_services 5); not run here", "550 Django tests + 40 unit tests, run before every deploy", ""),
     ("Docs", "ARCHITECTURE.md, Docker guides, optimization plans, pipeline README", "84 files in docs/, CHANGELOG, trackers, catalogues", ""),
 ]
 
@@ -192,17 +197,17 @@ COMPARE = [
      "django-redis; site / aisle / baseline cached (10 min / 1 h); hourly 'exists' flags.",
      "mqtt_pipeline/mqtt_pipeline/cache_layer.py; config.py CACHE_TTL_*",
      "CACHE_TTL_SITE = 600\nCACHE_TTL_BASELINE = 3600",
-     "Site cache with the default Django cache; main's server already has Redis CACHES.",
-     "wareApp/mqtt/services/site_cache.py",
-     "",
-     "His", "A shared Redis cache works across all worker processes.",
-     "Low", "Port: Redis CACHES setting (as on main's server)."),
+     "Re-checked 25 Nov: django-redis when REDIS_URL is set in .env, else per-process LocMemCache (200,000 entries); site cache, cooldowns and duplicate checks use it.",
+     "warehouse/settings.py:255-279; wareApp/mqtt/services/site_cache.py",
+     "REDIS_URL = config(\"REDIS_URL\", default=\"\")\nif REDIS_URL:\n    CACHES = {\"default\": {\"BACKEND\": \"django_redis.cache.RedisCache\", ...}}",
+     "Both", "Both can use a shared Redis cache now. Ours falls back to a per-process cache when REDIS_URL is not set.",
+     "Low", "Set REDIS_URL on test and main (check what test uses today)."),
     ("C17", "Alarms", "Alarm table design",
      "Two tables: NewAlarmsNotifications (power) and legacy AlarmNotifications (consumption).",
      "wareApp/models/alerts.py:8, :42",
      "class AlarmNotifications(models.Model)\nclass NewAlarmsNotifications(models.Model)",
      "One table for every alarm since Oct 2026.",
-     "wareApp/models.py:551",
+     "wareApp/models/alarms.py:9",
      "One row per issue per day: a repeat updates last_seen / occurrences",
      "Ours", "Two tables caused our old 'tile shows 0 alarms' bug; counts differ between screens.",
      "Medium", "Keep ours."),
@@ -254,7 +259,7 @@ COMPARE = [
      "wareApp/constants.py:10",
      "class NewAlarmType(IntEnum):\n    HIGH_VOLTAGE = 0\n    ...\n    FUEL_DRAIN = 6",
      "Integer constants / choices.",
-     "wareApp/models.py",
+     "wareApp/models/alarms.py",
      "alarm_type=16",
      "His", "Self-documenting, fewer magic numbers.",
      "Low", "Optional: add Enums for our alarm types 0-17."),
@@ -316,7 +321,7 @@ COMPARE = [
      "44 tests; never run here; no record of a run.",
      "wareApp/tests/",
      "test_alarms.py (34)",
-     "539 tests, run before each deploy; live on test, partly on main since 9 Oct with measured CPU.",
+     "550 Django tests + 40 unit tests, run before each deploy; live on test, partly on main since 9 Oct with measured CPU.",
      "wareApp/tests/",
      "",
      "Ours", "His code has never been proven on real traffic.",
@@ -325,11 +330,74 @@ COMPARE = [
      "One large commit for the whole project; 72 .pyc / __pycache__ files committed; celerybeat-schedule.dat committed.",
      "git log; mqtt_pipeline/mqtt_pipeline/celerybeat-schedule.dat",
      "6ea3c2f 'optimized backend code' (159k lines)",
-     "189 commits with messages; CHANGELOG row per change.",
+     "199 commits with messages; CHANGELOG row per change.",
      "docs/CHANGELOG.md",
      "",
      "Ours", "No way to see what changed and why.",
      "Low", "-"),
+    ("C32", "MQTT pipeline", "Packet lost when a worker is killed mid-task",
+     "acks_late=True on 19 Celery tasks: a task killed mid-run is delivered again (though his Redis list in front already loses packets, C02-C04).",
+     "mqtt_pipeline/mqtt_pipeline/tasks/*_task.py, dispatcher.py (acks_late=True)",
+     "@shared_task(acks_late=True, ...)",
+     "Consumption is safe (manual ack after commit). Every other MQTT type (LoadData, SupplyTime, fire alarm, recovery) goes through process_mqtt_message with Celery's default early ack.",
+     "wareApp/tasks.py:240; wareApp/mqtt/consumers.py:56; warehouse/settings.py:286",
+     "@app.task(queue=\"queue1_processing\")\ndef process_mqtt_message(...):",
+     "His", "With early ack, a worker killed in the middle of a task (restart, OOM) loses that packet; no dead letter is written.",
+     "Low", "Add acks_late=True and reject_on_worker_lost=True to process_mqtt_message; the Redis duplicate check (idempotency.py) already stops a re-delivered packet from counting twice."),
+    ("C33", "Code quality", "Type hints",
+     "70 functions with return type hints (services, pipeline).",
+     "wareApp/services/; mqtt_pipeline/",
+     "def raise_fuel_drain_alarm(cls, site, ...) -> ...",
+     "32 functions with return type hints.",
+     "wareApp/load_data/, wareApp/mqtt/",
+     "def save_raw_load_reading(site, aisle_group, reading: LoadReading):",
+     "His", "Easier to read and check.",
+     "Low", "Add hints in new and changed code."),
+    ("C34", "Database", "Connections",
+     "CONN_MAX_AGE 60 only in PROD (0 elsewhere: new connection per request); no CONN_HEALTH_CHECKS.",
+     "warehouse/settings.py",
+     "'CONN_MAX_AGE': 60 if env == \"PROD\" else 0",
+     "CONN_MAX_AGE 60 and CONN_HEALTH_CHECKS = True on every profile; dropped connections retried in place (run_with_db_retry).",
+     "warehouse/settings.py; wareApp/mqtt/services/failures.py",
+     "\"CONN_HEALTH_CHECKS\": True",
+     "Ours", "A stale connection is checked before use, so workers survive a DB restart.",
+     "Low", "Keep ours."),
+    ("C35", "Database", "Query loading and locking",
+     "10 select_related, 0 select_for_update.",
+     "wareApp/",
+     "",
+     "34 select_related, 10 select_for_update, 13 bulk_update.",
+     "wareApp/",
+     "AisleGroup.objects.select_for_update()",
+     "Ours", "Fewer queries per request, and parallel workers can't both change the same aisle row.",
+     "Medium", "Keep ours."),
+    ("C36", "Operations", "Logging",
+     "Console only (StreamHandler).",
+     "warehouse/settings.py LOGGING",
+     "",
+     "3 rotating log files plus console; readable log lines (log_format.py).",
+     "warehouse/settings.py LOGGING; wareApp/mqtt/services/log_format.py",
+     "RotatingFileHandler",
+     "Both", "Console logs suit Docker (collected by the container runtime); files suit our systemd servers.",
+     "Low", "Keep ours on the servers; log to console when run in Docker."),
+    ("C37", "Code layout", "models/ package on both sides",
+     "wareApp/models/: __init__, alerts, dg_fuel, fire, load, metering, site, system, user.",
+     "wareApp/models/",
+     "",
+     "Since 25 Nov also wareApp/models/: __init__, cleaning, users, setup, consumption, load, dg_fuel, alarms, equipment, sync, monitoring.",
+     "wareApp/models/",
+     "from wareApp.models import Site  # unchanged",
+     "Both", "Same layout now. His __init__.py, dg_fuel.py and load.py have the same names as ours: copying his folder in would replace them.",
+     "Medium", "Port model changes by hand into our module plus a migration of ours; never copy his files."),
+    ("C38", "Gaps", "Missing on both sides",
+     "No unique constraint on hourly readings, no health-check endpoint, no pagination on list APIs.",
+     "-",
+     "",
+     "Same three gaps. Ours avoids duplicate hours by locking the aisle rows, not by a constraint.",
+     "-",
+     "",
+     "Neither", "A unique constraint would stop duplicate hours even if a code path skips the lock; a health endpoint lets monitoring check the app.",
+     "Low", "Later: health endpoint; unique constraint only after a duplicate check on main's data (report_reading_duplicates)."),
 ]
 
 PORT = [
@@ -340,10 +408,12 @@ PORT = [
     ("Daily digest e-mail", "alarm_service.py:609, email_service.py:151 / :255, tasks/alarm_tasks.py:96", "mqtt/services/notifications.py + Celery beat", "Digest of non-urgent alarms once a day to the software team", "Notification priority", "Medium", "Medium"),
     ("Notification priority", "email_service.py:31-105 NotificationPolicy", "mqtt/services/alarm_policy.py, AlarmSetting", "Priority per alarm type; immediate e-mail only above a level; rest to digest; emergencies always", "Team agrees priorities", "Medium", "Medium"),
     ("Mains Higher Consumption alarm", "alarm_service.py:294", "mqtt/services/alarms.py (type 5)", "Raise into the single table with our repeat rule; threshold in AlarmSetting", "Rule / threshold agreed", "Small", "Medium"),
-    ("Redis cache", "settings.py CACHES (django-redis)", "warehouse/settings.py (as on main's server)", "CACHES from .env; site cache / cooldown / idempotency then shared", "Redis on test", "Small", "High"),
+    ("acks_late for MQTT tasks (new 25 Nov)", "mqtt_pipeline/tasks/*_task.py acks_late=True", "wareApp/tasks.py process_mqtt_message", "acks_late=True + reject_on_worker_lost=True; idempotency key already stops double counting; test a worker kill", "-", "Small", "High"),
+    ("Redis cache on the servers", "settings.py CACHES (django-redis)", "warehouse/settings.py (done in code: REDIS_URL)", "Set REDIS_URL in .env on test and main; then site cache / cooldown / idempotency are shared", "Redis on test", "Small", "High"),
     ("Bulk RawLoadData writes (idea)", "buffer.py:151 + flush_task.py", "wareApp/load_data/raw.py", "Batch queue on RabbitMQ like consumption_batch, one transaction, dead letters; no drop limits", "-", "Medium", "Medium"),
     ("Listener outside Celery (idea)", "bridge.py", "wareApp/mqtt/consumers.py", "Run the listener as its own systemd process publishing to RabbitMQ; keep clean_session=False", "Load test", "Medium", "Low"),
     ("Typed Enums", "constants.py", "wareApp/constants.py (new)", "IntEnum for alarm types 0-17 and site types; use in new code", "-", "Small", "Low"),
+    ("Type hints", "services/, mqtt_pipeline/", "new and changed code", "Add return / argument hints when a function is touched", "-", "Small", "Low"),
     ("Docker for local dev", "Dockerfile, docker-compose.yml", "repo root", "Use env_file, no inline secrets; Postgres + RabbitMQ + Redis services", "-", "Small", "Low"),
     ("His alarm tests", "tests/test_alarms.py (34)", "wareApp/tests/", "Port with each feature above", "Each feature", "Small", "Medium"),
 ]
@@ -354,7 +424,7 @@ DO_NOT = [
     ("forgot/ reset/ login/", "C26", "Account takeover with OTP 1234; login has no rate limit and re-activates deactivated users."),
     ("Placeholder and simplified views", "C24, C25", "Excel downloads and 40-42 frontend APIs break."),
     ("Migrations 0002-0032", "C15", "Don't fit main's DB; two leaf nodes."),
-    ("models/ and tasks/ packages", "-", "Would hide our models.py and tasks.py without any error."),
+    ("His models/ files and tasks/ package", "C37", "Our models are a models/ package too (25 Nov): his __init__.py, dg_fuel.py and load.py would replace ours. His tasks/ package would hide our tasks.py without any error."),
     ("Second alarm table", "C17", "Counts differ between screens."),
     ("settings.py, docker-compose.yml as they are", "C27, C28", "Credentials in plain text; DEBUG on in PROD."),
 ]
@@ -419,9 +489,10 @@ def build():
     # Start here
     ws = wb.active
     ws.title = "Start here"
-    title(ws, "Daksh's code vs ours: detailed analysis", "Read-only review, 21 Nov 2026. Kept in our repo only; nothing is uploaded to the colleague's repo.")
+    title(ws, "Daksh's code vs ours: detailed analysis", "Read-only review, 21 Nov 2026, re-checked 25 Nov 2026. Kept in our repo only; nothing is uploaded to the colleague's repo.")
     info = [
-        ("His repo", "github.com/Daksh007-batman/New-asem-merger, branches main = Ashutosh = 54313d5 (18 Nov 2026); no newer commits on 21 Nov"),
+        ("His repo", "github.com/Daksh007-batman/New-asem-merger, branches main = Ashutosh = 54313d5 (18 Nov 2026); no newer commits on 21 Nov or 25 Nov (git ls-remote)"),
+        ("Re-check 25 Nov", "Every point re-checked against both codebases. Changed: C16 (ours now has Redis CACHES via REDIS_URL), C17 / C23 refs (models/ package), C30 / C31 numbers, models/ row in Do not use. New points: C32-C38 (acks_late, type hints, DB connections, query loading, logging, models/ layout, gaps on both sides)."),
         ("Our code", OURS),
         ("How reviewed", "Cloned into .work/colleague_repo and read. His code was not run (no manage.py check, no tests). Nothing pushed or changed there."),
         ("Secrets", "His repo contains live credentials. Their values are deliberately not copied into this workbook."),
@@ -438,7 +509,7 @@ def build():
     ws.cell(row=r, column=1, value="Sheets").font = Font(name=FONT, bold=True, size=12)
     sheets = [
         ("Tech stack", "What each side uses, area by area."),
-        ("Comparison", "31 points: his approach and ours, file:line references, code examples, which is better and why, risk, action."),
+        ("Comparison", f"{len(COMPARE)} points: his approach and ours, file:line references, code examples, which is better and why, risk, action."),
         ("Pipeline flow", "The MQTT path step by step, his vs ours."),
         ("Port list", "His good parts to bring into our code, with where and how."),
         ("Do not use", "Parts of his code that must not be deployed, and why."),
@@ -457,6 +528,7 @@ def build():
         ("Ours better", f'=COUNTIF({rng_b},"Ours")'),
         ("His better", f'=COUNTIF({rng_b},"His")'),
         ("Both have value", f'=COUNTIF({rng_b},"Both")'),
+        ("Missing on both sides", f'=COUNTIF({rng_b},"Neither")'),
         ("High risk if his used as-is", f'=COUNTIF({rng_r},"High")'),
         ("Items to port", f"=COUNTA('Port list'!$A$4:$A${3 + len(PORT)})"),
     ]
@@ -469,8 +541,8 @@ def build():
     r = r + len(summary) + 2
     ws.cell(row=r, column=1, value="Verdict").font = Font(name=FONT, bold=True, size=12)
     verdict = ("Keep our code as the base and port his good parts onto it: alarm acknowledge, live feed, "
-               "dashboard summary, daily digest, notification priority, Mains Higher Consumption, Redis cache, "
-               "typed Enums, Docker. Take his bulk LoadData writes as an idea and build it on RabbitMQ with dead "
+               "dashboard summary, daily digest, notification priority, Mains Higher Consumption, acks_late on "
+               "the MQTT task, Redis cache on the servers, typed Enums, type hints, Docker. Take his bulk LoadData writes as an idea and build it on RabbitMQ with dead "
                "letters. Do not deploy his pipeline, consumption handler, auth views, placeholder views, "
                "migrations or settings as they are.")
     c = ws.cell(row=r + 1, column=1, value=verdict)
@@ -481,7 +553,7 @@ def build():
 
     r = r + 3
     ws.cell(row=r, column=1, value="Colours in Comparison").font = Font(name=FONT, bold=True)
-    for i, (k, label) in enumerate([("Ours", "Ours is better"), ("His", "His is better"), ("Both", "Both have value")], r + 1):
+    for i, (k, label) in enumerate([("Ours", "Ours is better"), ("His", "His is better"), ("Both", "Both have value"), ("Neither", "Missing on both sides")], r + 1):
         c = ws.cell(row=i, column=1, value=label)
         c.font = Font(name=FONT)
         c.fill = FILLS[k]
@@ -495,7 +567,7 @@ def build():
 
     # Comparison
     ws = wb.create_sheet("Comparison")
-    title(ws, "Point-by-point comparison with examples", "File references: his are relative to his repo, ours to our repo. Line numbers as of 21 Nov 2026.")
+    title(ws, "Point-by-point comparison with examples", "File references: his are relative to his repo, ours to our repo. Line numbers as of 21 Nov 2026, our references re-checked 25 Nov 2026.")
     headers = ["ID", "Area", "Topic", "His approach", "His file:line", "His code example",
                "Our approach", "Our file:line", "Our code example", "Better", "Why", "Risk if his used as-is", "Action"]
     end = write_table(ws, 3, headers, COMPARE, [6, 14, 26, 48, 32, 46, 44, 32, 44, 9, 44, 12, 38])
@@ -507,7 +579,7 @@ def build():
                 ws.cell(row=r, column=c).fill = fill
         for c in (6, 9):
             ws.cell(row=r, column=c).font = Font(name="Courier New", size=9)
-    dv = DataValidation(type="list", formula1='"His,Ours,Both"', allow_blank=True)
+    dv = DataValidation(type="list", formula1='"His,Ours,Both,Neither"', allow_blank=True)
     ws.add_data_validation(dv)
     dv.add(f"J4:J{end}")
     dv2 = DataValidation(type="list", formula1='"High,Medium,Low"', allow_blank=True)
