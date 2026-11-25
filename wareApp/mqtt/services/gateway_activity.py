@@ -14,6 +14,8 @@ import threading
 import time
 from datetime import datetime
 
+from django.db import close_old_connections, connection
+
 from wareApp.models import HomeGatewayId, HomeGatewayStatus, Site, SiteConsumptionPing
 
 logger = logging.getLogger(__name__)
@@ -44,8 +46,28 @@ def seen(site_id, gateway_id, message_type, now=None):
         flush()
 
 
+def _reset_connection(broken):
+    """Drops the listener's database connection when it is broken (or, before a flush, past
+    CONN_MAX_AGE), so the next query reconnects. Never inside a transaction (tests, callers that
+    already opened one): there the connection belongs to the caller.
+
+    Origin: Ashu
+    """
+    if connection.in_atomic_block:
+        return
+    if broken:
+        connection.close()
+    else:
+        close_old_connections()
+
+
 def flush():
     """Write the collected times; returns the number of gateways written.
+
+    Runs in the listener process, which never goes through Django's request / task cleanup:
+    a connection broken by a database restart is dropped before each flush and after a failed
+    one, so the next flush reconnects (found in the 25 Nov outage test: without it every flush
+    failed with "connection already closed" until the listener was restarted).
 
     Origin: Ashu
     """
@@ -56,6 +78,7 @@ def flush():
         _last_flush = time.monotonic()
     if not pending:
         return 0
+    _reset_connection(broken=False)
     try:
         known = dict(
             HomeGatewayId.objects.filter(hgw_id__in=list(pending)).values_list("hgw_id", "id")
@@ -100,6 +123,7 @@ def flush():
     except Exception:
         # Monitoring only: never break packet intake. Keep the times for the next try.
         logger.exception("Gateway activity flush failed (%s gateways)", len(pending))
+        _reset_connection(broken=True)
         with _lock:
             for gateway_id, entry in pending.items():
                 _pending.setdefault(gateway_id, entry)

@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta
 from unittest import mock
 
+from django.db import InterfaceError
 from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
@@ -117,6 +118,31 @@ class GatewayActivityTests(TestCase):
         status = HomeGatewayStatus.objects.get()
         self.assertEqual((status.last_data_at, status.status), (NOW, True))
         self.assertEqual(SiteConsumptionPing.objects.get().consumption_ping_time, NOW)
+
+    def test_failed_flush_drops_the_connection_and_keeps_the_times(self):
+        # 25 Nov outage test: after a database restart the listener's connection stayed closed
+        # and every flush failed until the listener was restarted.
+        gateway_activity.seen(self.site.id, GW, "load", now=NOW)
+        with mock.patch.object(gateway_activity, "_reset_connection") as reset, \
+                mock.patch.object(gateway_activity.HomeGatewayId.objects, "filter",
+                                  side_effect=InterfaceError("connection already closed")):
+            self.assertEqual(gateway_activity.flush(), 0)
+        self.assertEqual([c.kwargs["broken"] for c in reset.call_args_list], [False, True])
+        self.assertIn(GW, gateway_activity._pending)  # kept for the next flush
+        self.assertEqual(gateway_activity.flush(), 1)  # next flush (database back) writes it
+        self.assertEqual(HomeGatewayStatus.objects.get().last_data_at, NOW)
+
+    def test_reset_connection_closes_a_broken_connection_outside_a_transaction(self):
+        with mock.patch.object(gateway_activity, "connection") as conn, \
+                mock.patch.object(gateway_activity, "close_old_connections") as cleanup:
+            conn.in_atomic_block = False
+            gateway_activity._reset_connection(broken=True)
+            gateway_activity._reset_connection(broken=False)
+            conn.close.assert_called_once()
+            cleanup.assert_called_once()
+            conn.in_atomic_block = True
+            gateway_activity._reset_connection(broken=True)
+            conn.close.assert_called_once()  # not again inside a transaction
 
 
 @mock.patch.object(gateway_health, "notify")
